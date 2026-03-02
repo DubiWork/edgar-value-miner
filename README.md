@@ -26,10 +26,10 @@ Traditional financial research tools are either:
 
 **EDGAR Value Miner** is different:
 
-✨ **Beautiful** - Clean, modern UI that's a joy to use  
-🎯 **Focused** - Built for value investors, not day traders  
-🆓 **Free data** - Powered by official SEC EDGAR filings  
-📱 **Responsive** - Works beautifully on desktop and mobile  
+✨ **Beautiful** - Clean, modern UI that's a joy to use
+🎯 **Focused** - Built for value investors, not day traders
+🆓 **Free data** - Powered by official SEC EDGAR filings
+📱 **Responsive** - Works beautifully on desktop and mobile
 
 ---
 
@@ -38,7 +38,7 @@ Traditional financial research tools are either:
 ### 📈 Visual Financial Analysis
 Beautiful charts showing 5+ years of company fundamentals:
 - Revenue & growth trends
-- Free Cash Flow analysis  
+- Free Cash Flow analysis
 - Profit margins (Gross, Operating, Net)
 - Key financial ratios
 
