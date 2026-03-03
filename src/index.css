@@ -1,32 +1,98 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* Custom theme configuration */
+@theme {
+  /* Brand colors */
+  --color-brand-50: #f0f9ff;
+  --color-brand-100: #e0f2fe;
+  --color-brand-200: #bae6fd;
+  --color-brand-300: #7dd3fc;
+  --color-brand-400: #38bdf8;
+  --color-brand-500: #0ea5e9;
+  --color-brand-600: #0284c7;
+  --color-brand-700: #0369a1;
+  --color-brand-800: #075985;
+  --color-brand-900: #0c4a6e;
+
+  /* Custom animations */
+  --animate-shimmer: shimmer 2s infinite linear;
+}
 
 /* Custom base styles */
 @layer base {
   body {
-    @apply bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100;
-    @apply transition-colors duration-200;
+    background-color: var(--color-white);
+    color: var(--color-gray-900);
+    transition-property: color, background-color;
+    transition-duration: 200ms;
+  }
+
+  .dark body {
+    background-color: var(--color-gray-900);
+    color: var(--color-gray-100);
   }
 }
 
 /* Custom component classes */
 @layer components {
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6;
-    @apply border border-gray-100 dark:border-gray-700;
+    background-color: var(--color-white);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+    padding: var(--spacing-6);
+    border-width: 1px;
+    border-color: var(--color-gray-100);
+  }
+
+  .dark .card {
+    background-color: var(--color-gray-800);
+    border-color: var(--color-gray-700);
   }
 
   .btn-primary {
-    @apply bg-brand-600 hover:bg-brand-700 text-white;
-    @apply px-4 py-2 rounded-lg font-medium;
-    @apply transition-colors duration-200;
+    background-color: var(--color-brand-600);
+    color: var(--color-white);
+    padding: var(--spacing-2) var(--spacing-4);
+    border-radius: var(--radius-lg);
+    font-weight: 500;
+    transition-property: background-color;
+    transition-duration: 200ms;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--color-brand-700);
   }
 
   .btn-secondary {
-    @apply bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700;
-    @apply text-gray-900 dark:text-gray-100;
-    @apply px-4 py-2 rounded-lg font-medium;
-    @apply transition-colors duration-200;
+    background-color: var(--color-gray-100);
+    color: var(--color-gray-900);
+    padding: var(--spacing-2) var(--spacing-4);
+    border-radius: var(--radius-lg);
+    font-weight: 500;
+    transition-property: background-color;
+    transition-duration: 200ms;
+  }
+
+  .btn-secondary:hover {
+    background-color: var(--color-gray-200);
+  }
+
+  .dark .btn-secondary {
+    background-color: var(--color-gray-800);
+    color: var(--color-gray-100);
+  }
+
+  .dark .btn-secondary:hover {
+    background-color: var(--color-gray-700);
+  }
+}
+
+/* Custom shimmer animation keyframes */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
   }
 }
