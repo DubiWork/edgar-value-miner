@@ -624,15 +624,34 @@ export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
     return isValidNumber(item.val);
   });
 
-  // Sort by end date (most recent first)
+  // Sort by end date (most recent first), then by filed date (most recent first)
+  // This ensures restated financials (later filings) take precedence
   const sortedData = filteredData.sort((a, b) => {
     const dateA = parseDate(a.end) || parseDate(a.filed);
     const dateB = parseDate(b.end) || parseDate(b.filed);
     if (!dateA || !dateB) return 0;
-    return dateB.getTime() - dateA.getTime();
+
+    const endCompare = dateB.getTime() - dateA.getTime();
+    if (endCompare !== 0) return endCompare;
+
+    // Tiebreaker: most recently filed first (for restated financials)
+    const filedA = parseDate(a.filed);
+    const filedB = parseDate(b.filed);
+    if (filedA && filedB) {
+      const filedCompare = filedB.getTime() - filedA.getTime();
+      if (filedCompare !== 0) return filedCompare;
+    }
+
+    // Final tiebreaker: accession number (higher = more recent)
+    if (a.accn && b.accn) {
+      return b.accn.localeCompare(a.accn);
+    }
+    return 0;
   });
 
   // Deduplicate by period (keep most recent filing for each period)
+  // For restated financials: sort by filed date (most recent first) so the
+  // latest filing for each period is kept when deduplicating
   const seenPeriods = new Set();
   const deduplicatedData = sortedData.filter(item => {
     const period = item.frame || item.end;
@@ -929,10 +948,59 @@ export function normalizeCompanyFacts(companyFactsJson) {
 
   // Try to determine fiscal year end from the data
   let fiscalYearEnd = null;
+  let fiscalYearEndDefaulted = false;
   const revenueData = metrics.revenue?.annual?.[0];
   if (revenueData?.period) {
     // Extract from frame like CY2023I4 or end date
     fiscalYearEnd = revenueData.period;
+  }
+
+  // P1 #13: Default fiscal year end to December 31 if missing
+  if (!fiscalYearEnd) {
+    fiscalYearEnd = '12-31';
+    fiscalYearEndDefaulted = true;
+    devLog('log', 'Fiscal year end not found, defaulting to 12-31');
+  }
+
+  // P0 #5: Detect pre-revenue companies
+  const isPreRevenue = (() => {
+    const revMetric = metrics.revenue;
+    if (!revMetric) return true;
+    const hasAnnualRevenue = revMetric.annual?.some(d => d.value !== 0);
+    const hasQuarterlyRevenue = revMetric.quarterly?.some(d => d.value !== 0);
+    return !hasAnnualRevenue && !hasQuarterlyRevenue;
+  })();
+
+  // P0 #6: Detect negative equity (potential bankruptcy)
+  const hasNegativeEquity = (() => {
+    const equityMetric = metrics.stockholdersEquity;
+    if (!equityMetric) return false;
+    const latestAnnual = equityMetric.annual?.[0];
+    const latestQuarterly = equityMetric.quarterly?.[0];
+    const latestValue = latestAnnual?.value ?? latestQuarterly?.value ?? null;
+    return latestValue !== null && latestValue < 0;
+  })();
+
+  // P1 #15: Detect missing shares outstanding
+  const missingShares = (() => {
+    const sharesMetric = metrics.sharesOutstanding;
+    if (!sharesMetric) return true;
+    return sharesMetric.annual?.length === 0 && sharesMetric.quarterly?.length === 0;
+  })();
+
+  // Build warnings array
+  const warnings = [];
+  if (isPreRevenue) {
+    warnings.push('Company appears to be pre-revenue (revenue is zero or missing)');
+  }
+  if (hasNegativeEquity) {
+    warnings.push('Company has negative stockholders equity - may indicate financial distress');
+  }
+  if (missingShares) {
+    warnings.push('Shares outstanding data is missing - EPS calculations unavailable');
+  }
+  if (fiscalYearEndDefaulted) {
+    warnings.push('Fiscal year end not found in data - defaulted to December 31');
   }
 
   return {
@@ -942,6 +1010,7 @@ export function normalizeCompanyFacts(companyFactsJson) {
     metrics,
     metadata: {
       fiscalYearEnd,
+      fiscalYearEndDefaulted,
       currency: 'USD',
       normalized: true,
       normalizationVersion: NORMALIZATION_VERSION,
@@ -949,6 +1018,10 @@ export function normalizeCompanyFacts(companyFactsJson) {
       metricsFound,
       metricsTotal: allMetrics.length + 1, // +1 for freeCashFlow
       missingMetrics,
+      isPreRevenue,
+      hasNegativeEquity,
+      missingShares,
+      warnings,
     },
   };
 }

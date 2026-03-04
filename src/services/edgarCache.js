@@ -296,6 +296,38 @@ function isExpired(entry) {
 }
 
 /**
+ * Validates the structure of a cache entry to detect corruption.
+ * Checks for required fields in the cached company facts data.
+ *
+ * @param {Object} entry - Cache entry to validate
+ * @returns {boolean} True if the entry has a valid structure
+ * @private
+ */
+function isValidCacheEntry(entry) {
+  // Entry must exist and have data
+  if (!entry || !entry.data) {
+    return false;
+  }
+
+  // Data must have facts object (core SEC data structure)
+  if (!entry.data.facts || typeof entry.data.facts !== 'object') {
+    return false;
+  }
+
+  // Entry must have a ticker (keyPath)
+  if (!entry.ticker || typeof entry.ticker !== 'string') {
+    return false;
+  }
+
+  // Entry must have timestamps
+  if (!entry.lastUpdated || !entry.expiresAt) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Wraps an IndexedDB request in a Promise
  * @param {IDBRequest} request - IndexedDB request
  * @returns {Promise<any>} Promise resolving to the request result
@@ -364,6 +396,22 @@ export async function getCompanyFacts(ticker) {
     const entry = await promisifyRequest(request);
 
     if (!entry) {
+      return null;
+    }
+
+    // Validate cache entry structure (corruption detection)
+    if (!isValidCacheEntry(entry)) {
+      if (import.meta.env.DEV) {
+        console.warn('EdgarCache: Corrupt cache entry detected for', normalizedTicker);
+      }
+      // Delete corrupt entry from cache
+      try {
+        const deleteTx = db.transaction(DB_CONFIG.STORES.COMPANY_FACTS, 'readwrite');
+        const deleteStore = deleteTx.objectStore(DB_CONFIG.STORES.COMPANY_FACTS);
+        await promisifyRequest(deleteStore.delete(normalizedTicker));
+      } catch {
+        // Ignore deletion errors
+      }
       return null;
     }
 

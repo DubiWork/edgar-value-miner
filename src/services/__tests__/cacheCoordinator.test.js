@@ -614,4 +614,134 @@ describe('cacheCoordinator', () => {
       expect(result.metadata).toBeNull();
     });
   });
+
+  // =============================================================================
+  // Concurrent Request Deduplication Tests
+  // =============================================================================
+
+  describe('Concurrent Request Deduplication', () => {
+    it('should deduplicate concurrent requests for the same ticker', async () => {
+      // Simulate a slow L1 miss, L2 miss, and L3 fetch
+      edgarCache.getCompanyFacts.mockResolvedValue(null);
+      firestoreCache.getCompanyFactsFromFirestore.mockResolvedValue(null);
+
+      edgarApi.fetchCompanyFactsByTicker.mockImplementation(() => {
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            resolve({
+              facts: mockCompanyFacts,
+              companyInfo: mockCompanyInfo,
+            });
+          }, 100);
+        });
+      });
+
+      edgarCache.setCompanyFacts.mockResolvedValue(true);
+      firestoreCache.setCompanyFactsToFirestore.mockResolvedValue(true);
+
+      // Fire 3 concurrent requests for the same ticker
+      const [result1, result2, result3] = await Promise.all([
+        getCompanyData('AAPL'),
+        getCompanyData('AAPL'),
+        getCompanyData('AAPL'),
+      ]);
+
+      // All should succeed with the same data
+      expect(result1.success).toBe(true);
+      expect(result2.success).toBe(true);
+      expect(result3.success).toBe(true);
+
+      // SEC API should only be called ONCE (deduplicated)
+      expect(edgarApi.fetchCompanyFactsByTicker).toHaveBeenCalledTimes(1);
+    });
+
+    it('should NOT deduplicate requests for different tickers', async () => {
+      edgarCache.getCompanyFacts.mockResolvedValue(null);
+      firestoreCache.getCompanyFactsFromFirestore.mockResolvedValue(null);
+
+      edgarApi.fetchCompanyFactsByTicker.mockResolvedValue({
+        facts: mockCompanyFacts,
+        companyInfo: mockCompanyInfo,
+      });
+
+      edgarCache.setCompanyFacts.mockResolvedValue(true);
+      firestoreCache.setCompanyFactsToFirestore.mockResolvedValue(true);
+
+      // Fire concurrent requests for different tickers
+      await Promise.all([
+        getCompanyData('AAPL'),
+        getCompanyData('MSFT'),
+      ]);
+
+      // Both should trigger their own SEC API call
+      expect(edgarApi.fetchCompanyFactsByTicker).toHaveBeenCalledTimes(2);
+    });
+
+    it('should NOT deduplicate forceRefresh requests', async () => {
+      edgarApi.fetchCompanyFactsByTicker.mockImplementation(() => {
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            resolve({
+              facts: mockCompanyFacts,
+              companyInfo: mockCompanyInfo,
+            });
+          }, 50);
+        });
+      });
+
+      edgarCache.setCompanyFacts.mockResolvedValue(true);
+      firestoreCache.setCompanyFactsToFirestore.mockResolvedValue(true);
+
+      // Fire 2 forceRefresh requests - should NOT deduplicate
+      await Promise.all([
+        getCompanyData('AAPL', { forceRefresh: true }),
+        getCompanyData('AAPL', { forceRefresh: true }),
+      ]);
+
+      expect(edgarApi.fetchCompanyFactsByTicker).toHaveBeenCalledTimes(2);
+    });
+
+    it('should allow new requests after in-flight request completes', async () => {
+      edgarCache.getCompanyFacts.mockResolvedValue(null);
+      firestoreCache.getCompanyFactsFromFirestore.mockResolvedValue(null);
+
+      edgarApi.fetchCompanyFactsByTicker.mockResolvedValue({
+        facts: mockCompanyFacts,
+        companyInfo: mockCompanyInfo,
+      });
+
+      edgarCache.setCompanyFacts.mockResolvedValue(true);
+      firestoreCache.setCompanyFactsToFirestore.mockResolvedValue(true);
+
+      // First request
+      await getCompanyData('AAPL');
+
+      // Second request after first completes - should NOT be deduplicated
+      await getCompanyData('AAPL');
+
+      expect(edgarApi.fetchCompanyFactsByTicker).toHaveBeenCalledTimes(2);
+    });
+
+    it('should clean up in-flight map on error', async () => {
+      edgarCache.getCompanyFacts.mockResolvedValue(null);
+      firestoreCache.getCompanyFactsFromFirestore.mockResolvedValue(null);
+
+      // First call fails
+      edgarApi.fetchCompanyFactsByTicker.mockRejectedValueOnce(new Error('API Error'));
+
+      const result1 = await getCompanyData('AAPL');
+      expect(result1.success).toBe(false);
+
+      // Second call should work (not stuck in dedup map)
+      edgarApi.fetchCompanyFactsByTicker.mockResolvedValueOnce({
+        facts: mockCompanyFacts,
+        companyInfo: mockCompanyInfo,
+      });
+      edgarCache.setCompanyFacts.mockResolvedValue(true);
+      firestoreCache.setCompanyFactsToFirestore.mockResolvedValue(true);
+
+      const result2 = await getCompanyData('AAPL');
+      expect(result2.success).toBe(true);
+    });
+  });
 });

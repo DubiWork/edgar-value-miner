@@ -194,6 +194,15 @@ function devLog(level, message, data = undefined) {
 const activeRefreshes = new Set();
 
 /**
+ * Tracks in-flight getCompanyData requests for concurrent deduplication.
+ * When the same ticker is requested while a fetch is in progress, the
+ * same promise is returned instead of starting a duplicate request.
+ * @type {Map<string, Promise>}
+ * @private
+ */
+const inFlightRequests = new Map();
+
+/**
  * Performs a background refresh for stale cache data
  * Fire and forget - updates all cache layers when complete
  *
@@ -315,6 +324,47 @@ export async function getCompanyData(ticker, options = {}) {
   }
 
   const normalizedTicker = validation.normalized;
+
+  // Concurrent request deduplication:
+  // If the same ticker is already being fetched (non-forceRefresh), return the same promise
+  if (!forceRefresh) {
+    const existingRequest = inFlightRequests.get(normalizedTicker);
+    if (existingRequest) {
+      devLog('log', `Deduplicating concurrent request for ${normalizedTicker}`);
+      return existingRequest;
+    }
+  }
+
+  // Create the actual fetch promise
+  const fetchPromise = _getCompanyDataInternal(normalizedTicker, {
+    forceRefresh,
+    backgroundRefresh,
+    includeMetadata,
+  });
+
+  // Track in-flight request for deduplication (only non-forceRefresh)
+  if (!forceRefresh) {
+    inFlightRequests.set(normalizedTicker, fetchPromise);
+
+    // Clean up when done (whether success or failure)
+    fetchPromise.finally(() => {
+      inFlightRequests.delete(normalizedTicker);
+    });
+  }
+
+  return fetchPromise;
+}
+
+/**
+ * Internal implementation of getCompanyData (without deduplication wrapper)
+ * @private
+ */
+async function _getCompanyDataInternal(normalizedTicker, options) {
+  const {
+    forceRefresh,
+    backgroundRefresh,
+    includeMetadata,
+  } = options;
 
   // Skip cache if force refresh requested
   if (!forceRefresh) {

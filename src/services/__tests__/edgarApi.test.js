@@ -589,6 +589,63 @@ describe('edgarApi', () => {
       }
     });
 
+    it('should classify malformed JSON as PARSE_ERROR', async () => {
+      global.fetch = vi.fn(() => {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.reject(new SyntaxError('Unexpected token < in JSON')),
+        });
+      });
+
+      try {
+        await fetchCompanyTickers();
+        expect.fail('Should have thrown error');
+      } catch (error) {
+        expect(error).toBeInstanceOf(EdgarApiError);
+        expect(error.code).toBe(EDGAR_ERROR_CODES.PARSE_ERROR);
+        expect(error.statusCode).toBe(200);
+        expect(error.cause).toBeInstanceOf(SyntaxError);
+      }
+    });
+
+    it('should include context in PARSE_ERROR message', async () => {
+      global.fetch = vi.fn(() => {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.reject(new SyntaxError('Unexpected end of JSON input')),
+        });
+      });
+
+      try {
+        await fetchCompanyFacts(320193);
+        expect.fail('Should have thrown error');
+      } catch (error) {
+        expect(error).toBeInstanceOf(EdgarApiError);
+        expect(error.code).toBe(EDGAR_ERROR_CODES.PARSE_ERROR);
+        expect(error.message).toContain('parse JSON');
+      }
+    });
+
+    it('should handle empty response body as PARSE_ERROR', async () => {
+      global.fetch = vi.fn(() => {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.reject(new SyntaxError('Unexpected end of JSON input')),
+        });
+      });
+
+      try {
+        await fetchCompanyTickers();
+        expect.fail('Should have thrown error');
+      } catch (error) {
+        expect(error).toBeInstanceOf(EdgarApiError);
+        expect(error.code).toBe(EDGAR_ERROR_CODES.PARSE_ERROR);
+      }
+    });
+
     it.skip('should retry network errors up to 3 times', async () => {
       let callCount = 0;
       global.fetch = vi.fn(() => {

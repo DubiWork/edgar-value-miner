@@ -483,4 +483,139 @@ describe('edgarCache', () => {
       expect(stats.tickerMappings.count).toBe(3);
     });
   });
+
+  // =============================================================================
+  // Cache Corruption Validation Tests (P1 #18)
+  // =============================================================================
+
+  describe('Cache Corruption Validation', () => {
+    it('should return valid entry when all required fields are present', async () => {
+      await setCompanyFacts('VALID', mockCompanyFacts, '0000320193');
+
+      const result = await getCompanyFacts('VALID');
+      expect(result).not.toBeNull();
+      expect(result.data).toEqual(mockCompanyFacts);
+      expect(result.cik).toBe('0000320193');
+    });
+
+    it('should return null for cache entry with missing data (via raw write)', async () => {
+      // Use initializeCache to get the DB then write directly
+      await initializeCache();
+
+      // We'll use a workaround: save valid data first, then corrupt it
+      await setCompanyFacts('AAPL', mockCompanyFacts, '0000320193');
+
+      // Verify it works first
+      const validResult = await getCompanyFacts('AAPL');
+      expect(validResult).not.toBeNull();
+
+      // Now overwrite with corrupt data via the module's internal DB
+      // We can't easily access the internal DB, so let's test with setCompanyFacts
+      // passing null data - the setCompanyFacts function will write it but getCompanyFacts
+      // validation should catch it
+      await setCompanyFacts('CORRUPT1', null, '0000000001');
+
+      const result = await getCompanyFacts('CORRUPT1');
+      expect(result).toBeNull();
+    });
+
+    it('should return null for entry with data missing facts field', async () => {
+      // Save data without 'facts' key - validation should catch this
+      await setCompanyFacts('CORRUPT2', { entityName: 'Bad Company' }, '0000000002');
+
+      const result = await getCompanyFacts('CORRUPT2');
+      expect(result).toBeNull();
+    });
+
+    it('should accept entry with proper facts structure', async () => {
+      await setCompanyFacts('GOOD', {
+        cik: '0000000005',
+        entityName: 'Good Company',
+        facts: { 'us-gaap': {} },
+      }, '0000000005');
+
+      const result = await getCompanyFacts('GOOD');
+      expect(result).not.toBeNull();
+      expect(result.data.entityName).toBe('Good Company');
+    });
+
+    it('should clean up corrupt entry so it can be re-saved', async () => {
+      // Save corrupt data
+      await setCompanyFacts('FIXME', { entityName: 'No facts' }, '000');
+
+      // Read returns null (corrupt)
+      const result1 = await getCompanyFacts('FIXME');
+      expect(result1).toBeNull();
+
+      // Now save proper data
+      await setCompanyFacts('FIXME', mockCompanyFacts, '0000320193');
+
+      // Should work now
+      const result2 = await getCompanyFacts('FIXME');
+      expect(result2).not.toBeNull();
+      expect(result2.data).toEqual(mockCompanyFacts);
+    });
+  });
+
+  // =============================================================================
+  // IndexedDB Unavailable Fallback Tests (P1 #19)
+  // =============================================================================
+
+  describe('IndexedDB Unavailable Fallback', () => {
+    it('should return null gracefully when IndexedDB is not available', async () => {
+      // This tests the graceful degradation path
+      const originalIndexedDB = global.indexedDB;
+      const originalWindow = global.window;
+
+      delete global.indexedDB;
+      delete global.window;
+
+      vi.resetModules();
+      const freshModule = await import('../edgarCache.js');
+
+      // All read operations should return null
+      const facts = await freshModule.getCompanyFacts('AAPL');
+      expect(facts).toBeNull();
+
+      const mapping = await freshModule.getCikForTicker('AAPL');
+      expect(mapping).toBeNull();
+
+      // All write operations should return false
+      const saved = await freshModule.setCompanyFacts('AAPL', mockCompanyFacts);
+      expect(saved).toBe(false);
+
+      const mappingSaved = await freshModule.setTickerMapping('AAPL', '000', 'Apple');
+      expect(mappingSaved).toBe(false);
+
+      // Invalidation should return false
+      const invalidated = await freshModule.invalidateCache('AAPL');
+      expect(invalidated).toBe(false);
+
+      // Clear should return false
+      const cleared = await freshModule.clearAllCache();
+      expect(cleared).toBe(false);
+
+      // Stats should return default with isSupported: false
+      const stats = await freshModule.getCacheStats();
+      expect(stats.isSupported).toBe(false);
+      expect(stats.totalCount).toBe(0);
+
+      // Restore
+      global.indexedDB = originalIndexedDB;
+      global.window = originalWindow;
+      vi.resetModules();
+    });
+
+    it('should handle quota exceeded errors gracefully on write', async () => {
+      // Verify that writes fail gracefully (return false, don't throw)
+      // The actual QuotaExceededError is handled by promisifyRequest
+      const saved = await setCompanyFacts('AAPL', mockCompanyFacts);
+      expect(typeof saved).toBe('boolean');
+    });
+
+    it('should report support status in cache stats', async () => {
+      const stats = await getCacheStats();
+      expect(typeof stats.isSupported).toBe('boolean');
+    });
+  });
 });

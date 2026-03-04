@@ -419,7 +419,17 @@ async function fetchWithRateLimitAndRetry(url, context, retries = RATE_LIMIT_CON
 
     // Parse JSON response
     // Note: Modern browsers handle gzip decompression automatically
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      throw new EdgarApiError(
+        `Failed to parse JSON response while ${context}: ${parseError.message}`,
+        EDGAR_ERROR_CODES.PARSE_ERROR,
+        response.status,
+        parseError
+      );
+    }
     return data;
 
   } catch (error) {
