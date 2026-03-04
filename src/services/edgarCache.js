@@ -37,7 +37,7 @@ const DB_CONFIG = {
  * TTL Configuration (Time To Live)
  * @constant {Object}
  */
-const TTL_CONFIG = {
+export const TTL_CONFIG = {
   /** TTL for ticker mappings (24 hours in milliseconds) */
   TICKER_MAPPING_TTL: 24 * 60 * 60 * 1000,
   /** TTL for company facts (90 days - SEC filings are quarterly) */

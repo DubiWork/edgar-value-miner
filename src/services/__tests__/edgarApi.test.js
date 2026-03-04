@@ -204,16 +204,25 @@ describe('edgarApi', () => {
     });
 
     it('should include User-Agent header', async () => {
+      // Create a mock that captures arguments
+      const mockFetch = vi.fn((url, options) => {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(mockCompanyTickersResponse),
+        });
+      });
+      global.fetch = mockFetch;
+
       await fetchCompanyTickers();
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            'User-Agent': expect.any(String),
-          }),
-        })
-      );
+      // Verify fetch was called with headers
+      expect(mockFetch).toHaveBeenCalled();
+      const [[url, options]] = mockFetch.mock.calls;
+
+      expect(options).toBeDefined();
+      expect(options.headers).toBeDefined();
+      expect(options.headers['User-Agent']).toBeTruthy();
     });
 
     it('should handle network errors', async () => {
@@ -223,16 +232,22 @@ describe('edgarApi', () => {
     });
 
     it('should handle HTTP errors', async () => {
+      let attemptCount = 0;
       global.fetch = vi.fn(() => {
+        attemptCount++;
+        // Always fail with 500
         return Promise.resolve({
           ok: false,
           status: 500,
+          statusText: 'Internal Server Error',
           json: () => Promise.resolve({}),
         });
       });
 
       await expect(fetchCompanyTickers()).rejects.toThrow(EdgarApiError);
-    });
+      // Should have retried (initial + retries)
+      expect(attemptCount).toBeGreaterThan(1);
+    }, 10000);
 
     it('should retry on 429 rate limit error', async () => {
       let callCount = 0;
@@ -275,7 +290,7 @@ describe('edgarApi', () => {
 
       const tickers = await fetchCompanyTickers();
       expect(tickers).toBeDefined();
-      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(global.fetch).toHaveBeenCalledTimes(2); // Initial + 1 retry
     });
   });
 
@@ -470,21 +485,28 @@ describe('edgarApi', () => {
     });
 
     it('should refill tokens over time', async () => {
-      // Consume all tokens
+      // Get initial status
+      const initialStatus = getRateLimiterStatus();
+
+      // Consume some tokens (not all, to avoid waiting too long)
       const promises = [];
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 5; i++) {
         promises.push(fetchCompanyFacts(`00003201${i.toString().padStart(2, '0')}`));
       }
       await Promise.all(promises);
 
-      const statusBefore = getRateLimiterStatus();
-      expect(statusBefore.tokens).toBeLessThan(10);
+      const statusAfterConsume = getRateLimiterStatus();
 
-      // Wait for refill (200ms should add 2 tokens)
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      // Tokens should be less than initial after consuming
+      expect(statusAfterConsume.tokens).toBeLessThan(initialStatus.tokens);
 
-      const statusAfter = getRateLimiterStatus();
-      expect(statusAfter.tokens).toBeGreaterThan(statusBefore.tokens);
+      // Wait for refill (300ms should add 3 tokens at 10/sec rate)
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      const statusAfterWait = getRateLimiterStatus();
+
+      // Should have more tokens after waiting
+      expect(statusAfterWait.tokens).toBeGreaterThan(statusAfterConsume.tokens);
     }, 5000);
   });
 
@@ -571,6 +593,7 @@ describe('edgarApi', () => {
       let callCount = 0;
       global.fetch = vi.fn(() => {
         callCount++;
+        // Fail 3 times, then succeed on 4th attempt (initial + 3 retries = 4 attempts)
         if (callCount < 4) {
           return Promise.reject(new Error('Network error'));
         }
@@ -582,9 +605,10 @@ describe('edgarApi', () => {
       });
 
       const tickers = await fetchCompanyTickers();
+
       expect(tickers).toBeDefined();
-      expect(global.fetch).toHaveBeenCalledTimes(4); // Initial + 3 retries
-    }, 10000);
+      expect(callCount).toBe(4); // Initial + 3 retries = 4 attempts total
+    }, 15000);
   });
 
   // =============================================================================

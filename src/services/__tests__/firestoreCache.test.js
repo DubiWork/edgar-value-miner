@@ -12,6 +12,55 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// =============================================================================
+// Mock Firebase BEFORE imports
+// =============================================================================
+
+// Mock firebase/firestore module with inline Timestamp class to avoid hoisting issues
+vi.mock('firebase/firestore', () => {
+  // Define MockTimestamp inside the factory function
+  class MockTimestamp {
+    constructor(seconds, nanoseconds) {
+      this._seconds = seconds;
+      this._nanoseconds = nanoseconds;
+    }
+
+    toDate() {
+      return new Date(this._seconds * 1000);
+    }
+
+    toMillis() {
+      return this._seconds * 1000 + Math.floor(this._nanoseconds / 1000000);
+    }
+
+    static fromDate(date) {
+      const seconds = Math.floor(date.getTime() / 1000);
+      const nanoseconds = (date.getTime() % 1000) * 1000000;
+      return new MockTimestamp(seconds, nanoseconds);
+    }
+  }
+
+  return {
+    doc: vi.fn(),
+    collection: vi.fn(),
+    getDoc: vi.fn(),
+    setDoc: vi.fn(),
+    updateDoc: vi.fn(),
+    getCountFromServer: vi.fn(),
+    increment: vi.fn((n) => ({ _increment: n })),
+    serverTimestamp: vi.fn(() => ({ _serverTimestamp: true })),
+    Timestamp: MockTimestamp,
+  };
+});
+
+// Mock firebase lib
+vi.mock('../lib/firebase', () => ({
+  db: {},
+  getCurrentUserId: vi.fn(() => 'test-user-id'),
+}));
+
+// NOW import the functions after mocks are set up
 import {
   getCompanyFactsFromFirestore,
   checkIfCached,
@@ -24,6 +73,15 @@ import {
   FirestoreCacheError,
   FIRESTORE_CACHE_ERROR_CODES,
 } from '../firestoreCache.js';
+
+// Import mocked modules to access mock functions
+import * as firestore from 'firebase/firestore';
+
+// Access MockTimestamp from the mocked module for use in tests
+const MockTimestamp = firestore.Timestamp;
+
+let mockFirestore;
+let mockDocRef;
 
 // =============================================================================
 // Mock Data
@@ -49,8 +107,8 @@ const mockFirestoreDoc = {
   cik: '0000320193',
   companyName: 'Apple Inc.',
   companyFacts: mockCompanyFacts,
-  lastUpdated: { toDate: () => new Date('2024-01-01T00:00:00Z'), toMillis: () => 1704067200000 },
-  lastFiling: { toDate: () => new Date('2023-12-01T00:00:00Z'), toMillis: () => 1701388800000 },
+  lastUpdated: MockTimestamp.fromDate(new Date()), // Use current date for fresh cache
+  lastFiling: MockTimestamp.fromDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)),  // 30 days ago
   accessCount: 42,
   version: 1,
   needsRefresh: false,
@@ -60,28 +118,29 @@ const mockFirestoreDoc = {
 // Firebase Mock
 // =============================================================================
 
-let mockFirestore;
-
 beforeEach(() => {
   vi.clearAllMocks();
 
-  // Reset Firestore mock
-  mockFirestore = {
-    getDoc: vi.fn(),
-    setDoc: vi.fn(),
-    updateDoc: vi.fn(),
-    getCountFromServer: vi.fn(),
+  // Create mock document reference
+  mockDocRef = {
+    id: 'AAPL',
+    path: 'edgarCache/AAPL',
   };
 
-  // Mock the firebase module
-  vi.doMock('../lib/firebase', () => ({
-    db: {
-      collection: vi.fn(() => ({
-        doc: vi.fn(() => mockFirestore),
-      })),
-    },
-    getCurrentUserId: vi.fn(() => 'test-user-id'),
-  }));
+  // Configure mock returns for firebase/firestore functions
+  firestore.doc.mockReturnValue(mockDocRef);
+  firestore.collection.mockReturnValue({ path: 'edgarCache' });
+
+  // Default mock implementations (can be overridden in specific tests)
+  firestore.getDoc.mockResolvedValue({
+    exists: () => false,
+  });
+
+  firestore.setDoc.mockResolvedValue(undefined);
+  firestore.updateDoc.mockResolvedValue(undefined);
+  firestore.getCountFromServer.mockResolvedValue({
+    data: () => ({ count: 0 }),
+  });
 });
 
 // =============================================================================
@@ -95,7 +154,7 @@ describe('firestoreCache', () => {
 
   describe('getCompanyFactsFromFirestore', () => {
     it('should return cached data when found', async () => {
-      mockFirestore.getDoc.mockResolvedValue({
+      firestore.getDoc.mockResolvedValue({
         exists: () => true,
         data: () => mockFirestoreDoc,
       });
@@ -112,7 +171,7 @@ describe('firestoreCache', () => {
     });
 
     it('should return null when document not found', async () => {
-      mockFirestore.getDoc.mockResolvedValue({
+      firestore.getDoc.mockResolvedValue({
         exists: () => false,
       });
 
@@ -121,7 +180,7 @@ describe('firestoreCache', () => {
     });
 
     it('should normalize ticker to uppercase', async () => {
-      mockFirestore.getDoc.mockResolvedValue({
+      firestore.getDoc.mockResolvedValue({
         exists: () => true,
         data: () => mockFirestoreDoc,
       });
@@ -132,7 +191,7 @@ describe('firestoreCache', () => {
 
     it('should detect stale cache based on needsRefresh flag', async () => {
       const staleDoc = { ...mockFirestoreDoc, needsRefresh: true };
-      mockFirestore.getDoc.mockResolvedValue({
+      firestore.getDoc.mockResolvedValue({
         exists: () => true,
         data: () => staleDoc,
       });
@@ -142,14 +201,12 @@ describe('firestoreCache', () => {
     });
 
     it('should detect stale cache based on TTL', async () => {
+      const oldDate = new Date(Date.now() - 91 * 24 * 60 * 60 * 1000); // 91 days ago
       const oldDoc = {
         ...mockFirestoreDoc,
-        lastUpdated: {
-          toDate: () => new Date(Date.now() - 91 * 24 * 60 * 60 * 1000), // 91 days ago
-          toMillis: () => Date.now() - 91 * 24 * 60 * 60 * 1000,
-        },
+        lastUpdated: MockTimestamp.fromDate(oldDate),
       };
-      mockFirestore.getDoc.mockResolvedValue({
+      firestore.getDoc.mockResolvedValue({
         exists: () => true,
         data: () => oldDoc,
       });
@@ -159,11 +216,11 @@ describe('firestoreCache', () => {
     });
 
     it('should attempt to update access count', async () => {
-      mockFirestore.getDoc.mockResolvedValue({
+      firestore.getDoc.mockResolvedValue({
         exists: () => true,
         data: () => mockFirestoreDoc,
       });
-      mockFirestore.updateDoc.mockResolvedValue();
+      firestore.updateDoc.mockResolvedValue();
 
       await getCompanyFactsFromFirestore('AAPL');
 
@@ -171,11 +228,11 @@ describe('firestoreCache', () => {
       // Wait a bit for async operation
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      expect(mockFirestore.updateDoc).toHaveBeenCalled();
+      expect(firestore.updateDoc).toHaveBeenCalled();
     });
 
     it('should handle network errors gracefully', async () => {
-      mockFirestore.getDoc.mockRejectedValue(
+      firestore.getDoc.mockRejectedValue(
         new Error('Failed to fetch')
       );
 
@@ -184,7 +241,7 @@ describe('firestoreCache', () => {
     });
 
     it('should convert Timestamp objects to Date', async () => {
-      mockFirestore.getDoc.mockResolvedValue({
+      firestore.getDoc.mockResolvedValue({
         exists: () => true,
         data: () => mockFirestoreDoc,
       });
@@ -198,7 +255,7 @@ describe('firestoreCache', () => {
 
   describe('checkIfCached', () => {
     it('should return cache status when document exists', async () => {
-      mockFirestore.getDoc.mockResolvedValue({
+      firestore.getDoc.mockResolvedValue({
         exists: () => true,
         data: () => mockFirestoreDoc,
       });
@@ -212,7 +269,7 @@ describe('firestoreCache', () => {
     });
 
     it('should return not exists when document not found', async () => {
-      mockFirestore.getDoc.mockResolvedValue({
+      firestore.getDoc.mockResolvedValue({
         exists: () => false,
       });
 
@@ -226,7 +283,7 @@ describe('firestoreCache', () => {
 
     it('should detect staleness', async () => {
       const staleDoc = { ...mockFirestoreDoc, needsRefresh: true };
-      mockFirestore.getDoc.mockResolvedValue({
+      firestore.getDoc.mockResolvedValue({
         exists: () => true,
         data: () => staleDoc,
       });
@@ -236,7 +293,7 @@ describe('firestoreCache', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      mockFirestore.getDoc.mockRejectedValue(new Error('Network error'));
+      firestore.getDoc.mockRejectedValue(new Error('Network error'));
 
       const status = await checkIfCached('AAPL');
 
@@ -247,7 +304,7 @@ describe('firestoreCache', () => {
 
   describe('getGlobalCacheStats', () => {
     it('should return cache statistics', async () => {
-      mockFirestore.getCountFromServer = vi.fn().mockResolvedValue({
+      firestore.getCountFromServer.mockResolvedValue({
         data: () => ({ count: 150 }),
       });
 
@@ -259,7 +316,7 @@ describe('firestoreCache', () => {
     });
 
     it('should return default stats on error', async () => {
-      mockFirestore.getCountFromServer = vi.fn().mockRejectedValue(
+      firestore.getCountFromServer.mockRejectedValue(
         new Error('Permission denied')
       );
 
@@ -276,7 +333,7 @@ describe('firestoreCache', () => {
 
   describe('setCompanyFactsToFirestore', () => {
     it('should save company facts to Firestore', async () => {
-      mockFirestore.setDoc.mockResolvedValue();
+      firestore.setDoc.mockResolvedValue();
 
       const result = await setCompanyFactsToFirestore(
         'AAPL',
@@ -286,7 +343,8 @@ describe('firestoreCache', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockFirestore.setDoc).toHaveBeenCalledWith(
+      expect(firestore.setDoc).toHaveBeenCalledWith(
+        mockDocRef,
         expect.objectContaining({
           ticker: 'AAPL',
           cik: '0000320193',
@@ -300,7 +358,7 @@ describe('firestoreCache', () => {
     });
 
     it('should normalize ticker before saving', async () => {
-      mockFirestore.setDoc.mockResolvedValue();
+      firestore.setDoc.mockResolvedValue();
 
       await setCompanyFactsToFirestore(
         'aapl',
@@ -309,13 +367,14 @@ describe('firestoreCache', () => {
         'Apple Inc.'
       );
 
-      expect(mockFirestore.setDoc).toHaveBeenCalledWith(
+      expect(firestore.setDoc).toHaveBeenCalledWith(
+        mockDocRef,
         expect.objectContaining({ ticker: 'AAPL' })
       );
     });
 
     it('should handle optional lastFiling date', async () => {
-      mockFirestore.setDoc.mockResolvedValue();
+      firestore.setDoc.mockResolvedValue();
 
       const lastFiling = new Date('2023-12-01');
       await setCompanyFactsToFirestore(
@@ -326,13 +385,14 @@ describe('firestoreCache', () => {
         { lastFiling }
       );
 
-      expect(mockFirestore.setDoc).toHaveBeenCalledWith(
+      expect(firestore.setDoc).toHaveBeenCalledWith(
+        mockDocRef,
         expect.objectContaining({ lastFiling: expect.any(Object) })
       );
     });
 
     it('should handle permission denied errors gracefully', async () => {
-      mockFirestore.setDoc.mockRejectedValue(
+      firestore.setDoc.mockRejectedValue(
         Object.assign(new Error('PERMISSION_DENIED'), { code: 'permission-denied' })
       );
 
@@ -347,7 +407,7 @@ describe('firestoreCache', () => {
     });
 
     it('should handle other errors gracefully', async () => {
-      mockFirestore.setDoc.mockRejectedValue(new Error('Unknown error'));
+      firestore.setDoc.mockRejectedValue(new Error('Unknown error'));
 
       const result = await setCompanyFactsToFirestore(
         'AAPL',
@@ -362,16 +422,16 @@ describe('firestoreCache', () => {
 
   describe('updateAccessCount', () => {
     it('should increment access count', async () => {
-      mockFirestore.updateDoc.mockResolvedValue();
+      firestore.updateDoc.mockResolvedValue();
 
       const result = await updateAccessCount('AAPL');
 
       expect(result).toBe(true);
-      expect(mockFirestore.updateDoc).toHaveBeenCalled();
+      expect(firestore.updateDoc).toHaveBeenCalled();
     });
 
     it('should handle permission denied silently', async () => {
-      mockFirestore.updateDoc.mockRejectedValue(
+      firestore.updateDoc.mockRejectedValue(
         Object.assign(new Error('PERMISSION_DENIED'), { code: 'permission-denied' })
       );
 
@@ -381,7 +441,7 @@ describe('firestoreCache', () => {
     });
 
     it('should handle not found errors', async () => {
-      mockFirestore.updateDoc.mockRejectedValue(
+      firestore.updateDoc.mockRejectedValue(
         Object.assign(new Error('Not found'), { code: 'not-found' })
       );
 
@@ -393,18 +453,18 @@ describe('firestoreCache', () => {
 
   describe('invalidateGlobalCache', () => {
     it('should mark cache as needing refresh', async () => {
-      mockFirestore.updateDoc.mockResolvedValue();
+      firestore.updateDoc.mockResolvedValue();
 
       const result = await invalidateGlobalCache('AAPL');
 
       expect(result).toBe(true);
-      expect(mockFirestore.updateDoc).toHaveBeenCalledWith({
+      expect(firestore.updateDoc).toHaveBeenCalledWith(mockDocRef, {
         needsRefresh: true,
       });
     });
 
     it('should handle permission denied', async () => {
-      mockFirestore.updateDoc.mockRejectedValue(
+      firestore.updateDoc.mockRejectedValue(
         Object.assign(new Error('PERMISSION_DENIED'), { code: 'permission-denied' })
       );
 
@@ -414,7 +474,7 @@ describe('firestoreCache', () => {
     });
 
     it('should handle not found errors', async () => {
-      mockFirestore.updateDoc.mockRejectedValue(
+      firestore.updateDoc.mockRejectedValue(
         Object.assign(new Error('Not found'), { code: 'not-found' })
       );
 
@@ -496,12 +556,12 @@ describe('firestoreCache', () => {
   describe('Integration', () => {
     it('should handle full cache lifecycle', async () => {
       // 1. Check if cached (not found)
-      mockFirestore.getDoc.mockResolvedValue({ exists: () => false });
+      firestore.getDoc.mockResolvedValue({ exists: () => false });
       let status = await checkIfCached('AAPL');
       expect(status.exists).toBe(false);
 
       // 2. Save to cache
-      mockFirestore.setDoc.mockResolvedValue();
+      firestore.setDoc.mockResolvedValue();
       const saved = await setCompanyFactsToFirestore(
         'AAPL',
         mockCompanyFacts,
@@ -511,7 +571,7 @@ describe('firestoreCache', () => {
       expect(saved).toBe(true);
 
       // 3. Check if cached (found)
-      mockFirestore.getDoc.mockResolvedValue({
+      firestore.getDoc.mockResolvedValue({
         exists: () => true,
         data: () => mockFirestoreDoc,
       });
@@ -523,7 +583,7 @@ describe('firestoreCache', () => {
       expect(data).not.toBeNull();
 
       // 5. Update access count
-      mockFirestore.updateDoc.mockResolvedValue();
+      firestore.updateDoc.mockResolvedValue();
       const updated = await updateAccessCount('AAPL');
       expect(updated).toBe(true);
 

@@ -342,15 +342,30 @@ describe('edgarCache', () => {
 
   describe('Error Handling', () => {
     it('should return false when IndexedDB not supported', async () => {
-      // Mock isIndexedDBSupported to return false
+      // Save original and temporarily remove indexedDB
       const originalIndexedDB = global.indexedDB;
-      global.indexedDB = undefined;
+      const originalWindow = global.window;
 
-      const success = await initializeCache();
+      // Remove indexedDB from environment
+      delete global.indexedDB;
+      delete global.window;
+
+      // Need to re-import to get fresh state
+      vi.resetModules();
+      const edgarCacheModule = await import('../edgarCache.js');
+
+      const isSupported = edgarCacheModule.isIndexedDBSupported();
+      expect(isSupported).toBe(false);
+
+      const success = await edgarCacheModule.initializeCache();
       expect(success).toBe(false);
 
-      // Restore
+      // Restore original environment
       global.indexedDB = originalIndexedDB;
+      global.window = originalWindow;
+
+      // Reset modules again to restore normal state
+      vi.resetModules();
     });
 
     it('should return null on read errors', async () => {

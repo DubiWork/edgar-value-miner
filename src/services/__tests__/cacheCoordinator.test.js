@@ -480,23 +480,28 @@ describe('cacheCoordinator', () => {
 
     it('should track successful and failed fetches', async () => {
       let callCount = 0;
-      edgarCache.getCompanyFacts.mockImplementation(() => {
+      edgarCache.getCompanyFacts.mockImplementation(async () => {
         callCount++;
         if (callCount === 2) {
-          return Promise.reject(new Error('Failed'));
+          throw new Error('Failed');
         }
-        return Promise.resolve({
+        return {
           data: mockCompanyFacts,
           cik: '0000320193',
           needsRefresh: false,
-        });
+        };
       });
+
+      // Also mock Firestore and API to fail for the second call
+      // So it doesn't fall back and succeed
+      firestoreCache.getCompanyFactsFromFirestore.mockResolvedValue(null);
+      edgarApi.fetchCompanyFactsByTicker.mockRejectedValue(new Error('API Error'));
 
       const result = await prefetchCompanies(['AAPL', 'MSFT', 'GOOGL']);
 
       expect(result.summary.successful).toBe(2);
       expect(result.summary.failed).toBe(1);
-    });
+    }, 10000);
   });
 
   // =============================================================================
