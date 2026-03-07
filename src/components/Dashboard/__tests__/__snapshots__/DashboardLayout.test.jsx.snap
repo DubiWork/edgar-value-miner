@@ -1,0 +1,101 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`DashboardLayout > matches snapshot for full layout 1`] = `
+<div
+  class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
+  data-testid="dashboard-layout"
+>
+  <div
+    class="grid grid-cols-1 gap-6"
+  >
+    <section
+      aria-label="Company banner"
+    >
+      <div
+        class="card"
+      >
+        AAPL - Apple Inc.
+      </div>
+    </section>
+    <section
+      aria-label="Key metrics"
+    >
+      <div
+        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+      >
+        <article
+          aria-label="Metric 1"
+        >
+          <div
+            class="card"
+          >
+            Revenue: $394B
+          </div>
+        </article>
+        <article
+          aria-label="Metric 2"
+        >
+          <div
+            class="card"
+          >
+            FCF: $111B
+          </div>
+        </article>
+        <article
+          aria-label="Metric 3"
+        >
+          <div
+            class="card"
+          >
+            Margin: 28%
+          </div>
+        </article>
+      </div>
+    </section>
+    <section
+      aria-label="Primary chart"
+    >
+      <div
+        class="card"
+      >
+        Revenue Chart Placeholder
+      </div>
+    </section>
+    <section
+      aria-label="Secondary charts"
+    >
+      <div
+        class="grid grid-cols-1 lg:grid-cols-2 gap-6"
+      >
+        <article
+          aria-label="Chart 1"
+        >
+          <div
+            class="card"
+          >
+            Margin Chart
+          </div>
+        </article>
+        <article
+          aria-label="Chart 2"
+        >
+          <div
+            class="card"
+          >
+            Growth Chart
+          </div>
+        </article>
+      </div>
+    </section>
+    <section
+      aria-label="Valuation"
+    >
+      <div
+        class="card"
+      >
+        P/E Fair Value: $185
+      </div>
+    </section>
+  </div>
+</div>
+`;
