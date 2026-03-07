@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { TrendingUp, DollarSign, BarChart3, Gem } from 'lucide-react'
 import { TickerSearch } from './components/TickerSearch'
 import { ThemeToggle } from './components/ThemeToggle'
