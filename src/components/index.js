@@ -24,6 +24,7 @@ export { ThemeToggle } from './ThemeToggle';
 export { DashboardLayout } from './Dashboard';
 export { CompanyBanner } from './Dashboard/CompanyBanner';
 export { MetricCard } from './Dashboard';
+export { ChartContainer } from './Dashboard/ChartContainer';
 
 // Demo components (for development/testing)
 export { LoadingStatesDemo } from './LoadingStatesDemo';
