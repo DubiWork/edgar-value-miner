@@ -34,11 +34,9 @@ export function ErrorFallback({ error, resetError, errorType }) {
   };
 
   const handleGoHome = () => {
-    // Reset error state and navigate to root
     if (resetError) {
       resetError();
     }
-    // Use window.location for a clean navigation
     window.location.href = '/';
   };
 
@@ -46,17 +44,26 @@ export function ErrorFallback({ error, resetError, errorType }) {
     <div className="min-h-[400px] flex items-center justify-center p-6">
       <div className="card max-w-md w-full text-center">
         {/* Icon */}
-        <div className={`inline-flex p-4 rounded-full ${config.iconBg} mb-6`}>
+        <div
+          className="inline-flex p-4 rounded-full mb-6"
+          style={{ backgroundColor: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' }}
+        >
           <Icon className={`h-10 w-10 ${config.iconColor}`} />
         </div>
 
         {/* Title */}
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+        <h2
+          className="text-2xl font-bold mb-3"
+          style={{ color: 'var(--color-text-primary)' }}
+        >
           {config.title}
         </h2>
 
         {/* Description */}
-        <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
+        <p
+          className="mb-6 leading-relaxed"
+          style={{ color: 'var(--color-text-secondary)' }}
+        >
           {config.description}
         </p>
 
@@ -83,28 +90,37 @@ export function ErrorFallback({ error, resetError, errorType }) {
         {/* Dev mode: Show error details */}
         {import.meta.env.DEV && error && (
           <details className="mt-6 text-left">
-            <summary className="text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
+            <summary
+              className="text-sm cursor-pointer"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
               Technical Details (Dev Mode)
             </summary>
-            <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-xs font-mono overflow-auto max-h-48">
-              <div className="text-gray-700 dark:text-gray-300">
+            <div
+              className="mt-2 p-3 rounded-lg text-xs font-mono overflow-auto max-h-48"
+              style={{ backgroundColor: 'var(--color-bg-secondary)' }}
+            >
+              <div style={{ color: 'var(--color-text-secondary)' }}>
                 <strong>Name:</strong> {error.name || 'Unknown'}
               </div>
-              <div className="text-gray-700 dark:text-gray-300 mt-1">
+              <div className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>
                 <strong>Message:</strong> {error.message || 'No message'}
               </div>
               {error.code && (
-                <div className="text-gray-700 dark:text-gray-300 mt-1">
+                <div className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>
                   <strong>Code:</strong> {error.code}
                 </div>
               )}
               {error.statusCode && (
-                <div className="text-gray-700 dark:text-gray-300 mt-1">
+                <div className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>
                   <strong>Status:</strong> {error.statusCode}
                 </div>
               )}
               {error.stack && (
-                <div className="text-gray-600 dark:text-gray-400 mt-2 whitespace-pre-wrap break-all">
+                <div
+                  className="mt-2 whitespace-pre-wrap break-all"
+                  style={{ color: 'var(--color-text-muted)' }}
+                >
                   {error.stack}
                 </div>
               )}
@@ -121,31 +137,6 @@ export function ErrorFallback({ error, resetError, errorType }) {
  *
  * React Error Boundary that catches JavaScript errors in child components
  * and displays a user-friendly fallback UI.
- *
- * Features:
- * - Catches errors without crashing the entire app
- * - Shows different UIs for different error types
- * - Provides "Try Again" button to recover
- * - Logs errors to console in dev mode
- * - Supports custom fallback components
- *
- * @example
- * // Basic usage
- * <ErrorBoundary>
- *   <App />
- * </ErrorBoundary>
- *
- * @example
- * // With custom fallback
- * <ErrorBoundary fallback={<CustomErrorPage />}>
- *   <App />
- * </ErrorBoundary>
- *
- * @example
- * // With onError callback
- * <ErrorBoundary onError={(error, info) => logToService(error, info)}>
- *   <App />
- * </ErrorBoundary>
  */
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -157,10 +148,6 @@ class ErrorBoundary extends Component {
     };
   }
 
-  /**
-   * Update state when an error is caught
-   * This lifecycle method is called during "render" phase
-   */
   static getDerivedStateFromError(error) {
     return {
       hasError: true,
@@ -168,15 +155,9 @@ class ErrorBoundary extends Component {
     };
   }
 
-  /**
-   * Log error information
-   * This lifecycle method is called during "commit" phase
-   */
   componentDidCatch(error, errorInfo) {
-    // Store error info for potential debugging
     this.setState({ errorInfo });
 
-    // Log to console in dev mode only
     if (import.meta.env.DEV) {
       console.group('ErrorBoundary caught an error');
       console.error('Error:', error);
@@ -184,15 +165,11 @@ class ErrorBoundary extends Component {
       console.groupEnd();
     }
 
-    // Call optional onError callback
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
     }
   }
 
-  /**
-   * Reset the error state to allow retry
-   */
   resetError = () => {
     this.setState({
       hasError: false,
@@ -200,7 +177,6 @@ class ErrorBoundary extends Component {
       errorInfo: null,
     });
 
-    // Call optional onReset callback
     if (this.props.onReset) {
       this.props.onReset();
     }
@@ -211,17 +187,13 @@ class ErrorBoundary extends Component {
     const { children, fallback } = this.props;
 
     if (hasError) {
-      // If a custom fallback is provided, render it
       if (fallback) {
-        // If fallback is a function, call it with error and reset function
         if (typeof fallback === 'function') {
           return fallback({ error, resetError: this.resetError });
         }
-        // If fallback is a React element, clone it with error props
         return fallback;
       }
 
-      // Render default error UI
       return (
         <ErrorFallback
           error={error}
