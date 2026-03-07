@@ -9,19 +9,12 @@
  * @module TickerSearch
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useId } from 'react';
 import PropTypes from 'prop-types';
 import { Search, X, Clock, Loader2 } from 'lucide-react';
 import { useTickerAutocomplete } from '../../hooks/useTickerAutocomplete';
 import { useRecentSearches } from '../../hooks/useRecentSearches';
 import { sanitizeTickerInput } from '../../utils/inputSanitization';
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-const SUGGESTION_ID_PREFIX = 'ticker-suggestion-';
-const LISTBOX_ID = 'ticker-suggestion-list';
 
 // =============================================================================
 // Sub-components
@@ -30,8 +23,8 @@ const LISTBOX_ID = 'ticker-suggestion-list';
 /**
  * SuggestionItem - Single suggestion row in the dropdown
  */
-function SuggestionItem({ item, index, isHighlighted, onSelect, type }) {
-  const itemId = `${SUGGESTION_ID_PREFIX}${index}`;
+function SuggestionItem({ item, index, isHighlighted, onSelect, type, idPrefix }) {
+  const itemId = `${idPrefix}${index}`;
 
   return (
     <li
@@ -76,6 +69,7 @@ SuggestionItem.propTypes = {
   isHighlighted: PropTypes.bool.isRequired,
   onSelect: PropTypes.func.isRequired,
   type: PropTypes.oneOf(['suggestion', 'recent']),
+  idPrefix: PropTypes.string.isRequired,
 };
 
 // =============================================================================
@@ -104,6 +98,11 @@ export function TickerSearch({
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [showRecent, setShowRecent] = useState(false);
+
+  // Instance-unique IDs for ARIA (supports multiple TickerSearch instances)
+  const instanceId = useId();
+  const listboxId = `${instanceId}-listbox`;
+  const suggestionIdPrefix = `${instanceId}-suggestion-`;
 
   // Refs
   const inputRef = useRef(null);
@@ -342,7 +341,7 @@ export function TickerSearch({
           role="combobox"
           aria-expanded={isDropdownOpen}
           aria-haspopup="listbox"
-          aria-owns={LISTBOX_ID}
+          aria-owns={listboxId}
         >
           {/* Search Icon or Loading Spinner */}
           {isSearching ? (
@@ -368,10 +367,10 @@ export function TickerSearch({
             placeholder="Search by ticker or company name..."
             autoComplete="off"
             aria-autocomplete="list"
-            aria-controls={LISTBOX_ID}
+            aria-controls={listboxId}
             aria-activedescendant={
               highlightedIndex >= 0
-                ? `${SUGGESTION_ID_PREFIX}${highlightedIndex}`
+                ? `${suggestionIdPrefix}${highlightedIndex}`
                 : undefined
             }
             aria-label="Search for a company by ticker symbol or name"
@@ -398,7 +397,7 @@ export function TickerSearch({
       {/* Dropdown */}
       {isDropdownOpen && (
         <ul
-          id={LISTBOX_ID}
+          id={listboxId}
           role="listbox"
           aria-label="Search suggestions"
           className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden max-h-[400px] overflow-y-auto"
@@ -439,6 +438,7 @@ export function TickerSearch({
               isHighlighted={index === highlightedIndex}
               onSelect={handleSelect}
               type={showRecent && !inputValue ? 'recent' : 'suggestion'}
+              idPrefix={suggestionIdPrefix}
             />
           ))}
 

@@ -370,7 +370,7 @@ describe('TickerSearch', () => {
 
       fireEvent.keyDown(input, { key: 'ArrowDown' });
 
-      expect(input.getAttribute('aria-activedescendant')).toBe('ticker-suggestion-0');
+      expect(input.getAttribute('aria-activedescendant')).toMatch(/-suggestion-0$/);
     });
 
     it('should have role=listbox on dropdown', async () => {

@@ -51,6 +51,7 @@ export function useTickerAutocomplete() {
   const tickerArrayRef = useRef(null);
   const debounceTimerRef = useRef(null);
   const isMountedRef = useRef(true);
+  const isLoadingRef = useRef(false);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -67,11 +68,12 @@ export function useTickerAutocomplete() {
    * Loads the ticker data lazily (called on first focus)
    */
   const loadTickers = useCallback(async () => {
-    // Already loaded or loading
-    if (tickerMapRef.current || isLoading) {
+    // Already loaded or loading (ref-based guard prevents concurrent fetches)
+    if (tickerMapRef.current || isLoadingRef.current) {
       return;
     }
 
+    isLoadingRef.current = true;
     setIsLoading(true);
 
     try {
@@ -97,8 +99,9 @@ export function useTickerAutocomplete() {
       if (isMountedRef.current) {
         setIsLoading(false);
       }
+      isLoadingRef.current = false;
     }
-  }, [isLoading]);
+  }, []);
 
   /**
    * Filters the ticker array based on the query
@@ -129,7 +132,7 @@ export function useTickerAutocomplete() {
         prefixMatches.push(entry);
       }
       // Company name substring match (case-insensitive)
-      else if (entry.name.toLowerCase().includes(lowerQuery)) {
+      else if ((entry.name || '').toLowerCase().includes(lowerQuery)) {
         nameMatches.push(entry);
       }
 
