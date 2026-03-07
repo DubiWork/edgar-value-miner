@@ -14,6 +14,9 @@ export {
   LoadingDots,
 } from './LoadingStates';
 
+// Search
+export { TickerSearch } from './TickerSearch';
+
 // Theme
 export { ThemeToggle } from './ThemeToggle';
 
