@@ -17,5 +17,8 @@ export {
 // Search
 export { TickerSearch } from './TickerSearch';
 
+// Theme
+export { ThemeToggle } from './ThemeToggle';
+
 // Demo components (for development/testing)
 export { LoadingStatesDemo } from './LoadingStatesDemo';

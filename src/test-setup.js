@@ -9,6 +9,120 @@ import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 
 // =============================================================================
+// Node.js 25+ localStorage Fix
+// =============================================================================
+// Node.js 25+ provides a built-in `localStorage` that lacks standard Web Storage
+// API methods (getItem, setItem, removeItem, clear). The jsdom environment should
+// provide a proper implementation, but Node.js 25+ may override it.
+// Create a standards-compliant in-memory localStorage mock.
+
+const localStorageStore = new Map();
+
+const localStorageMock = {
+  getItem(key) {
+    return localStorageStore.has(key) ? localStorageStore.get(key) : null;
+  },
+  setItem(key, value) {
+    localStorageStore.set(key, String(value));
+  },
+  removeItem(key) {
+    localStorageStore.delete(key);
+  },
+  clear() {
+    localStorageStore.clear();
+  },
+  get length() {
+    return localStorageStore.size;
+  },
+  key(index) {
+    return [...localStorageStore.keys()][index] || null;
+  },
+};
+
+// Override both window.localStorage and globalThis.localStorage
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
+  writable: true,
+  configurable: true,
+});
+Object.defineProperty(globalThis, 'localStorage', {
+  value: localStorageMock,
+  writable: true,
+  configurable: true,
+});
+
+// =============================================================================
+// matchMedia Mock Setup
+// =============================================================================
+
+/**
+ * Creates a configurable matchMedia mock.
+ * Supports adding/removing change event listeners.
+ *
+ * @param {boolean} matches - Whether the media query matches
+ * @returns {Object} Mock matchMedia result
+ */
+export function createMatchMediaMock(matches = false) {
+  const listeners = [];
+
+  const mediaQueryList = {
+    matches,
+    media: '(prefers-color-scheme: dark)',
+    onchange: null,
+    addEventListener: vi.fn((event, listener) => {
+      if (event === 'change') {
+        listeners.push(listener);
+      }
+    }),
+    removeEventListener: vi.fn((event, listener) => {
+      if (event === 'change') {
+        const index = listeners.indexOf(listener);
+        if (index > -1) {
+          listeners.splice(index, 1);
+        }
+      }
+    }),
+    dispatchEvent: vi.fn(),
+    // Trigger change event for testing
+    _triggerChange(newMatches) {
+      mediaQueryList.matches = newMatches;
+      listeners.forEach((listener) =>
+        listener({ matches: newMatches, media: mediaQueryList.media })
+      );
+    },
+    _listeners: listeners,
+  };
+
+  return mediaQueryList;
+}
+
+// Default matchMedia mock (dark mode = false)
+let currentMediaQueryList = createMatchMediaMock(false);
+
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  configurable: true,
+  value: vi.fn((query) => {
+    if (query === '(prefers-color-scheme: dark)') {
+      return currentMediaQueryList;
+    }
+    return createMatchMediaMock(false);
+  }),
+});
+
+/**
+ * Sets the matchMedia mock to return a specific value for dark mode.
+ * Call this in tests to simulate system theme preference.
+ *
+ * @param {boolean} prefersDark - Whether system prefers dark mode
+ * @returns {Object} The media query list mock (for triggering changes)
+ */
+export function setSystemTheme(prefersDark) {
+  currentMediaQueryList = createMatchMediaMock(prefersDark);
+  return currentMediaQueryList;
+}
+
+// =============================================================================
 // IndexedDB Mock Setup
 // =============================================================================
 
@@ -60,6 +174,14 @@ Object.defineProperty(import.meta, 'env', {
 // =============================================================================
 // Global Cleanup
 // =============================================================================
+
+beforeEach(() => {
+  // Reset document state for theme tests
+  document.documentElement.classList.remove('dark');
+  document.documentElement.removeAttribute('data-theme');
+  localStorageStore.clear();
+  currentMediaQueryList = createMatchMediaMock(false);
+});
 
 afterEach(() => {
   // Clear all mocks after each test

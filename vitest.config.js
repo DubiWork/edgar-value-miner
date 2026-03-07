@@ -20,6 +20,10 @@ export default defineConfig({
         'src/hooks/useTickerAutocomplete.js',
         'src/hooks/useRecentSearches.js',
         'src/components/TickerSearch/TickerSearch.jsx',
+        'src/contexts/ThemeProvider.jsx',
+        'src/hooks/useTheme.js',
+        'src/components/ThemeToggle.jsx',
+        'src/utils/storage.js',
       ],
       exclude: [
         'src/**/__tests__/**',
