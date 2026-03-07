@@ -1,1 +1,3 @@
-export { DashboardLayout, default } from './DashboardLayout';
+export { DashboardLayout } from './DashboardLayout';
+export { ChartContainer } from './ChartContainer';
+export { default } from './DashboardLayout';
