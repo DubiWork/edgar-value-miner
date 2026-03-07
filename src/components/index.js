@@ -14,5 +14,8 @@ export {
   LoadingDots,
 } from './LoadingStates';
 
+// Search
+export { TickerSearch } from './TickerSearch';
+
 // Demo components (for development/testing)
 export { LoadingStatesDemo } from './LoadingStatesDemo';

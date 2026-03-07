@@ -17,6 +17,9 @@ export default defineConfig({
         'src/services/firestoreCache.js',
         'src/services/cacheCoordinator.js',
         'src/services/cacheInvalidation.js',
+        'src/hooks/useTickerAutocomplete.js',
+        'src/hooks/useRecentSearches.js',
+        'src/components/TickerSearch/TickerSearch.jsx',
       ],
       exclude: [
         'src/**/__tests__/**',
