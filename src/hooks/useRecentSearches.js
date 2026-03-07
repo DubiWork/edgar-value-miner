@@ -7,7 +7,7 @@
  * @module useRecentSearches
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback } from 'react';
 
 // =============================================================================
 // Constants
@@ -76,14 +76,6 @@ function writeToStorage(data) {
  */
 export function useRecentSearches() {
   const [recentSearches, setRecentSearches] = useState(() => readFromStorage());
-  const isMountedRef = useRef(true);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
 
   /**
    * Adds a search to recent history
