@@ -188,7 +188,7 @@ export function TickerSearch({
     const upper = sanitized.toUpperCase();
 
     setInputValue(upper);
-    setQuery(raw);
+    setQuery(sanitized);
     setIsOpen(true);
     setShowRecent(false);
     setHighlightedIndex(-1);

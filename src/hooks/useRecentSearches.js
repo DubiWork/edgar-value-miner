@@ -19,6 +19,9 @@ const STORAGE_KEY = 'edgar-recent-searches';
 /** Maximum number of recent searches to store */
 const MAX_RECENT = 5;
 
+/** Maximum length for stored string fields */
+const MAX_STRING_LENGTH = 200;
+
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -38,7 +41,9 @@ function readFromStorage() {
       (item) =>
         item &&
         typeof item.ticker === 'string' &&
+        item.ticker.length <= MAX_STRING_LENGTH &&
         typeof item.companyName === 'string' &&
+        item.companyName.length <= MAX_STRING_LENGTH &&
         typeof item.timestamp === 'number'
     );
   } catch {
