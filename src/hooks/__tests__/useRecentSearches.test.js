@@ -267,4 +267,41 @@ describe('useRecentSearches', () => {
     expect(result.current.recentSearches).toHaveLength(1);
     expect(result.current.recentSearches[0].ticker).toBe('AAPL');
   });
+
+  it('should handle non-array JSON from localStorage', () => {
+    mockStorage[STORAGE_KEY] = JSON.stringify({ not: 'an array' });
+
+    const { result } = renderHook(() => useRecentSearches());
+
+    expect(result.current.recentSearches).toEqual([]);
+  });
+
+  it('should handle removeRecentSearch with null ticker', () => {
+    const { result } = renderHook(() => useRecentSearches());
+
+    act(() => {
+      result.current.addRecentSearch('AAPL', 'Apple Inc.');
+    });
+
+    act(() => {
+      result.current.removeRecentSearch(null);
+    });
+
+    // Should still have the search, not crash
+    expect(result.current.recentSearches).toHaveLength(1);
+  });
+
+  it('should handle removeRecentSearch with empty string', () => {
+    const { result } = renderHook(() => useRecentSearches());
+
+    act(() => {
+      result.current.addRecentSearch('AAPL', 'Apple Inc.');
+    });
+
+    act(() => {
+      result.current.removeRecentSearch('');
+    });
+
+    expect(result.current.recentSearches).toHaveLength(1);
+  });
 });

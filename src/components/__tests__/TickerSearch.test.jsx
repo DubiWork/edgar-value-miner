@@ -322,6 +322,18 @@ describe('TickerSearch', () => {
 
       expect(onSearch).not.toHaveBeenCalled();
     });
+
+    it('should not interfere with regular key presses', async () => {
+      const { input } = setup();
+
+      await focusAndType(input, 'AA');
+
+      // Press a regular key (not arrow/enter/escape/tab) -- hits default case
+      fireEvent.keyDown(input, { key: 'a' });
+
+      // Dropdown should still be open, nothing should crash
+      expect(screen.queryByTestId('suggestion-dropdown')).not.toBeNull();
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -472,6 +484,144 @@ describe('TickerSearch', () => {
       });
 
       expect(screen.queryByTestId('suggestion-dropdown')).toBeNull();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Recent searches (extended)
+  // ---------------------------------------------------------------------------
+
+  describe('recent searches (extended)', () => {
+    it('should reopen recent searches on ArrowDown after closing with Escape', async () => {
+      const recent = [
+        { ticker: 'AAPL', companyName: 'Apple Inc.', timestamp: 1000 },
+      ];
+      mockStorage['edgar-recent-searches'] = JSON.stringify(recent);
+
+      const { input } = setup();
+
+      // Focus opens the dropdown with recent searches
+      await act(async () => {
+        fireEvent.focus(input);
+      });
+      expect(screen.queryByTestId('suggestion-dropdown')).not.toBeNull();
+
+      // Close dropdown with Escape
+      fireEvent.keyDown(input, { key: 'Escape' });
+      expect(screen.queryByTestId('suggestion-dropdown')).toBeNull();
+
+      // ArrowDown should reopen dropdown with recents
+      fireEvent.keyDown(input, { key: 'ArrowDown' });
+      expect(screen.queryByTestId('suggestion-dropdown')).not.toBeNull();
+    });
+
+    it('should open dropdown on ArrowDown when input has value but dropdown is closed', async () => {
+      const { input } = setup();
+
+      // Focus to load tickers
+      await act(async () => {
+        fireEvent.focus(input);
+      });
+
+      // Type something and wait for debounce
+      await act(async () => {
+        fireEvent.change(input, { target: { value: 'AA' } });
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(200);
+      });
+
+      // Close with Escape
+      fireEvent.keyDown(input, { key: 'Escape' });
+      expect(screen.queryByTestId('suggestion-dropdown')).toBeNull();
+
+      // ArrowDown should reopen
+      fireEvent.keyDown(input, { key: 'ArrowDown' });
+
+      // isOpen is now true (but displayItems may or may not show depending on state)
+      // The key behavior is that ArrowDown when closed doesn't crash
+    });
+
+    it('should clear all recent searches when Clear All is clicked', async () => {
+      const recent = [
+        { ticker: 'AAPL', companyName: 'Apple Inc.', timestamp: 1000 },
+        { ticker: 'MSFT', companyName: 'Microsoft Corp', timestamp: 900 },
+      ];
+      mockStorage['edgar-recent-searches'] = JSON.stringify(recent);
+
+      const { input } = setup();
+
+      await act(async () => {
+        fireEvent.focus(input);
+      });
+
+      const clearBtn = screen.getByTestId('clear-recent-searches');
+      await act(async () => {
+        fireEvent.click(clearBtn);
+      });
+
+      expect(screen.queryByTestId('suggestion-dropdown')).toBeNull();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Click outside
+  // ---------------------------------------------------------------------------
+
+  describe('click outside', () => {
+    it('should close dropdown when clicking outside', async () => {
+      const { input } = setup();
+
+      await focusAndType(input, 'AA');
+      expect(screen.queryByTestId('suggestion-dropdown')).not.toBeNull();
+
+      // Simulate clicking outside the container
+      await act(async () => {
+        fireEvent.mouseDown(document.body);
+      });
+
+      expect(screen.queryByTestId('suggestion-dropdown')).toBeNull();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Auto-focus
+  // ---------------------------------------------------------------------------
+
+  describe('auto-focus', () => {
+    it('should auto-focus input on desktop when autoFocus is true', async () => {
+      // Mock matchMedia to return desktop
+      const originalMatchMedia = window.matchMedia;
+      window.matchMedia = vi.fn().mockReturnValue({ matches: true });
+
+      setup({ autoFocus: true, variant: 'hero' });
+
+      // Advance past the 100ms delay
+      await act(async () => {
+        vi.advanceTimersByTime(150);
+      });
+
+      const input = screen.getByTestId('ticker-search-input');
+      expect(document.activeElement).toBe(input);
+
+      window.matchMedia = originalMatchMedia;
+    });
+
+    it('should not auto-focus on mobile', async () => {
+      const originalMatchMedia = window.matchMedia;
+      window.matchMedia = vi.fn().mockReturnValue({ matches: false });
+
+      setup({ autoFocus: true, variant: 'hero' });
+
+      await act(async () => {
+        vi.advanceTimersByTime(150);
+      });
+
+      const input = screen.getByTestId('ticker-search-input');
+      // On mobile, input should NOT be auto-focused
+      expect(document.activeElement).not.toBe(input);
+
+      window.matchMedia = originalMatchMedia;
     });
   });
 

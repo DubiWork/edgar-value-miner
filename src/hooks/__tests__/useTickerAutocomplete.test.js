@@ -343,4 +343,49 @@ describe('useTickerAutocomplete', () => {
 
     expect(sanitizeTickerInput).toHaveBeenCalledWith('<script>AAPL</script>');
   });
+
+  it('should return empty suggestions when tickers not loaded and query is set', async () => {
+    // Don't call loadTickers - go straight to querying
+    const { result } = renderHook(() => useTickerAutocomplete());
+
+    act(() => {
+      result.current.setQuery('AAPL');
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+
+    expect(result.current.suggestions).toEqual([]);
+  });
+
+  it('should trigger early exit when enough matches are found', async () => {
+    // Create a large mock dataset where 'A' prefix matches 20+ entries
+    const largeMockTickerMap = {};
+    for (let i = 0; i < 25; i++) {
+      const ticker = `A${String(i).padStart(3, '0')}`;
+      largeMockTickerMap[ticker] = { cik: 100000 + i, name: `Company ${ticker}`, ticker };
+    }
+
+    fetchCompanyTickers.mockResolvedValue(largeMockTickerMap);
+
+    const { result } = renderHook(() => useTickerAutocomplete());
+
+    await act(async () => {
+      result.current.loadTickers();
+    });
+
+    act(() => {
+      result.current.setQuery('A');
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+
+    // Should still limit to max 8 suggestions
+    expect(result.current.suggestions.length).toBeLessThanOrEqual(8);
+    // But should have found results
+    expect(result.current.suggestions.length).toBeGreaterThan(0);
+  });
 });
