@@ -1,0 +1,96 @@
+/* =================================================================
+   MetricCard Component Styles
+   Uses semantic CSS variables from index.css for theme support.
+   ================================================================= */
+
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  min-height: 120px;
+}
+
+/* Title */
+.metric-card__title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.25;
+}
+
+/* Value row: value + unit side-by-side */
+.metric-card__value-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-1);
+}
+
+.metric-card__value {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1.2;
+}
+
+.metric-card__unit {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+/* Trend indicator */
+.metric-card__trend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.metric-card__trend--up {
+  color: var(--color-success);
+}
+
+.metric-card__trend--down {
+  color: var(--color-danger);
+}
+
+.metric-card__trend--neutral {
+  color: var(--color-text-muted);
+}
+
+/* Loading shimmer state */
+.metric-card--loading .metric-card__shimmer {
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    to right,
+    var(--color-border),
+    var(--color-bg-hover),
+    var(--color-border)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+.metric-card--loading .metric-card__shimmer--title {
+  height: 0.875rem;
+  width: 40%;
+}
+
+.metric-card--loading .metric-card__shimmer--value {
+  height: 1.875rem;
+  width: 60%;
+}
+
+.metric-card--loading .metric-card__shimmer--trend {
+  height: 0.875rem;
+  width: 30%;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .metric-card--loading .metric-card__shimmer {
+    animation: none;
+  }
+}

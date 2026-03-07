@@ -1,0 +1,63 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MetricCard > matches snapshot for a fully populated card 1`] = `
+<div
+  class="card metric-card"
+  data-testid="metric-card"
+>
+  <h3
+    class="metric-card__title"
+  >
+    Revenue
+  </h3>
+  <div
+    class="metric-card__value-row"
+  >
+    <span
+      aria-label="Value: $394B USD"
+      class="metric-card__value"
+    >
+      $394B
+    </span>
+    <span
+      aria-hidden="true"
+      class="metric-card__unit"
+    >
+      USD
+    </span>
+  </div>
+  <span
+    aria-label="Trending up"
+    class="metric-card__trend metric-card__trend--up"
+    role="img"
+  >
+    ▲
+  </span>
+</div>
+`;
+
+exports[`MetricCard > matches snapshot for loading state 1`] = `
+<div
+  aria-label="Loading Revenue"
+  class="card metric-card metric-card--loading"
+  data-testid="metric-card"
+  role="status"
+>
+  <div
+    class="metric-card__shimmer metric-card__shimmer--title"
+  />
+  <div
+    class="metric-card__shimmer metric-card__shimmer--value"
+  />
+  <div
+    class="metric-card__shimmer metric-card__shimmer--trend"
+  />
+  <span
+    class="sr-only"
+  >
+    Loading 
+    Revenue
+    ...
+  </span>
+</div>
+`;

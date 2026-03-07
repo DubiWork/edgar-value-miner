@@ -1,0 +1,63 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CompanyBanner > matches snapshot with price 1`] = `
+<div
+  class="company-banner"
+  data-testid="company-banner"
+>
+  <div
+    class="company-banner__identity"
+  >
+    <h1
+      class="company-banner__name"
+      title="Apple Inc."
+    >
+      Apple Inc.
+    </h1>
+    <span
+      class="company-banner__ticker"
+      data-testid="ticker-badge"
+    >
+      AAPL
+    </span>
+  </div>
+  <span
+    aria-label="Stock price $178.50"
+    class="company-banner__price"
+    data-testid="price-display"
+  >
+    $178.50
+  </span>
+</div>
+`;
+
+exports[`CompanyBanner > matches snapshot without price 1`] = `
+<div
+  class="company-banner"
+  data-testid="company-banner"
+>
+  <div
+    class="company-banner__identity"
+  >
+    <h1
+      class="company-banner__name"
+      title="Apple Inc."
+    >
+      Apple Inc.
+    </h1>
+    <span
+      class="company-banner__ticker"
+      data-testid="ticker-badge"
+    >
+      AAPL
+    </span>
+  </div>
+  <span
+    aria-label="Price unavailable"
+    class="company-banner__price company-banner__price--unavailable"
+    data-testid="price-display"
+  >
+    --
+  </span>
+</div>
+`;
