@@ -158,11 +158,11 @@ function App() {
               <div className="flex items-center space-x-3 mb-3">
                 <div
                   className="p-2 rounded-lg"
-                  style={{ backgroundColor: 'color-mix(in srgb, #a78bfa 15%, transparent)' }}
+                  style={{ backgroundColor: 'color-mix(in srgb, var(--color-info) 15%, transparent)' }}
                 >
                   <BarChart3
                     className="h-6 w-6"
-                    style={{ color: '#a78bfa' }}
+                    style={{ color: 'var(--color-info)' }}
                   />
                 </div>
                 <h3

@@ -51,6 +51,7 @@
   --color-success: #16a34a;
   --color-warning: #d97706;
   --color-danger: #dc2626;
+  --color-info: #7c3aed;
 
   /* Utility */
   --color-focus-ring: #0ea5e9;
@@ -89,6 +90,7 @@
   --color-success: #22c55e;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
+  --color-info: #a78bfa;
 
   /* Utility */
   --color-focus-ring: #38bdf8;
