@@ -17,6 +17,10 @@ export default defineConfig({
         'src/services/firestoreCache.js',
         'src/services/cacheCoordinator.js',
         'src/services/cacheInvalidation.js',
+        'src/contexts/ThemeProvider.jsx',
+        'src/hooks/useTheme.js',
+        'src/components/ThemeToggle.jsx',
+        'src/utils/storage.js',
       ],
       exclude: [
         'src/**/__tests__/**',

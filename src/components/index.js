@@ -14,5 +14,8 @@ export {
   LoadingDots,
 } from './LoadingStates';
 
+// Theme
+export { ThemeToggle } from './ThemeToggle';
+
 // Demo components (for development/testing)
 export { LoadingStatesDemo } from './LoadingStatesDemo';
