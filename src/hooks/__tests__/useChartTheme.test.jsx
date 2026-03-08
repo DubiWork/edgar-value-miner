@@ -43,6 +43,8 @@ describe('useChartTheme', () => {
       'chartColor4',
       'chartColor5',
       'chartColor6',
+      'successColor',
+      'dangerColor',
       'textColor',
       'textMutedColor',
       'gridColor',
@@ -57,12 +59,12 @@ describe('useChartTheme', () => {
     });
   });
 
-  it('returns exactly 11 properties', () => {
+  it('returns exactly 13 properties', () => {
     setSystemTheme(false);
 
     const { result } = renderHook(() => useChartTheme(), { wrapper });
 
-    expect(Object.keys(result.current)).toHaveLength(11);
+    expect(Object.keys(result.current)).toHaveLength(13);
   });
 
   // =========================================================================

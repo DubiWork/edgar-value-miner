@@ -26,5 +26,7 @@ describe('Dashboard barrel exports', () => {
     expect(barrel.ChartContainer).toBeDefined();
     expect(barrel.RevenueChart).toBeDefined();
     expect(typeof barrel.RevenueChart).toBe('function');
+    expect(barrel.FCFChart).toBeDefined();
+    expect(typeof barrel.FCFChart).toBe('function');
   }, 15000);
 });
