@@ -40,4 +40,16 @@
   .chart-container--responsive {
     height: 250px !important;
   }
+
+  .chart-container__header {
+    padding: var(--spacing-3) var(--spacing-4) 0;
+  }
+
+  .chart-container__body {
+    padding: var(--spacing-3) var(--spacing-4) var(--spacing-4);
+  }
+
+  .chart-container__title {
+    font-size: 0.875rem;
+  }
 }

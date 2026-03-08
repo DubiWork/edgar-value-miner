@@ -58,6 +58,14 @@
   .chart-container-skeleton--responsive {
     height: 250px !important;
   }
+
+  .chart-container-skeleton__header {
+    padding: var(--spacing-3) var(--spacing-4) 0;
+  }
+
+  .chart-container-skeleton__body {
+    padding: var(--spacing-3) var(--spacing-4) var(--spacing-4);
+  }
 }
 
 /* Reduced motion */

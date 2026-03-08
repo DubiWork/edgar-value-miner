@@ -25,6 +25,9 @@ export default defineConfig({
         'src/hooks/useTheme.js',
         'src/components/ThemeToggle.jsx',
         'src/utils/storage.js',
+        'src/utils/formatCurrency.js',
+        'src/utils/calculateYoY.js',
+        'src/components/Dashboard/RevenueChart.jsx',
       ],
       exclude: [
         'src/**/__tests__/**',
