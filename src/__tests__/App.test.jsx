@@ -136,6 +136,11 @@ vi.mock('../components/Dashboard', () => ({
       {children}
     </div>
   ),
+  FCFChart: ({ data }) => (
+    <div data-testid="fcf-chart" data-has-data={Array.isArray(data) && data.length > 0}>
+      FCFChart mock
+    </div>
+  ),
   DashboardSkeleton: () => (
     <div data-testid="dashboard-skeleton">Loading skeleton...</div>
   ),

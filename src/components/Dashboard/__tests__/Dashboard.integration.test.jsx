@@ -11,6 +11,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, within, cleanup } from '@testing-library/react';
+import { ThemeProvider } from '../../../contexts/ThemeProvider';
 import App from '../../../App';
 import {
   mockAppleData,
@@ -106,6 +107,31 @@ vi.mock('../../../components/ErrorBoundary', () => ({
 // Helpers
 // =============================================================================
 
+/**
+ * Renders App wrapped in ThemeProvider for integration tests.
+ * FCFChart (and other chart components) require ThemeProvider context
+ * for useChartTheme hook.
+ */
+function renderApp() {
+  return render(
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
+  );
+}
+
+/**
+ * Rerenders App wrapped in ThemeProvider for integration tests.
+ * Used with rerender from RTL when testing state transitions.
+ */
+function rerenderApp(rerender) {
+  return rerender(
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
+  );
+}
+
 function setHookState(overrides) {
   mockHookReturn = {
     data: null,
@@ -140,19 +166,19 @@ describe('Dashboard Integration Tests', () => {
   describe('Welcome to Dashboard transition', () => {
     it('IT-DASH-01: shows welcome state initially, then dashboard after data loads', () => {
       // Phase 1: Welcome state
-      const { rerender } = render(<App />);
+      const { rerender } = renderApp();
       expect(screen.getByTestId('welcome-state')).toBeTruthy();
       expect(screen.getByText('Find gems in the market')).toBeTruthy();
 
       // Phase 2: Simulate loading state
       setHookState({ loading: true });
-      rerender(<App />);
+      rerenderApp(rerender);
       expect(screen.queryByTestId('welcome-state')).toBeNull();
       expect(screen.getByTestId('dashboard-skeleton')).toBeTruthy();
 
       // Phase 3: Data loaded
       setHookState({ data: mockAppleData });
-      rerender(<App />);
+      rerenderApp(rerender);
       expect(screen.queryByTestId('welcome-state')).toBeNull();
       expect(screen.queryByTestId('dashboard-skeleton')).toBeNull();
       expect(screen.getByTestId('dashboard-layout')).toBeTruthy();
@@ -160,7 +186,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('IT-DASH-06: compact search in header triggers new company load', () => {
       setHookState({ data: mockAppleData });
-      render(<App />);
+      renderApp();
 
       const compactInput = screen.getByTestId('ticker-input-compact');
       fireEvent.change(compactInput, { target: { value: 'MSFT' } });
@@ -178,7 +204,7 @@ describe('Dashboard Integration Tests', () => {
     it('IT-DASH-02: shows skeletons during loading, replaced by data', () => {
       // Loading state
       setHookState({ loading: true });
-      const { rerender } = render(<App />);
+      const { rerender } = renderApp();
 
       const skeleton = screen.getByTestId('dashboard-skeleton');
       expect(skeleton).toBeTruthy();
@@ -188,7 +214,7 @@ describe('Dashboard Integration Tests', () => {
 
       // Data loaded
       setHookState({ data: mockAppleData });
-      rerender(<App />);
+      rerenderApp(rerender);
 
       expect(screen.queryByTestId('dashboard-skeleton')).toBeNull();
       expect(screen.getByTestId('dashboard-layout')).toBeTruthy();
@@ -196,7 +222,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('IT-DASH-14: skeleton renders correct number of loaders', () => {
       setHookState({ loading: true });
-      render(<App />);
+      renderApp();
 
       // DashboardSkeleton uses default 3 metric skeletons + 1 hero + 2 secondary = 3 chart skeletons
       const metricSkeletons = screen.getAllByTestId('metric-card-skeleton');
@@ -224,7 +250,7 @@ describe('Dashboard Integration Tests', () => {
           retryable: true,
         },
       });
-      render(<App />);
+      renderApp();
 
       expect(screen.getByTestId('error-state')).toBeTruthy();
       expect(screen.getByTestId('error-fallback')).toBeTruthy();
@@ -241,7 +267,7 @@ describe('Dashboard Integration Tests', () => {
           retryable: true,
         },
       });
-      const { rerender } = render(<App />);
+      const { rerender } = renderApp();
 
       expect(screen.getByTestId('error-fallback')).toBeTruthy();
 
@@ -251,7 +277,7 @@ describe('Dashboard Integration Tests', () => {
 
       // Simulate successful reload
       setHookState({ data: mockAppleData });
-      rerender(<App />);
+      rerenderApp(rerender);
 
       expect(screen.queryByTestId('error-fallback')).toBeNull();
       expect(screen.getByTestId('dashboard-layout')).toBeTruthy();
@@ -265,7 +291,7 @@ describe('Dashboard Integration Tests', () => {
   describe('MetricCard data flow', () => {
     it('IT-DASH-04: renders metric cards with correctly formatted values from data', () => {
       setHookState({ data: mockAppleData });
-      render(<App />);
+      renderApp();
 
       // Revenue card should exist with formatted value
       const metricCards = screen.getAllByTestId('metric-card');
@@ -279,7 +305,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('IT-DASH-15: metric card trend arrows reflect year-over-year change', () => {
       setHookState({ data: mockAppleData });
-      render(<App />);
+      renderApp();
 
       // Apple revenue goes from 391B to 420B = up trend
       // Look for up trend indicator (triangle up)
@@ -289,7 +315,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('IT-DASH-16: extreme value formatting works correctly', () => {
       setHookState({ data: mockAppleData });
-      render(<App />);
+      renderApp();
 
       // Revenue $420B should be formatted as "$420.0B"
       const values = document.querySelectorAll('.metric-card__value');
@@ -308,7 +334,7 @@ describe('Dashboard Integration Tests', () => {
   describe('Theme integration', () => {
     it('IT-DASH-05: dashboard layout renders with theme-aware CSS variables', () => {
       setHookState({ data: mockAppleData });
-      render(<App />);
+      renderApp();
 
       // Dashboard is rendered within a div that uses CSS variables
       const appContainer = screen.getByTestId('dashboard-layout').closest('[style]');
@@ -318,7 +344,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('renders all components consistently with default theme', () => {
       setHookState({ data: mockAppleData });
-      render(<App />);
+      renderApp();
 
       // All major components should be present
       expect(screen.getByTestId('dashboard-layout')).toBeTruthy();
@@ -340,7 +366,7 @@ describe('Dashboard Integration Tests', () => {
   describe('Empty and edge-case data handling', () => {
     it('IT-DASH-07: company with empty metrics renders dashboard without metric cards', () => {
       setHookState({ data: mockNullDataCompany });
-      render(<App />);
+      renderApp();
 
       expect(screen.getByTestId('dashboard-layout')).toBeTruthy();
       // CompanyBanner should still render
@@ -353,7 +379,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('IT-DASH-09: company with 1 year of data renders single data points', () => {
       setHookState({ data: mockPreRevenueCompany });
-      render(<App />);
+      renderApp();
 
       expect(screen.getByTestId('dashboard-layout')).toBeTruthy();
       expect(screen.getByText('New IPO Corp')).toBeTruthy();
@@ -366,7 +392,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('IT-DASH-10: company with 10 years of data renders all data', () => {
       setHookState({ data: mockTenYearCompany });
-      render(<App />);
+      renderApp();
 
       expect(screen.getByTestId('dashboard-layout')).toBeTruthy();
       expect(screen.getByText('Microsoft Corporation')).toBeTruthy();
@@ -385,7 +411,7 @@ describe('Dashboard Integration Tests', () => {
   describe('Partial and mixed data', () => {
     it('IT-DASH-08: partial data company renders available metrics only', () => {
       setHookState({ data: mockPartialDataCompany });
-      render(<App />);
+      renderApp();
 
       expect(screen.getByTestId('dashboard-layout')).toBeTruthy();
 
@@ -401,7 +427,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('handles company with negative values correctly', () => {
       setHookState({ data: mockNegativeCompany });
-      render(<App />);
+      renderApp();
 
       expect(screen.getByTestId('dashboard-layout')).toBeTruthy();
       expect(screen.getByText('Money Losing Inc.')).toBeTruthy();
@@ -421,7 +447,7 @@ describe('Dashboard Integration Tests', () => {
   describe('Accessibility', () => {
     it('IT-DASH-11: dashboard skeleton has proper ARIA attributes', () => {
       setHookState({ loading: true });
-      render(<App />);
+      renderApp();
 
       const skeleton = screen.getByTestId('dashboard-skeleton');
       expect(skeleton.getAttribute('role')).toBe('status');
@@ -431,7 +457,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('dashboard sections have proper ARIA labels', () => {
       setHookState({ data: mockAppleData });
-      render(<App />);
+      renderApp();
 
       // Check that main content area exists
       const main = document.querySelector('main');
@@ -444,7 +470,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('metric cards have accessible labels', () => {
       setHookState({ data: mockAppleData });
-      render(<App />);
+      renderApp();
 
       // MetricCards should have h3 headings for titles
       const metricCards = screen.getAllByTestId('metric-card');
@@ -460,7 +486,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('chart containers have accessible section labels', () => {
       setHookState({ data: mockAppleData });
-      render(<App />);
+      renderApp();
 
       const chartContainers = screen.getAllByTestId('chart-container');
       chartContainers.forEach((container) => {
@@ -477,7 +503,7 @@ describe('Dashboard Integration Tests', () => {
   describe('Loading state behavior', () => {
     it('IT-DASH-12: search input reports searching state during loading', () => {
       setHookState({ loading: true });
-      render(<App />);
+      renderApp();
 
       const compactSearch = screen.getByTestId('ticker-search-compact');
       expect(compactSearch.getAttribute('data-searching')).toBe('true');
@@ -491,7 +517,7 @@ describe('Dashboard Integration Tests', () => {
   describe('Long company name', () => {
     it('renders long company names in banner with title attribute', () => {
       setHookState({ data: mockLongNameCompany });
-      render(<App />);
+      renderApp();
 
       const heading = screen.getByRole('heading', { level: 1 });
       expect(heading.textContent).toBe(mockLongNameCompany.companyName);
@@ -506,7 +532,7 @@ describe('Dashboard Integration Tests', () => {
   describe('Full dashboard composition', () => {
     it('renders banner, metrics, hero chart, and secondary charts together', () => {
       setHookState({ data: mockAppleData });
-      render(<App />);
+      renderApp();
 
       // Banner
       const banner = screen.getByTestId('company-banner');
@@ -533,7 +559,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('renders dashboard layout with proper grid structure', () => {
       setHookState({ data: mockAppleData });
-      render(<App />);
+      renderApp();
 
       const layout = screen.getByTestId('dashboard-layout');
       expect(layout.className).toContain('dashboard-layout');
@@ -551,7 +577,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('renders correct section order in dashboard', () => {
       setHookState({ data: mockAppleData });
-      render(<App />);
+      renderApp();
 
       const layout = screen.getByTestId('dashboard-layout');
       const grid = layout.querySelector('.dashboard-layout__grid');
@@ -572,7 +598,7 @@ describe('Dashboard Integration Tests', () => {
   describe('Responsive layout classes', () => {
     it('dashboard layout has responsive padding classes', () => {
       setHookState({ data: mockAppleData });
-      render(<App />);
+      renderApp();
 
       const layout = screen.getByTestId('dashboard-layout');
       expect(layout.className).toContain('px-4');
@@ -582,7 +608,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('chart containers have responsive class', () => {
       setHookState({ data: mockAppleData });
-      render(<App />);
+      renderApp();
 
       const chartContainers = screen.getAllByTestId('chart-container');
       chartContainers.forEach((container) => {
@@ -605,7 +631,7 @@ describe('Dashboard Integration Tests', () => {
           lastUpdated: '2025-12-15T10:00:00Z',
         },
       });
-      render(<App />);
+      renderApp();
 
       const metadataEl = screen.getByTestId('cache-metadata');
       expect(metadataEl).toBeTruthy();
@@ -614,7 +640,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('does not render cache metadata when not available', () => {
       setHookState({ data: mockAppleData, metadata: null });
-      render(<App />);
+      renderApp();
 
       expect(screen.queryByTestId('cache-metadata')).toBeNull();
     });
@@ -627,7 +653,7 @@ describe('Dashboard Integration Tests', () => {
   describe('State mutual exclusivity', () => {
     it('only one state is visible at a time: welcome', () => {
       setHookState({});
-      render(<App />);
+      renderApp();
 
       expect(screen.getByTestId('welcome-state')).toBeTruthy();
       expect(screen.queryByTestId('dashboard-skeleton')).toBeNull();
@@ -637,7 +663,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('only one state is visible at a time: loading', () => {
       setHookState({ loading: true });
-      render(<App />);
+      renderApp();
 
       expect(screen.queryByTestId('welcome-state')).toBeNull();
       expect(screen.getByTestId('dashboard-skeleton')).toBeTruthy();
@@ -652,7 +678,7 @@ describe('Dashboard Integration Tests', () => {
 
     it('only one state is visible at a time: data loaded', () => {
       setHookState({ data: mockAppleData });
-      render(<App />);
+      renderApp();
 
       expect(screen.queryByTestId('welcome-state')).toBeNull();
       expect(screen.queryByTestId('dashboard-skeleton')).toBeNull();
@@ -669,7 +695,7 @@ describe('Dashboard Integration Tests', () => {
           retryable: false,
         },
       });
-      render(<App />);
+      renderApp();
 
       expect(screen.queryByTestId('welcome-state')).toBeNull();
       expect(screen.queryByTestId('dashboard-skeleton')).toBeNull();

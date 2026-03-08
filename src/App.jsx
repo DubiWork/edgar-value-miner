@@ -7,6 +7,7 @@ import {
   CompanyBanner,
   MetricCard,
   ChartContainer,
+  FCFChart,
   DashboardSkeleton,
 } from './components/Dashboard'
 import { useCompanySearch } from './hooks/useCompanySearch'
@@ -355,12 +356,10 @@ function App() {
             }
             secondaryCharts={[
               <ChartContainer key="fcf-chart" title="Free Cash Flow" loading={false}>
-                <div
-                  className="flex items-center justify-center h-full"
-                  style={{ color: 'var(--color-text-muted)' }}
-                >
-                  Chart placeholder — Recharts integration coming in Issue #6
-                </div>
+                <FCFChart
+                  data={data?.metrics?.freeCashFlow?.annual}
+                  animationDisabled={false}
+                />
               </ChartContainer>,
               <ChartContainer key="margins-chart" title="Margins" loading={false}>
                 <div
