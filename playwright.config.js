@@ -1,4 +1,11 @@
+/* global process */
 import { defineConfig, devices } from '@playwright/test';
+
+/**
+ * Use a dedicated port for E2E tests to avoid conflicts with other dev servers
+ * that may already be running on the default Vite port (5173).
+ */
+const E2E_PORT = 5174;
 
 export default defineConfig({
   testDir: './e2e',
@@ -9,7 +16,7 @@ export default defineConfig({
   reporter: 'list',
 
   use: {
-    baseURL: 'http://localhost:5173/edgar-value-miner/',
+    baseURL: `http://localhost:${E2E_PORT}/edgar-value-miner/`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -22,8 +29,8 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173/edgar-value-miner/',
+    command: `npx vite --port ${E2E_PORT} --strictPort`,
+    url: `http://localhost:${E2E_PORT}/edgar-value-miner/`,
     reuseExistingServer: true,
     timeout: 60000,
   },

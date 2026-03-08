@@ -80,10 +80,14 @@ test.describe('Dashboard smoke tests', () => {
     await mockAPIs(page);
     await page.goto('/');
 
+    // Wait for the app to be fully rendered before reading attributes
+    await expect(page.locator('[data-testid="welcome-state"]')).toBeVisible();
+
     const html = page.locator('html');
 
-    // Read initial theme
+    // Read initial theme (should be set by ThemeProvider on mount)
     const initialTheme = await html.getAttribute('data-theme');
+    expect(initialTheme).not.toBeNull();
 
     // Click the toggle (aria-label starts with "Switch to")
     const toggle = page.getByRole('button', { name: /Switch to/ });
