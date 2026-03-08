@@ -1,0 +1,50 @@
+/* =================================================================
+   MetricCardSkeleton Component Styles
+   Matches the shape/layout of MetricCard during loading.
+   Uses semantic CSS variables from index.css for theme support.
+   ================================================================= */
+
+.metric-card-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  min-height: 120px;
+}
+
+/* Shimmer base for all skeleton bars */
+.metric-card-skeleton__bone {
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    to right,
+    var(--color-border),
+    var(--color-bg-hover),
+    var(--color-border)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+/* Title placeholder — matches .metric-card__title at 0.875rem */
+.metric-card-skeleton__bone--title {
+  height: 0.875rem;
+  width: 40%;
+}
+
+/* Value placeholder — matches .metric-card__value at 1.875rem */
+.metric-card-skeleton__bone--value {
+  height: 1.875rem;
+  width: 60%;
+}
+
+/* Trend placeholder — matches .metric-card__trend at 0.875rem */
+.metric-card-skeleton__bone--trend {
+  height: 0.875rem;
+  width: 30%;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .metric-card-skeleton__bone {
+    animation: none;
+  }
+}

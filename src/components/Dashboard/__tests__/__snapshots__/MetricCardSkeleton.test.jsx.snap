@@ -1,0 +1,26 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MetricCardSkeleton > matches snapshot 1`] = `
+<div
+  aria-busy="true"
+  aria-label="Loading metric"
+  class="card metric-card-skeleton"
+  data-testid="metric-card-skeleton"
+  role="status"
+>
+  <div
+    class="metric-card-skeleton__bone metric-card-skeleton__bone--title"
+  />
+  <div
+    class="metric-card-skeleton__bone metric-card-skeleton__bone--value"
+  />
+  <div
+    class="metric-card-skeleton__bone metric-card-skeleton__bone--trend"
+  />
+  <span
+    class="sr-only"
+  >
+    Loading metric...
+  </span>
+</div>
+`;

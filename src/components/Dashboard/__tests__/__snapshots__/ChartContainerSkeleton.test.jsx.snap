@@ -1,0 +1,63 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ChartContainerSkeleton > matches snapshot with custom height 1`] = `
+<div
+  aria-busy="true"
+  aria-label="Loading chart"
+  class="chart-container-skeleton chart-container-skeleton--responsive"
+  data-testid="chart-container-skeleton"
+  role="status"
+  style="height: 400px;"
+>
+  <div
+    class="chart-container-skeleton__header"
+  >
+    <div
+      class="chart-container-skeleton__bone chart-container-skeleton__bone--title"
+    />
+  </div>
+  <div
+    class="chart-container-skeleton__body"
+  >
+    <div
+      class="chart-container-skeleton__bone chart-container-skeleton__bone--chart"
+    />
+  </div>
+  <span
+    class="sr-only"
+  >
+    Loading chart...
+  </span>
+</div>
+`;
+
+exports[`ChartContainerSkeleton > matches snapshot with default props 1`] = `
+<div
+  aria-busy="true"
+  aria-label="Loading chart"
+  class="chart-container-skeleton chart-container-skeleton--responsive"
+  data-testid="chart-container-skeleton"
+  role="status"
+  style="height: 300px;"
+>
+  <div
+    class="chart-container-skeleton__header"
+  >
+    <div
+      class="chart-container-skeleton__bone chart-container-skeleton__bone--title"
+    />
+  </div>
+  <div
+    class="chart-container-skeleton__body"
+  >
+    <div
+      class="chart-container-skeleton__bone chart-container-skeleton__bone--chart"
+    />
+  </div>
+  <span
+    class="sr-only"
+  >
+    Loading chart...
+  </span>
+</div>
+`;
