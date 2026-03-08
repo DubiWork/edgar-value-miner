@@ -227,6 +227,8 @@ function devLog(level, message, data = undefined) {
  * }
  */
 export async function getCompanyFactsFromFirestore(ticker) {
+  if (!db) return null;
+
   const normalizedTicker = normalizeTicker(ticker);
 
   try {
@@ -306,6 +308,15 @@ export async function getCompanyFactsFromFirestore(ticker) {
  * }
  */
 export async function checkIfCached(ticker) {
+  const defaultResult = {
+    exists: false,
+    needsRefresh: false,
+    lastUpdated: null,
+    accessCount: 0,
+  };
+
+  if (!db) return defaultResult;
+
   const normalizedTicker = normalizeTicker(ticker);
 
   try {
@@ -381,6 +392,8 @@ export async function getGlobalCacheStats() {
     isAvailable: false,
   };
 
+  if (!db) return defaultStats;
+
   try {
     const collectionRef = collection(db, FIRESTORE_CONFIG.COLLECTION_NAME);
 
@@ -430,6 +443,8 @@ export async function getGlobalCacheStats() {
  * await setCompanyFactsToFirestore('AAPL', companyFacts, '0000320193', 'Apple Inc.');
  */
 export async function setCompanyFactsToFirestore(ticker, companyFacts, cik, companyName, options = {}) {
+  if (!db) return false;
+
   const normalizedTicker = normalizeTicker(ticker);
 
   const document = {
@@ -479,6 +494,8 @@ export async function setCompanyFactsToFirestore(ticker, companyFacts, cik, comp
  * await updateAccessCount('AAPL');
  */
 export async function updateAccessCount(ticker) {
+  if (!db) return false;
+
   const normalizedTicker = normalizeTicker(ticker);
 
   try {
@@ -524,6 +541,8 @@ export async function updateAccessCount(ticker) {
  * await invalidateGlobalCache('AAPL');
  */
 export async function invalidateGlobalCache(ticker) {
+  if (!db) return false;
+
   const normalizedTicker = normalizeTicker(ticker);
 
   try {
