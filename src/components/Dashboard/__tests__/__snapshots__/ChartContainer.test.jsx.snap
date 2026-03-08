@@ -1,0 +1,131 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ChartContainer > matches snapshot for default state 1`] = `
+<section
+  aria-label="Revenue chart"
+  class="chart-container chart-container--responsive"
+  data-testid="chart-container"
+  style="height: 300px;"
+>
+  <div
+    class="chart-container__header"
+  >
+    <h3
+      class="chart-container__title"
+    >
+      Revenue
+    </h3>
+  </div>
+  <div
+    class="chart-container__body"
+  >
+    <div
+      class="card"
+    >
+      Revenue Chart Placeholder
+    </div>
+  </div>
+</section>
+`;
+
+exports[`ChartContainer > matches snapshot for loading state 1`] = `
+<section
+  aria-label="Revenue chart"
+  class="chart-container chart-container--responsive"
+  data-testid="chart-container"
+  style="height: 300px;"
+>
+  <div
+    class="chart-container__header"
+  >
+    <h3
+      class="chart-container__title"
+    >
+      Revenue
+    </h3>
+  </div>
+  <div
+    class="chart-container__body"
+  >
+    <div
+      aria-label="Loading line chart"
+      class="card "
+      role="status"
+    >
+      <div
+        class="flex justify-between items-center mb-4"
+      >
+        <div
+          class="animate-pulse rounded h-5 w-32"
+          style="background-color: var(--color-border);"
+        />
+        <div
+          class="flex space-x-2"
+        >
+          <div
+            class="animate-pulse rounded h-6 w-16"
+            style="background-color: var(--color-border);"
+          />
+          <div
+            class="animate-pulse rounded h-6 w-16"
+            style="background-color: var(--color-border);"
+          />
+        </div>
+      </div>
+      <div
+        class="relative overflow-hidden rounded-lg bg-[length:200%_100%] animate-shimmer"
+        style="height: 240px; background-image: linear-gradient(to right, var(--color-border), var(--color-bg-hover), var(--color-border));"
+      >
+        <svg
+          class="absolute inset-0 w-full h-full opacity-20"
+          preserveAspectRatio="none"
+          viewBox="0 0 400 200"
+        >
+          <path
+            d="M0,150 Q50,120 100,140 T200,100 T300,130 T400,80"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            style="color: var(--color-text-muted);"
+          />
+        </svg>
+      </div>
+      <div
+        class="flex justify-center space-x-6 mt-4"
+      >
+        <div
+          class="flex items-center space-x-2"
+        >
+          <div
+            class="animate-pulse rounded h-3 w-3"
+            style="background-color: var(--color-border);"
+          />
+          <div
+            class="animate-pulse rounded h-3 w-16"
+            style="background-color: var(--color-border);"
+          />
+        </div>
+        <div
+          class="flex items-center space-x-2"
+        >
+          <div
+            class="animate-pulse rounded h-3 w-3"
+            style="background-color: var(--color-border);"
+          />
+          <div
+            class="animate-pulse rounded h-3 w-16"
+            style="background-color: var(--color-border);"
+          />
+        </div>
+      </div>
+      <span
+        class="sr-only"
+      >
+        Loading 
+        line
+         chart...
+      </span>
+    </div>
+  </div>
+</section>
+`;

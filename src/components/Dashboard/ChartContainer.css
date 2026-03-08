@@ -1,0 +1,55 @@
+/* =================================================================
+   ChartContainer — Fixed-height wrapper for chart sections.
+   Prevents CLS (Cumulative Layout Shift) by reserving space
+   before chart data loads.
+   ================================================================= */
+
+.chart-container {
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  border-width: 1px;
+  border-color: var(--color-border);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-container__header {
+  padding: var(--spacing-4) var(--spacing-6) 0;
+}
+
+.chart-container__title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.chart-container__body {
+  padding: var(--spacing-4) var(--spacing-6) var(--spacing-6);
+  flex: 1;
+  min-height: 0;
+}
+
+/* =================================================================
+   Responsive height override: 250px on mobile (<768px)
+   ================================================================= */
+@media (max-width: 767px) {
+  .chart-container--responsive {
+    height: 250px !important;
+  }
+
+  .chart-container__header {
+    padding: var(--spacing-3) var(--spacing-4) 0;
+  }
+
+  .chart-container__body {
+    padding: var(--spacing-3) var(--spacing-4) var(--spacing-4);
+  }
+
+  .chart-container__title {
+    font-size: 0.875rem;
+  }
+}

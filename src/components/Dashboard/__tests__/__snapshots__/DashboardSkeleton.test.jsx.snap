@@ -1,0 +1,431 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`DashboardSkeleton > matches snapshot with custom props 1`] = `
+<div
+  aria-busy="true"
+  aria-label="Loading dashboard"
+  data-testid="dashboard-skeleton"
+  role="status"
+>
+  <div
+    class="dashboard-layout max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
+    data-testid="dashboard-layout"
+  >
+    <div
+      class="dashboard-layout__grid"
+    >
+      <section
+        aria-label="Company banner"
+      >
+        <div
+          aria-busy="true"
+          aria-label="Loading company banner"
+          class="company-banner-skeleton"
+          data-testid="company-banner-skeleton"
+          role="status"
+        >
+          <div
+            class="company-banner-skeleton__identity"
+          >
+            <div
+              class="company-banner-skeleton__bone company-banner-skeleton__bone--name"
+            />
+            <div
+              class="company-banner-skeleton__bone company-banner-skeleton__bone--ticker"
+            />
+          </div>
+          <div
+            class="company-banner-skeleton__bone company-banner-skeleton__bone--price"
+          />
+          <span
+            class="sr-only"
+          >
+            Loading company banner...
+          </span>
+        </div>
+      </section>
+      <section
+        aria-label="Key metrics"
+      >
+        <div
+          class="dashboard-layout__metrics-grid"
+        >
+          <article
+            aria-label="Metric 1"
+          >
+            <div
+              aria-busy="true"
+              aria-label="Loading metric"
+              class="card metric-card-skeleton"
+              data-testid="metric-card-skeleton"
+              role="status"
+            >
+              <div
+                class="metric-card-skeleton__bone metric-card-skeleton__bone--title"
+              />
+              <div
+                class="metric-card-skeleton__bone metric-card-skeleton__bone--value"
+              />
+              <div
+                class="metric-card-skeleton__bone metric-card-skeleton__bone--trend"
+              />
+              <span
+                class="sr-only"
+              >
+                Loading metric...
+              </span>
+            </div>
+          </article>
+          <article
+            aria-label="Metric 2"
+          >
+            <div
+              aria-busy="true"
+              aria-label="Loading metric"
+              class="card metric-card-skeleton"
+              data-testid="metric-card-skeleton"
+              role="status"
+            >
+              <div
+                class="metric-card-skeleton__bone metric-card-skeleton__bone--title"
+              />
+              <div
+                class="metric-card-skeleton__bone metric-card-skeleton__bone--value"
+              />
+              <div
+                class="metric-card-skeleton__bone metric-card-skeleton__bone--trend"
+              />
+              <span
+                class="sr-only"
+              >
+                Loading metric...
+              </span>
+            </div>
+          </article>
+        </div>
+      </section>
+      <section
+        aria-label="Primary chart"
+      >
+        <div
+          aria-busy="true"
+          aria-label="Loading chart"
+          class="chart-container-skeleton chart-container-skeleton--responsive"
+          data-testid="chart-container-skeleton"
+          role="status"
+          style="height: 400px;"
+        >
+          <div
+            class="chart-container-skeleton__header"
+          >
+            <div
+              class="chart-container-skeleton__bone chart-container-skeleton__bone--title"
+            />
+          </div>
+          <div
+            class="chart-container-skeleton__body"
+          >
+            <div
+              class="chart-container-skeleton__bone chart-container-skeleton__bone--chart"
+            />
+          </div>
+          <span
+            class="sr-only"
+          >
+            Loading chart...
+          </span>
+        </div>
+      </section>
+      <section
+        aria-label="Secondary charts"
+      >
+        <div
+          class="dashboard-layout__charts-grid"
+        >
+          <article
+            aria-label="Chart 1"
+          >
+            <div
+              aria-busy="true"
+              aria-label="Loading chart"
+              class="chart-container-skeleton chart-container-skeleton--responsive"
+              data-testid="chart-container-skeleton"
+              role="status"
+              style="height: 250px;"
+            >
+              <div
+                class="chart-container-skeleton__header"
+              >
+                <div
+                  class="chart-container-skeleton__bone chart-container-skeleton__bone--title"
+                />
+              </div>
+              <div
+                class="chart-container-skeleton__body"
+              >
+                <div
+                  class="chart-container-skeleton__bone chart-container-skeleton__bone--chart"
+                />
+              </div>
+              <span
+                class="sr-only"
+              >
+                Loading chart...
+              </span>
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
+  </div>
+  <span
+    class="sr-only"
+  >
+    Loading dashboard...
+  </span>
+</div>
+`;
+
+exports[`DashboardSkeleton > matches snapshot with default props 1`] = `
+<div
+  aria-busy="true"
+  aria-label="Loading dashboard"
+  data-testid="dashboard-skeleton"
+  role="status"
+>
+  <div
+    class="dashboard-layout max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
+    data-testid="dashboard-layout"
+  >
+    <div
+      class="dashboard-layout__grid"
+    >
+      <section
+        aria-label="Company banner"
+      >
+        <div
+          aria-busy="true"
+          aria-label="Loading company banner"
+          class="company-banner-skeleton"
+          data-testid="company-banner-skeleton"
+          role="status"
+        >
+          <div
+            class="company-banner-skeleton__identity"
+          >
+            <div
+              class="company-banner-skeleton__bone company-banner-skeleton__bone--name"
+            />
+            <div
+              class="company-banner-skeleton__bone company-banner-skeleton__bone--ticker"
+            />
+          </div>
+          <div
+            class="company-banner-skeleton__bone company-banner-skeleton__bone--price"
+          />
+          <span
+            class="sr-only"
+          >
+            Loading company banner...
+          </span>
+        </div>
+      </section>
+      <section
+        aria-label="Key metrics"
+      >
+        <div
+          class="dashboard-layout__metrics-grid"
+        >
+          <article
+            aria-label="Metric 1"
+          >
+            <div
+              aria-busy="true"
+              aria-label="Loading metric"
+              class="card metric-card-skeleton"
+              data-testid="metric-card-skeleton"
+              role="status"
+            >
+              <div
+                class="metric-card-skeleton__bone metric-card-skeleton__bone--title"
+              />
+              <div
+                class="metric-card-skeleton__bone metric-card-skeleton__bone--value"
+              />
+              <div
+                class="metric-card-skeleton__bone metric-card-skeleton__bone--trend"
+              />
+              <span
+                class="sr-only"
+              >
+                Loading metric...
+              </span>
+            </div>
+          </article>
+          <article
+            aria-label="Metric 2"
+          >
+            <div
+              aria-busy="true"
+              aria-label="Loading metric"
+              class="card metric-card-skeleton"
+              data-testid="metric-card-skeleton"
+              role="status"
+            >
+              <div
+                class="metric-card-skeleton__bone metric-card-skeleton__bone--title"
+              />
+              <div
+                class="metric-card-skeleton__bone metric-card-skeleton__bone--value"
+              />
+              <div
+                class="metric-card-skeleton__bone metric-card-skeleton__bone--trend"
+              />
+              <span
+                class="sr-only"
+              >
+                Loading metric...
+              </span>
+            </div>
+          </article>
+          <article
+            aria-label="Metric 3"
+          >
+            <div
+              aria-busy="true"
+              aria-label="Loading metric"
+              class="card metric-card-skeleton"
+              data-testid="metric-card-skeleton"
+              role="status"
+            >
+              <div
+                class="metric-card-skeleton__bone metric-card-skeleton__bone--title"
+              />
+              <div
+                class="metric-card-skeleton__bone metric-card-skeleton__bone--value"
+              />
+              <div
+                class="metric-card-skeleton__bone metric-card-skeleton__bone--trend"
+              />
+              <span
+                class="sr-only"
+              >
+                Loading metric...
+              </span>
+            </div>
+          </article>
+        </div>
+      </section>
+      <section
+        aria-label="Primary chart"
+      >
+        <div
+          aria-busy="true"
+          aria-label="Loading chart"
+          class="chart-container-skeleton chart-container-skeleton--responsive"
+          data-testid="chart-container-skeleton"
+          role="status"
+          style="height: 300px;"
+        >
+          <div
+            class="chart-container-skeleton__header"
+          >
+            <div
+              class="chart-container-skeleton__bone chart-container-skeleton__bone--title"
+            />
+          </div>
+          <div
+            class="chart-container-skeleton__body"
+          >
+            <div
+              class="chart-container-skeleton__bone chart-container-skeleton__bone--chart"
+            />
+          </div>
+          <span
+            class="sr-only"
+          >
+            Loading chart...
+          </span>
+        </div>
+      </section>
+      <section
+        aria-label="Secondary charts"
+      >
+        <div
+          class="dashboard-layout__charts-grid"
+        >
+          <article
+            aria-label="Chart 1"
+          >
+            <div
+              aria-busy="true"
+              aria-label="Loading chart"
+              class="chart-container-skeleton chart-container-skeleton--responsive"
+              data-testid="chart-container-skeleton"
+              role="status"
+              style="height: 300px;"
+            >
+              <div
+                class="chart-container-skeleton__header"
+              >
+                <div
+                  class="chart-container-skeleton__bone chart-container-skeleton__bone--title"
+                />
+              </div>
+              <div
+                class="chart-container-skeleton__body"
+              >
+                <div
+                  class="chart-container-skeleton__bone chart-container-skeleton__bone--chart"
+                />
+              </div>
+              <span
+                class="sr-only"
+              >
+                Loading chart...
+              </span>
+            </div>
+          </article>
+          <article
+            aria-label="Chart 2"
+          >
+            <div
+              aria-busy="true"
+              aria-label="Loading chart"
+              class="chart-container-skeleton chart-container-skeleton--responsive"
+              data-testid="chart-container-skeleton"
+              role="status"
+              style="height: 300px;"
+            >
+              <div
+                class="chart-container-skeleton__header"
+              >
+                <div
+                  class="chart-container-skeleton__bone chart-container-skeleton__bone--title"
+                />
+              </div>
+              <div
+                class="chart-container-skeleton__body"
+              >
+                <div
+                  class="chart-container-skeleton__bone chart-container-skeleton__bone--chart"
+                />
+              </div>
+              <span
+                class="sr-only"
+              >
+                Loading chart...
+              </span>
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
+  </div>
+  <span
+    class="sr-only"
+  >
+    Loading dashboard...
+  </span>
+</div>
+`;

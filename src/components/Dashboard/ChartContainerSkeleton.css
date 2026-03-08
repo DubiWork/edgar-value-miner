@@ -1,0 +1,76 @@
+/* =================================================================
+   ChartContainerSkeleton Component Styles
+   Matches the shape/layout of ChartContainer during loading.
+   Uses semantic CSS variables for theme support.
+   ================================================================= */
+
+.chart-container-skeleton {
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  border-width: 1px;
+  border-color: var(--color-border);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-container-skeleton__header {
+  padding: var(--spacing-4) var(--spacing-6) 0;
+}
+
+.chart-container-skeleton__body {
+  padding: var(--spacing-4) var(--spacing-6) var(--spacing-6);
+  flex: 1;
+  min-height: 0;
+}
+
+/* Shimmer base for all skeleton bars */
+.chart-container-skeleton__bone {
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    to right,
+    var(--color-border),
+    var(--color-bg-hover),
+    var(--color-border)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+/* Title placeholder — matches .chart-container__title at 1rem */
+.chart-container-skeleton__bone--title {
+  height: 1rem;
+  width: 8rem;
+}
+
+/* Chart area placeholder — fills remaining body space */
+.chart-container-skeleton__bone--chart {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-lg);
+}
+
+/* =================================================================
+   Responsive height override: 250px on mobile (<768px)
+   ================================================================= */
+@media (max-width: 767px) {
+  .chart-container-skeleton--responsive {
+    height: 250px !important;
+  }
+
+  .chart-container-skeleton__header {
+    padding: var(--spacing-3) var(--spacing-4) 0;
+  }
+
+  .chart-container-skeleton__body {
+    padding: var(--spacing-3) var(--spacing-4) var(--spacing-4);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .chart-container-skeleton__bone {
+    animation: none;
+  }
+}

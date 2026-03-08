@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CompanyBannerSkeleton > matches snapshot 1`] = `
+<div
+  aria-busy="true"
+  aria-label="Loading company banner"
+  class="company-banner-skeleton"
+  data-testid="company-banner-skeleton"
+  role="status"
+>
+  <div
+    class="company-banner-skeleton__identity"
+  >
+    <div
+      class="company-banner-skeleton__bone company-banner-skeleton__bone--name"
+    />
+    <div
+      class="company-banner-skeleton__bone company-banner-skeleton__bone--ticker"
+    />
+  </div>
+  <div
+    class="company-banner-skeleton__bone company-banner-skeleton__bone--price"
+  />
+  <span
+    class="sr-only"
+  >
+    Loading company banner...
+  </span>
+</div>
+`;
