@@ -27,6 +27,7 @@ export default defineConfig({
         'src/utils/storage.js',
         'src/utils/formatCurrency.js',
         'src/utils/calculateYoY.js',
+        'src/components/Dashboard/RevenueChart.jsx',
       ],
       exclude: [
         'src/**/__tests__/**',
