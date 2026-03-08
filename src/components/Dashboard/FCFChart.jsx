@@ -158,12 +158,12 @@ FCFBarShape.propTypes = {
 
 /**
  * Custom YoY label renderer for LabelList.
- * Positions above positive bars, below negative bars.
+ * Positions label above each bar (offset from the bar top edge).
  * Returns null for the first bar (no prior year) or when no value.
  */
 function renderYoYLabel(props) {
-  const { x, y, width, value, index } = props;
-  if (!value || index === undefined) return null;
+  const { x, y, width, value } = props;
+  if (!value) return null;
 
   // Access the chart data from the BarChart payload to determine bar direction
   const offset = 8;
