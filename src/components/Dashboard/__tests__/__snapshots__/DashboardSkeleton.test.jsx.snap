@@ -8,11 +8,11 @@ exports[`DashboardSkeleton > matches snapshot with custom props 1`] = `
   role="status"
 >
   <div
-    class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
+    class="dashboard-layout max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
     data-testid="dashboard-layout"
   >
     <div
-      class="grid grid-cols-1 gap-6"
+      class="dashboard-layout__grid"
     >
       <section
         aria-label="Company banner"
@@ -48,7 +48,7 @@ exports[`DashboardSkeleton > matches snapshot with custom props 1`] = `
         aria-label="Key metrics"
       >
         <div
-          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          class="dashboard-layout__metrics-grid"
         >
           <article
             aria-label="Metric 1"
@@ -140,7 +140,7 @@ exports[`DashboardSkeleton > matches snapshot with custom props 1`] = `
         aria-label="Secondary charts"
       >
         <div
-          class="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          class="dashboard-layout__charts-grid"
         >
           <article
             aria-label="Chart 1"
@@ -194,11 +194,11 @@ exports[`DashboardSkeleton > matches snapshot with default props 1`] = `
   role="status"
 >
   <div
-    class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
+    class="dashboard-layout max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6"
     data-testid="dashboard-layout"
   >
     <div
-      class="grid grid-cols-1 gap-6"
+      class="dashboard-layout__grid"
     >
       <section
         aria-label="Company banner"
@@ -234,7 +234,7 @@ exports[`DashboardSkeleton > matches snapshot with default props 1`] = `
         aria-label="Key metrics"
       >
         <div
-          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          class="dashboard-layout__metrics-grid"
         >
           <article
             aria-label="Metric 1"
@@ -352,7 +352,7 @@ exports[`DashboardSkeleton > matches snapshot with default props 1`] = `
         aria-label="Secondary charts"
       >
         <div
-          class="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          class="dashboard-layout__charts-grid"
         >
           <article
             aria-label="Chart 1"

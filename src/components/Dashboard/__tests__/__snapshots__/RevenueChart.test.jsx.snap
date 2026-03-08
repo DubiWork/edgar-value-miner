@@ -1,0 +1,840 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = `
+<div
+  aria-label="Revenue trend chart showing annual revenue"
+  class="revenue-chart"
+  data-testid="revenue-chart"
+>
+  <div
+    class="recharts-responsive-container"
+    style="width: 100%; height: 300px; min-width: 0px;"
+  >
+    <div
+      style="width: 0px; overflow-x: visible;"
+    >
+      <div
+        class="recharts-wrapper"
+        height="300"
+        style="position: relative; cursor: default; width: 600px; height: 300px;"
+        width="600"
+      >
+        <div
+          class="recharts-tooltip-wrapper"
+          style="visibility: hidden; pointer-events: none; position: absolute; top: 0px; left: 0px;"
+          tabindex="-1"
+          xmlns="http://www.w3.org/1999/xhtml"
+        />
+        <svg
+          class="recharts-surface"
+          height="300"
+          role="application"
+          style="width: 100%; height: 100%; display: block;"
+          tabindex="0"
+          viewBox="0 0 600 300"
+          width="600"
+        >
+          <title />
+          <desc />
+          <g
+            tabindex="-1"
+          >
+            <g
+              class="recharts-cartesian-grid"
+            >
+              <g
+                class="recharts-cartesian-grid-horizontal"
+              >
+                <line
+                  fill="none"
+                  height="242"
+                  stroke="#e2e8f0"
+                  stroke-dasharray="3 3"
+                  width="516"
+                  x="68"
+                  x1="68"
+                  x2="584"
+                  y="24"
+                  y1="266"
+                  y2="266"
+                />
+                <line
+                  fill="none"
+                  height="242"
+                  stroke="#e2e8f0"
+                  stroke-dasharray="3 3"
+                  width="516"
+                  x="68"
+                  x1="68"
+                  x2="584"
+                  y="24"
+                  y1="205.5"
+                  y2="205.5"
+                />
+                <line
+                  fill="none"
+                  height="242"
+                  stroke="#e2e8f0"
+                  stroke-dasharray="3 3"
+                  width="516"
+                  x="68"
+                  x1="68"
+                  x2="584"
+                  y="24"
+                  y1="145"
+                  y2="145"
+                />
+                <line
+                  fill="none"
+                  height="242"
+                  stroke="#e2e8f0"
+                  stroke-dasharray="3 3"
+                  width="516"
+                  x="68"
+                  x1="68"
+                  x2="584"
+                  y="24"
+                  y1="84.5"
+                  y2="84.5"
+                />
+                <line
+                  fill="none"
+                  height="242"
+                  stroke="#e2e8f0"
+                  stroke-dasharray="3 3"
+                  width="516"
+                  x="68"
+                  x1="68"
+                  x2="584"
+                  y="24"
+                  y1="24"
+                  y2="24"
+                />
+              </g>
+            </g>
+          </g>
+          <g
+            tabindex="-1"
+          />
+          <defs>
+            <clippath
+              id="recharts573-clip"
+            >
+              <rect
+                height="242"
+                width="516"
+                x="68"
+                y="24"
+              />
+            </clippath>
+          </defs>
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          >
+            <g
+              class="recharts-layer recharts-bar"
+              id="recharts-bar-_r_2d_"
+            >
+              <g
+                class="recharts-layer recharts-bar-rectangles"
+              >
+                <g
+                  class="recharts-layer"
+                >
+                  <g
+                    class="recharts-layer recharts-bar-rectangle"
+                  >
+                    <path
+                      class="recharts-rectangle"
+                      d="M78.32,112.5947A 4,4,0,0,1,82.32,108.5947L 156.32,108.5947A 4,4,0,0,1,
+        160.32,112.5947L 160.32,266L 78.32,266Z"
+                      fill="#0284c7"
+                      height="157.4053"
+                      name="undefined"
+                      width="82"
+                      x="78.32"
+                      y="108.5947"
+                    />
+                  </g>
+                  <g
+                    class="recharts-layer recharts-bar-rectangle"
+                  >
+                    <path
+                      class="recharts-rectangle"
+                      d="M181.52,103.9184A 4,4,0,0,1,185.52,99.9184L 259.52,99.9184A 4,4,0,0,1,
+        263.52,103.9184L 263.52,266L 181.52,266Z"
+                      fill="#0284c7"
+                      height="166.0816"
+                      name="undefined"
+                      width="82"
+                      x="181.52"
+                      y="99.9184"
+                    />
+                  </g>
+                  <g
+                    class="recharts-layer recharts-bar-rectangle"
+                  >
+                    <path
+                      class="recharts-rectangle"
+                      d="M284.72,48.6807A 4,4,0,0,1,288.72,44.6807L 362.72,44.6807A 4,4,0,0,1,
+        366.72,48.6807L 366.72,266L 284.72,266Z"
+                      fill="#0284c7"
+                      height="221.3193"
+                      name="undefined"
+                      width="82"
+                      x="284.72"
+                      y="44.6807"
+                    />
+                  </g>
+                  <g
+                    class="recharts-layer recharts-bar-rectangle"
+                  >
+                    <path
+                      class="recharts-rectangle"
+                      d="M387.92,31.4316A 4,4,0,0,1,391.92,27.4316L 465.92,27.4316A 4,4,0,0,1,
+        469.92,31.4316L 469.92,266L 387.92,266Z"
+                      fill="#0284c7"
+                      height="238.5684"
+                      name="undefined"
+                      width="82"
+                      x="387.92"
+                      y="27.4316"
+                    />
+                  </g>
+                  <g
+                    class="recharts-layer recharts-bar-rectangle"
+                  >
+                    <path
+                      class="recharts-rectangle"
+                      d="M491.12,38.1126A 4,4,0,0,1,495.12,34.1126L 569.12,34.1126A 4,4,0,0,1,
+        573.12,38.1126L 573.12,266L 491.12,266Z"
+                      fill="#0284c7"
+                      height="231.8874"
+                      name="undefined"
+                      width="82"
+                      x="491.12"
+                      y="34.1126"
+                    />
+                  </g>
+                </g>
+              </g>
+            </g>
+          </g>
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          >
+            <g
+              class="recharts-layer recharts-cartesian-axis recharts-xAxis xAxis"
+            >
+              <line
+                angle="0"
+                class="recharts-cartesian-axis-line"
+                fill="none"
+                height="30"
+                orientation="bottom"
+                stroke="#e2e8f0"
+                width="516"
+                x="68"
+                x1="68"
+                x2="584"
+                y="266"
+                y1="266"
+                y2="266"
+              />
+              <g
+                class="recharts-cartesian-axis-ticks recharts-xAxis-ticks"
+              >
+                <g
+                  class="recharts-cartesian-axis-tick-lines recharts-xAxis-tick-lines"
+                >
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                </g>
+              </g>
+            </g>
+            <g
+              class="recharts-layer recharts-cartesian-axis recharts-yAxis yAxis"
+            >
+              <g
+                class="recharts-cartesian-axis-ticks recharts-yAxis-ticks"
+              >
+                <g
+                  class="recharts-cartesian-axis-tick-lines recharts-yAxis-tick-lines"
+                >
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                </g>
+              </g>
+            </g>
+          </g>
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          >
+            <g
+              class="recharts-cartesian-axis-tick-labels recharts-xAxis-tick-labels"
+            >
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="30"
+                  orientation="bottom"
+                  stroke="none"
+                  text-anchor="middle"
+                  width="516"
+                  x="119.6"
+                  y="274"
+                >
+                  <tspan
+                    dy="0.71em"
+                    x="119.6"
+                  >
+                    FY2019
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="30"
+                  orientation="bottom"
+                  stroke="none"
+                  text-anchor="middle"
+                  width="516"
+                  x="222.79999999999998"
+                  y="274"
+                >
+                  <tspan
+                    dy="0.71em"
+                    x="222.79999999999998"
+                  >
+                    FY2020
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="30"
+                  orientation="bottom"
+                  stroke="none"
+                  text-anchor="middle"
+                  width="516"
+                  x="326"
+                  y="274"
+                >
+                  <tspan
+                    dy="0.71em"
+                    x="326"
+                  >
+                    FY2021
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="30"
+                  orientation="bottom"
+                  stroke="none"
+                  text-anchor="middle"
+                  width="516"
+                  x="429.20000000000005"
+                  y="274"
+                >
+                  <tspan
+                    dy="0.71em"
+                    x="429.20000000000005"
+                  >
+                    FY2022
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="30"
+                  orientation="bottom"
+                  stroke="none"
+                  text-anchor="middle"
+                  width="516"
+                  x="532.4"
+                  y="274"
+                >
+                  <tspan
+                    dy="0.71em"
+                    x="532.4"
+                  >
+                    FY2023
+                  </tspan>
+                </text>
+              </g>
+            </g>
+            <g
+              class="recharts-cartesian-axis-tick-labels recharts-yAxis-tick-labels"
+            >
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="242"
+                  orientation="left"
+                  stroke="none"
+                  text-anchor="end"
+                  width="60"
+                  x="60"
+                  y="266"
+                >
+                  <tspan
+                    dy="0.355em"
+                    x="60"
+                  >
+                    $0
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="242"
+                  orientation="left"
+                  stroke="none"
+                  text-anchor="end"
+                  width="60"
+                  x="60"
+                  y="205.5"
+                >
+                  <tspan
+                    dy="0.355em"
+                    x="60"
+                  >
+                    $100.0B
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="242"
+                  orientation="left"
+                  stroke="none"
+                  text-anchor="end"
+                  width="60"
+                  x="60"
+                  y="145"
+                >
+                  <tspan
+                    dy="0.355em"
+                    x="60"
+                  >
+                    $200.0B
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="242"
+                  orientation="left"
+                  stroke="none"
+                  text-anchor="end"
+                  width="60"
+                  x="60"
+                  y="84.5"
+                >
+                  <tspan
+                    dy="0.355em"
+                    x="60"
+                  >
+                    $300.0B
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="242"
+                  orientation="left"
+                  stroke="none"
+                  text-anchor="end"
+                  width="60"
+                  x="60"
+                  y="24"
+                >
+                  <tspan
+                    dy="0.355em"
+                    x="60"
+                  >
+                    $400.0B
+                  </tspan>
+                </text>
+              </g>
+            </g>
+            <g
+              class="recharts-layer recharts-label-list"
+            >
+              <text
+                class="revenue-chart__yoy-label"
+                data-testid="yoy-label"
+                text-anchor="middle"
+                x="222.51999999999998"
+                y="91.91842499999998"
+              >
+                +5.5%
+              </text>
+              <text
+                class="revenue-chart__yoy-label"
+                data-testid="yoy-label"
+                text-anchor="middle"
+                x="325.71999999999997"
+                y="36.68071499999999"
+              >
+                +33.3%
+              </text>
+              <text
+                class="revenue-chart__yoy-label"
+                data-testid="yoy-label"
+                text-anchor="middle"
+                x="428.92"
+                y="19.431559999999994"
+              >
+                +7.8%
+              </text>
+              <text
+                class="revenue-chart__yoy-label"
+                data-testid="yoy-label"
+                text-anchor="middle"
+                x="532.12"
+                y="26.112574999999993"
+              >
+                -2.8%
+              </text>
+            </g>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <table
+    class="sr-only"
+  >
+    <caption>
+      Annual revenue data
+    </caption>
+    <thead>
+      <tr>
+        <th
+          scope="col"
+        >
+          Year
+        </th>
+        <th
+          scope="col"
+        >
+          Revenue
+        </th>
+        <th
+          scope="col"
+        >
+          YoY Growth
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          FY2019
+        </td>
+        <td>
+          $260.2B
+        </td>
+        <td>
+          N/A
+        </td>
+      </tr>
+      <tr>
+        <td>
+          FY2020
+        </td>
+        <td>
+          $274.5B
+        </td>
+        <td>
+          +5.5%
+        </td>
+      </tr>
+      <tr>
+        <td>
+          FY2021
+        </td>
+        <td>
+          $365.8B
+        </td>
+        <td>
+          +33.3%
+        </td>
+      </tr>
+      <tr>
+        <td>
+          FY2022
+        </td>
+        <td>
+          $394.3B
+        </td>
+        <td>
+          +7.8%
+        </td>
+      </tr>
+      <tr>
+        <td>
+          FY2023
+        </td>
+        <td>
+          $383.3B
+        </td>
+        <td>
+          -2.8%
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+`;
+
+exports[`RevenueChart > Snapshot tests > matches snapshot for empty state 1`] = `
+<div
+  aria-label="Revenue trend chart showing annual revenue"
+  class="revenue-chart"
+  data-testid="revenue-chart"
+>
+  <div
+    class="revenue-chart__empty"
+    data-testid="revenue-chart-empty"
+    role="status"
+  >
+    <svg
+      aria-hidden="true"
+      class="lucide lucide-chart-column revenue-chart__empty-icon"
+      fill="none"
+      height="48"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="48"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M3 3v16a2 2 0 0 0 2 2h16"
+      />
+      <path
+        d="M18 17V9"
+      />
+      <path
+        d="M13 17V5"
+      />
+      <path
+        d="M8 17v-3"
+      />
+    </svg>
+    <p
+      class="revenue-chart__empty-text"
+    >
+      No revenue data available
+    </p>
+  </div>
+</div>
+`;
+
+exports[`RevenueChart > Snapshot tests > matches snapshot for pre-revenue state 1`] = `
+<div
+  aria-label="Revenue trend chart showing annual revenue"
+  class="revenue-chart"
+  data-testid="revenue-chart"
+>
+  <div
+    class="revenue-chart__empty"
+    data-testid="revenue-chart-empty"
+    role="status"
+  >
+    <svg
+      aria-hidden="true"
+      class="lucide lucide-chart-column revenue-chart__empty-icon"
+      fill="none"
+      height="48"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="48"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M3 3v16a2 2 0 0 0 2 2h16"
+      />
+      <path
+        d="M18 17V9"
+      />
+      <path
+        d="M13 17V5"
+      />
+      <path
+        d="M8 17v-3"
+      />
+    </svg>
+    <p
+      class="revenue-chart__empty-text"
+    >
+      Pre-revenue company
+    </p>
+  </div>
+  <table
+    class="sr-only"
+  >
+    <caption>
+      Annual revenue data
+    </caption>
+    <thead>
+      <tr>
+        <th
+          scope="col"
+        >
+          Year
+        </th>
+        <th
+          scope="col"
+        >
+          Revenue
+        </th>
+        <th
+          scope="col"
+        >
+          YoY Growth
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          FY2021
+        </td>
+        <td>
+          $0
+        </td>
+        <td>
+          N/A
+        </td>
+      </tr>
+      <tr>
+        <td>
+          FY2022
+        </td>
+        <td>
+          $0
+        </td>
+        <td>
+          N/A
+        </td>
+      </tr>
+      <tr>
+        <td>
+          FY2023
+        </td>
+        <td>
+          $0
+        </td>
+        <td>
+          N/A
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+`;

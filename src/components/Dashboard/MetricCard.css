@@ -88,6 +88,23 @@
   width: 30%;
 }
 
+/* =================================================================
+   Responsive: compact sizing on mobile (<768px)
+   ================================================================= */
+@media (max-width: 767px) {
+  .metric-card {
+    min-height: 100px;
+  }
+
+  .metric-card__value {
+    font-size: 1.5rem;
+  }
+
+  .metric-card__title {
+    font-size: 0.8125rem;
+  }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .metric-card--loading .metric-card__shimmer {

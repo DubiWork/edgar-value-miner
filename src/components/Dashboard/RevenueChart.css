@@ -1,0 +1,97 @@
+/* =================================================================
+   RevenueChart — Bar chart displaying annual revenue with YoY growth.
+   First Recharts chart component. Patterns here apply to FCF, Margins.
+   ================================================================= */
+
+.revenue-chart {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* -----------------------------------------------------------------
+   YoY Growth Labels (above bars)
+   ----------------------------------------------------------------- */
+
+.revenue-chart__yoy-label {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--color-text-primary);
+}
+
+/* -----------------------------------------------------------------
+   Custom Tooltip
+   ----------------------------------------------------------------- */
+
+.revenue-chart__tooltip {
+  padding: var(--spacing-3, 0.75rem) var(--spacing-4, 1rem);
+  border-radius: var(--radius-lg, 0.5rem);
+  border-width: 1px;
+  border-style: solid;
+  box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
+  min-width: 140px;
+}
+
+.revenue-chart__tooltip-year {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin: 0 0 4px;
+  opacity: 0.7;
+}
+
+.revenue-chart__tooltip-value {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 2px;
+}
+
+.revenue-chart__tooltip-yoy {
+  font-size: 0.75rem;
+  margin: 0;
+  opacity: 0.8;
+}
+
+/* -----------------------------------------------------------------
+   Empty State
+   ----------------------------------------------------------------- */
+
+.revenue-chart__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 200px;
+  gap: var(--spacing-3, 0.75rem);
+  color: var(--color-text-muted);
+}
+
+.revenue-chart__empty-icon {
+  opacity: 0.4;
+}
+
+.revenue-chart__empty-text {
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+/* -----------------------------------------------------------------
+   Responsive: hide YoY labels on mobile (<768px)
+   ----------------------------------------------------------------- */
+
+@media (max-width: 767px) {
+  .revenue-chart__yoy-label {
+    display: none;
+  }
+}
+
+/* -----------------------------------------------------------------
+   Reduced Motion: disable animations
+   ----------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .revenue-chart .recharts-bar-rectangle {
+    transition: none !important;
+    animation: none !important;
+  }
+}

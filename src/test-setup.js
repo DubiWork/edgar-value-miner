@@ -52,6 +52,42 @@ Object.defineProperty(globalThis, 'localStorage', {
 });
 
 // =============================================================================
+// ResizeObserver Mock (required by Recharts ResponsiveContainer)
+// =============================================================================
+
+class ResizeObserverMock {
+  constructor(callback) {
+    this.callback = callback;
+    this.observations = [];
+  }
+  observe(target) {
+    this.observations.push(target);
+    // Trigger initial observation with target dimensions
+    this.callback([
+      {
+        target,
+        contentRect: {
+          width: target.clientWidth || 600,
+          height: target.clientHeight || 300,
+          top: 0,
+          left: 0,
+          bottom: 300,
+          right: 600,
+        },
+      },
+    ]);
+  }
+  unobserve() {}
+  disconnect() {
+    this.observations = [];
+  }
+}
+
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = ResizeObserverMock;
+}
+
+// =============================================================================
 // matchMedia Mock Setup
 // =============================================================================
 

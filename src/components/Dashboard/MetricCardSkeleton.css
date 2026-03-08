@@ -42,6 +42,23 @@
   width: 30%;
 }
 
+/* =================================================================
+   Responsive: compact sizing on mobile (<768px)
+   ================================================================= */
+@media (max-width: 767px) {
+  .metric-card-skeleton {
+    min-height: 100px;
+  }
+
+  .metric-card-skeleton__bone--value {
+    height: 1.5rem;
+  }
+
+  .metric-card-skeleton__bone--title {
+    height: 0.8125rem;
+  }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .metric-card-skeleton__bone {
