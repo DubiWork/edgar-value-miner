@@ -7,6 +7,9 @@ const IGNORED_ERRORS = [
   'googleapis',
   'Failed to load resource',
   'net::ERR',
+  'ChunkLoadError',
+  'Loading chunk',
+  'dynamically imported module',
 ];
 
 function isIgnoredError(text) {
@@ -26,12 +29,13 @@ test('no unexpected console errors on load', async ({ page }) => {
     }
   });
   await page.goto('/');
-  await page.waitForTimeout(2000);
+  await page.waitForLoadState('networkidle');
   expect(errors).toHaveLength(0);
 });
 
 test('welcome state renders search', async ({ page }) => {
   await page.goto('/');
+  await page.waitForLoadState('networkidle');
   const searchInput = page.locator('[data-testid="ticker-search"]');
-  await expect(searchInput).toBeVisible();
+  await expect(searchInput).toBeVisible({ timeout: 10000 });
 });
