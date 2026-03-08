@@ -141,9 +141,29 @@ vi.mock('../components/Dashboard', () => ({
       FCFChart mock
     </div>
   ),
+  MarginsChart: ({ data }) => (
+    <div data-testid="margins-chart" data-has-data={Array.isArray(data) && data.length > 0}>
+      MarginsChart mock
+    </div>
+  ),
   DashboardSkeleton: () => (
     <div data-testid="dashboard-skeleton">Loading skeleton...</div>
   ),
+}));
+
+// Mock calculateMargins utility
+vi.mock('../utils/calculateMargins', () => ({
+  calculateMargins: vi.fn((metrics) => {
+    if (!metrics || !metrics.revenue || metrics.revenue.length === 0) return [];
+    return metrics.revenue.map((entry) => ({
+      fiscalYear: entry.fiscalYear,
+      label: `FY${entry.fiscalYear}`,
+      grossMargin: 44.0,
+      operatingMargin: 31.0,
+      netMargin: 25.0,
+    }));
+  }),
+  default: vi.fn(),
 }));
 
 // =============================================================================
