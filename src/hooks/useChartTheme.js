@@ -48,7 +48,7 @@ const FALLBACK_THEMES = {
     textColor: '#e2e8f0',
     textMutedColor: '#64748b',
     gridColor: '#334155',
-    tooltipBg: '#1a2332',
+    tooltipBg: '#243044',
     tooltipBorder: '#334155',
   },
 };

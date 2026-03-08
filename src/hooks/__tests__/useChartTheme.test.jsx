@@ -166,7 +166,7 @@ describe('useChartTheme', () => {
       result.current.setTheme('dark');
     });
 
-    expect(result.current.chartTheme.tooltipBg).toBe('#1a2332');
+    expect(result.current.chartTheme.tooltipBg).toBe('#243044');
     expect(result.current.chartTheme.tooltipBorder).toBe('#334155');
   });
 
