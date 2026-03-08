@@ -1,0 +1,1552 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1`] = `
+<div
+  aria-label="Free cash flow chart showing annual FCF"
+  class="fcf-chart"
+  data-testid="fcf-chart"
+>
+  <div
+    class="recharts-responsive-container"
+    style="width: 100%; height: 300px; min-width: 0px;"
+  >
+    <div
+      style="width: 0px; overflow-x: visible;"
+    >
+      <div
+        class="recharts-wrapper"
+        height="300"
+        style="position: relative; cursor: default; width: 600px; height: 300px;"
+        width="600"
+      >
+        <div
+          class="recharts-tooltip-wrapper"
+          style="visibility: hidden; pointer-events: none; position: absolute; top: 0px; left: 0px;"
+          tabindex="-1"
+          xmlns="http://www.w3.org/1999/xhtml"
+        />
+        <svg
+          class="recharts-surface"
+          height="300"
+          role="application"
+          style="width: 100%; height: 100%; display: block;"
+          tabindex="0"
+          viewBox="0 0 600 300"
+          width="600"
+        >
+          <title />
+          <desc />
+          <g
+            tabindex="-1"
+          >
+            <g
+              class="recharts-cartesian-grid"
+            >
+              <g
+                class="recharts-cartesian-grid-horizontal"
+              >
+                <line
+                  fill="none"
+                  height="242"
+                  stroke="#e2e8f0"
+                  stroke-dasharray="3 3"
+                  width="516"
+                  x="68"
+                  x1="68"
+                  x2="584"
+                  y="24"
+                  y1="266"
+                  y2="266"
+                />
+                <line
+                  fill="none"
+                  height="242"
+                  stroke="#e2e8f0"
+                  stroke-dasharray="3 3"
+                  width="516"
+                  x="68"
+                  x1="68"
+                  x2="584"
+                  y="24"
+                  y1="205.5"
+                  y2="205.5"
+                />
+                <line
+                  fill="none"
+                  height="242"
+                  stroke="#e2e8f0"
+                  stroke-dasharray="3 3"
+                  width="516"
+                  x="68"
+                  x1="68"
+                  x2="584"
+                  y="24"
+                  y1="145"
+                  y2="145"
+                />
+                <line
+                  fill="none"
+                  height="242"
+                  stroke="#e2e8f0"
+                  stroke-dasharray="3 3"
+                  width="516"
+                  x="68"
+                  x1="68"
+                  x2="584"
+                  y="24"
+                  y1="84.5"
+                  y2="84.5"
+                />
+                <line
+                  fill="none"
+                  height="242"
+                  stroke="#e2e8f0"
+                  stroke-dasharray="3 3"
+                  width="516"
+                  x="68"
+                  x1="68"
+                  x2="584"
+                  y="24"
+                  y1="24"
+                  y2="24"
+                />
+              </g>
+            </g>
+          </g>
+          <g
+            tabindex="-1"
+          />
+          <defs>
+            <clippath
+              id="recharts275-clip"
+            >
+              <rect
+                height="242"
+                width="516"
+                x="68"
+                y="24"
+              />
+            </clippath>
+          </defs>
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          >
+            <g
+              class="recharts-layer recharts-bar"
+              id="recharts-bar-_r_2p_"
+            >
+              <g
+                class="recharts-layer recharts-bar-rectangles"
+              >
+                <g
+                  class="recharts-layer"
+                >
+                  <g
+                    class="recharts-layer recharts-bar-rectangle"
+                  >
+                    <path
+                      d="
+    M82.32,78.54478333333333
+    L156.32,78.54478333333333
+    Q160.32,78.54478333333333 160.32,82.54478333333333
+    L160.32,266
+    Q160.32,266 160.32,266
+    L78.32,266
+    Q78.32,266 78.32,266
+    L78.32,82.54478333333333
+    Q78.32,78.54478333333333 82.32,78.54478333333333
+    Z
+  "
+                      fill="#16a34a"
+                    />
+                  </g>
+                  <g
+                    class="recharts-layer recharts-bar-rectangle"
+                  >
+                    <path
+                      d="
+    M185.51999999999998,118.04725
+    L259.52,118.04725
+    Q263.52,118.04725 263.52,122.04725
+    L263.52,266
+    Q263.52,266 263.52,266
+    L181.51999999999998,266
+    Q181.51999999999998,266 181.51999999999998,266
+    L181.51999999999998,122.04725
+    Q181.51999999999998,118.04725 185.51999999999998,118.04725
+    Z
+  "
+                      fill="#16a34a"
+                    />
+                  </g>
+                  <g
+                    class="recharts-layer recharts-bar-rectangle"
+                  >
+                    <path
+                      d="
+    M288.71999999999997,78.54478333333333
+    L362.71999999999997,78.54478333333333
+    Q366.71999999999997,78.54478333333333 366.71999999999997,82.54478333333333
+    L366.71999999999997,266
+    Q366.71999999999997,266 366.71999999999997,266
+    L284.71999999999997,266
+    Q284.71999999999997,266 284.71999999999997,266
+    L284.71999999999997,82.54478333333333
+    Q284.71999999999997,78.54478333333333 288.71999999999997,78.54478333333333
+    Z
+  "
+                      fill="#16a34a"
+                    />
+                  </g>
+                  <g
+                    class="recharts-layer recharts-bar-rectangle"
+                  >
+                    <path
+                      d="
+    M391.92,41.25661666666666
+    L465.92,41.25661666666666
+    Q469.92,41.25661666666666 469.92,45.25661666666666
+    L469.92,266
+    Q469.92,266 469.92,266
+    L387.92,266
+    Q387.92,266 387.92,266
+    L387.92,45.25661666666666
+    Q387.92,41.25661666666666 391.92,41.25661666666666
+    Z
+  "
+                      fill="#16a34a"
+                    />
+                  </g>
+                  <g
+                    class="recharts-layer recharts-bar-rectangle"
+                  >
+                    <path
+                      d="
+    M495.12,43.07161666666667
+    L569.12,43.07161666666667
+    Q573.12,43.07161666666667 573.12,47.07161666666667
+    L573.12,266
+    Q573.12,266 573.12,266
+    L491.12,266
+    Q491.12,266 491.12,266
+    L491.12,47.07161666666667
+    Q491.12,43.07161666666667 495.12,43.07161666666667
+    Z
+  "
+                      fill="#16a34a"
+                    />
+                  </g>
+                </g>
+              </g>
+            </g>
+          </g>
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          >
+            <g
+              class="recharts-layer recharts-cartesian-axis recharts-xAxis xAxis"
+            >
+              <line
+                angle="0"
+                class="recharts-cartesian-axis-line"
+                fill="none"
+                height="30"
+                orientation="bottom"
+                stroke="#e2e8f0"
+                width="516"
+                x="68"
+                x1="68"
+                x2="584"
+                y="266"
+                y1="266"
+                y2="266"
+              />
+              <g
+                class="recharts-cartesian-axis-ticks recharts-xAxis-ticks"
+              >
+                <g
+                  class="recharts-cartesian-axis-tick-lines recharts-xAxis-tick-lines"
+                >
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                </g>
+              </g>
+            </g>
+            <g
+              class="recharts-layer recharts-cartesian-axis recharts-yAxis yAxis"
+            >
+              <g
+                class="recharts-cartesian-axis-ticks recharts-yAxis-ticks"
+              >
+                <g
+                  class="recharts-cartesian-axis-tick-lines recharts-yAxis-tick-lines"
+                >
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                </g>
+              </g>
+            </g>
+          </g>
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          >
+            <g
+              class="recharts-cartesian-axis-tick-labels recharts-xAxis-tick-labels"
+            >
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="30"
+                  orientation="bottom"
+                  stroke="none"
+                  text-anchor="middle"
+                  width="516"
+                  x="119.6"
+                  y="274"
+                >
+                  <tspan
+                    dy="0.71em"
+                    x="119.6"
+                  >
+                    FY2019
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="30"
+                  orientation="bottom"
+                  stroke="none"
+                  text-anchor="middle"
+                  width="516"
+                  x="222.79999999999998"
+                  y="274"
+                >
+                  <tspan
+                    dy="0.71em"
+                    x="222.79999999999998"
+                  >
+                    FY2020
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="30"
+                  orientation="bottom"
+                  stroke="none"
+                  text-anchor="middle"
+                  width="516"
+                  x="326"
+                  y="274"
+                >
+                  <tspan
+                    dy="0.71em"
+                    x="326"
+                  >
+                    FY2021
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="30"
+                  orientation="bottom"
+                  stroke="none"
+                  text-anchor="middle"
+                  width="516"
+                  x="429.20000000000005"
+                  y="274"
+                >
+                  <tspan
+                    dy="0.71em"
+                    x="429.20000000000005"
+                  >
+                    FY2022
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="30"
+                  orientation="bottom"
+                  stroke="none"
+                  text-anchor="middle"
+                  width="516"
+                  x="532.4"
+                  y="274"
+                >
+                  <tspan
+                    dy="0.71em"
+                    x="532.4"
+                  >
+                    FY2023
+                  </tspan>
+                </text>
+              </g>
+            </g>
+            <g
+              class="recharts-cartesian-axis-tick-labels recharts-yAxis-tick-labels"
+            >
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="242"
+                  orientation="left"
+                  stroke="none"
+                  text-anchor="end"
+                  width="60"
+                  x="60"
+                  y="266"
+                >
+                  <tspan
+                    dy="0.355em"
+                    x="60"
+                  >
+                    $0
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="242"
+                  orientation="left"
+                  stroke="none"
+                  text-anchor="end"
+                  width="60"
+                  x="60"
+                  y="205.5"
+                >
+                  <tspan
+                    dy="0.355em"
+                    x="60"
+                  >
+                    $30.0B
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="242"
+                  orientation="left"
+                  stroke="none"
+                  text-anchor="end"
+                  width="60"
+                  x="60"
+                  y="145"
+                >
+                  <tspan
+                    dy="0.355em"
+                    x="60"
+                  >
+                    $60.0B
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="242"
+                  orientation="left"
+                  stroke="none"
+                  text-anchor="end"
+                  width="60"
+                  x="60"
+                  y="84.5"
+                >
+                  <tspan
+                    dy="0.355em"
+                    x="60"
+                  >
+                    $90.0B
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="242"
+                  orientation="left"
+                  stroke="none"
+                  text-anchor="end"
+                  width="60"
+                  x="60"
+                  y="24"
+                >
+                  <tspan
+                    dy="0.355em"
+                    x="60"
+                  >
+                    $120.0B
+                  </tspan>
+                </text>
+              </g>
+            </g>
+            <g
+              class="recharts-layer recharts-label-list"
+            >
+              <text
+                class="fcf-chart__yoy-label"
+                data-testid="yoy-label"
+                text-anchor="middle"
+                x="222.51999999999998"
+                y="110.04725"
+              >
+                -21.1%
+              </text>
+              <text
+                class="fcf-chart__yoy-label"
+                data-testid="yoy-label"
+                text-anchor="middle"
+                x="325.71999999999997"
+                y="70.54478333333333"
+              >
+                +26.7%
+              </text>
+              <text
+                class="fcf-chart__yoy-label"
+                data-testid="yoy-label"
+                text-anchor="middle"
+                x="428.92"
+                y="33.25661666666666"
+              >
+                +19.9%
+              </text>
+              <text
+                class="fcf-chart__yoy-label"
+                data-testid="yoy-label"
+                text-anchor="middle"
+                x="532.12"
+                y="35.07161666666667"
+              >
+                -0.8%
+              </text>
+            </g>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <table
+    class="sr-only"
+  >
+    <caption>
+      Annual free cash flow data
+    </caption>
+    <thead>
+      <tr>
+        <th
+          scope="col"
+        >
+          Year
+        </th>
+        <th
+          scope="col"
+        >
+          Free Cash Flow
+        </th>
+        <th
+          scope="col"
+        >
+          Operating Cash Flow
+        </th>
+        <th
+          scope="col"
+        >
+          Capital Expenditures
+        </th>
+        <th
+          scope="col"
+        >
+          YoY Growth
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          FY2019
+        </td>
+        <td>
+          $93.0B
+        </td>
+        <td>
+          $69.4B
+        </td>
+        <td>
+          $10.5B
+        </td>
+        <td>
+          N/A
+        </td>
+      </tr>
+      <tr>
+        <td>
+          FY2020
+        </td>
+        <td>
+          $73.4B
+        </td>
+        <td>
+          $80.7B
+        </td>
+        <td>
+          $7.3B
+        </td>
+        <td>
+          -21.1%
+        </td>
+      </tr>
+      <tr>
+        <td>
+          FY2021
+        </td>
+        <td>
+          $93.0B
+        </td>
+        <td>
+          $104.0B
+        </td>
+        <td>
+          $11.1B
+        </td>
+        <td>
+          +26.7%
+        </td>
+      </tr>
+      <tr>
+        <td>
+          FY2022
+        </td>
+        <td>
+          $111.4B
+        </td>
+        <td>
+          $122.2B
+        </td>
+        <td>
+          $10.7B
+        </td>
+        <td>
+          +19.9%
+        </td>
+      </tr>
+      <tr>
+        <td>
+          FY2023
+        </td>
+        <td>
+          $110.5B
+        </td>
+        <td>
+          $118.3B
+        </td>
+        <td>
+          $10.7B
+        </td>
+        <td>
+          -0.8%
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+`;
+
+exports[`FCFChart > Snapshot tests > matches snapshot for empty state 1`] = `
+<div
+  aria-label="Free cash flow chart showing annual FCF"
+  class="fcf-chart"
+  data-testid="fcf-chart"
+>
+  <div
+    class="fcf-chart__empty"
+    data-testid="fcf-chart-empty"
+    role="status"
+  >
+    <svg
+      aria-hidden="true"
+      class="lucide lucide-trending-down fcf-chart__empty-icon"
+      fill="none"
+      height="48"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="48"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M16 17h6v-6"
+      />
+      <path
+        d="m22 17-8.5-8.5-5 5L2 7"
+      />
+    </svg>
+    <p
+      class="fcf-chart__empty-text"
+    >
+      No free cash flow data available
+    </p>
+  </div>
+</div>
+`;
+
+exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negative data 1`] = `
+<div
+  aria-label="Free cash flow chart showing annual FCF"
+  class="fcf-chart"
+  data-testid="fcf-chart"
+>
+  <div
+    class="recharts-responsive-container"
+    style="width: 100%; height: 300px; min-width: 0px;"
+  >
+    <div
+      style="width: 0px; overflow-x: visible;"
+    >
+      <div
+        class="recharts-wrapper"
+        height="300"
+        style="position: relative; cursor: default; width: 600px; height: 300px;"
+        width="600"
+      >
+        <div
+          class="recharts-tooltip-wrapper"
+          style="visibility: hidden; pointer-events: none; position: absolute; top: 0px; left: 0px;"
+          tabindex="-1"
+          xmlns="http://www.w3.org/1999/xhtml"
+        />
+        <svg
+          class="recharts-surface"
+          height="300"
+          role="application"
+          style="width: 100%; height: 100%; display: block;"
+          tabindex="0"
+          viewBox="0 0 600 300"
+          width="600"
+        >
+          <title />
+          <desc />
+          <g
+            tabindex="-1"
+          >
+            <g
+              class="recharts-cartesian-grid"
+            >
+              <g
+                class="recharts-cartesian-grid-horizontal"
+              >
+                <line
+                  fill="none"
+                  height="242"
+                  stroke="#e2e8f0"
+                  stroke-dasharray="3 3"
+                  width="516"
+                  x="68"
+                  x1="68"
+                  x2="584"
+                  y="24"
+                  y1="266"
+                  y2="266"
+                />
+                <line
+                  fill="none"
+                  height="242"
+                  stroke="#e2e8f0"
+                  stroke-dasharray="3 3"
+                  width="516"
+                  x="68"
+                  x1="68"
+                  x2="584"
+                  y="24"
+                  y1="205.5"
+                  y2="205.5"
+                />
+                <line
+                  fill="none"
+                  height="242"
+                  stroke="#e2e8f0"
+                  stroke-dasharray="3 3"
+                  width="516"
+                  x="68"
+                  x1="68"
+                  x2="584"
+                  y="24"
+                  y1="145"
+                  y2="145"
+                />
+                <line
+                  fill="none"
+                  height="242"
+                  stroke="#e2e8f0"
+                  stroke-dasharray="3 3"
+                  width="516"
+                  x="68"
+                  x1="68"
+                  x2="584"
+                  y="24"
+                  y1="84.5"
+                  y2="84.5"
+                />
+                <line
+                  fill="none"
+                  height="242"
+                  stroke="#e2e8f0"
+                  stroke-dasharray="3 3"
+                  width="516"
+                  x="68"
+                  x1="68"
+                  x2="584"
+                  y="24"
+                  y1="24"
+                  y2="24"
+                />
+              </g>
+            </g>
+          </g>
+          <g
+            tabindex="-1"
+          />
+          <defs>
+            <clippath
+              id="recharts278-clip"
+            >
+              <rect
+                height="242"
+                width="516"
+                x="68"
+                y="24"
+              />
+            </clippath>
+          </defs>
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          >
+            <g
+              class="recharts-layer recharts-bar"
+              id="recharts-bar-_r_2q_"
+            >
+              <g
+                class="recharts-layer recharts-bar-rectangles"
+              >
+                <g
+                  class="recharts-layer"
+                >
+                  <g
+                    class="recharts-layer recharts-bar-rectangle"
+                  >
+                    <path
+                      d="
+    M78.32,266
+    L160.32,266
+    Q160.32,266 160.32,266
+    L160.32,322.5
+    Q160.32,326.5 156.32,326.5
+    L82.32,326.5
+    Q78.32,326.5 78.32,322.5
+    L78.32,266
+    Q78.32,266 78.32,266
+    Z
+  "
+                      fill="#dc2626"
+                    />
+                  </g>
+                  <g
+                    class="recharts-layer recharts-bar-rectangle"
+                  >
+                    <path
+                      d="
+    M185.51999999999998,173.23333333333332
+    L259.52,173.23333333333332
+    Q263.52,173.23333333333332 263.52,177.23333333333332
+    L263.52,205.5
+    Q263.52,205.5 263.52,205.5
+    L181.51999999999998,205.5
+    Q181.51999999999998,205.5 181.51999999999998,205.5
+    L181.51999999999998,177.23333333333332
+    Q181.51999999999998,173.23333333333332 185.51999999999998,173.23333333333332
+    Z
+  "
+                      fill="#16a34a"
+                    />
+                  </g>
+                  <g
+                    class="recharts-layer recharts-bar-rectangle"
+                  >
+                    <path
+                      d="
+    M284.71999999999997,217.60000000000002
+    L366.71999999999997,217.60000000000002
+    Q366.71999999999997,217.60000000000002 366.71999999999997,217.60000000000002
+    L366.71999999999997,225.70000000000005
+    Q366.71999999999997,229.70000000000005 362.71999999999997,229.70000000000005
+    L288.71999999999997,229.70000000000005
+    Q284.71999999999997,229.70000000000005 284.71999999999997,225.70000000000005
+    L284.71999999999997,217.60000000000002
+    Q284.71999999999997,217.60000000000002 284.71999999999997,217.60000000000002
+    Z
+  "
+                      fill="#dc2626"
+                    />
+                  </g>
+                  <g
+                    class="recharts-layer recharts-bar-rectangle"
+                  >
+                    <path
+                      d="
+    M391.92,104.66666666666667
+    L465.92,104.66666666666667
+    Q469.92,104.66666666666667 469.92,108.66666666666667
+    L469.92,205.5
+    Q469.92,205.5 469.92,205.5
+    L387.92,205.5
+    Q387.92,205.5 387.92,205.5
+    L387.92,108.66666666666667
+    Q387.92,104.66666666666667 391.92,104.66666666666667
+    Z
+  "
+                      fill="#16a34a"
+                    />
+                  </g>
+                  <g
+                    class="recharts-layer recharts-bar-rectangle"
+                  >
+                    <path
+                      d="
+    M495.12,36.10000000000001
+    L569.12,36.10000000000001
+    Q573.12,36.10000000000001 573.12,40.10000000000001
+    L573.12,205.5
+    Q573.12,205.5 573.12,205.5
+    L491.12,205.5
+    Q491.12,205.5 491.12,205.5
+    L491.12,40.10000000000001
+    Q491.12,36.10000000000001 495.12,36.10000000000001
+    Z
+  "
+                      fill="#16a34a"
+                    />
+                  </g>
+                </g>
+              </g>
+            </g>
+          </g>
+          <g
+            tabindex="-1"
+          >
+            <g
+              class="recharts-layer recharts-reference-line"
+            >
+              <line
+                class="recharts-reference-line-line"
+                data-testid="fcf-reference-line"
+                fill="none"
+                fill-opacity="1"
+                stroke="#94a3b8"
+                stroke-dasharray="3 3"
+                stroke-width="1"
+                x1="68"
+                x2="584"
+                y="0"
+                y1="205.5"
+                y2="205.5"
+              />
+            </g>
+          </g>
+          <g
+            tabindex="-1"
+          >
+            <g
+              class="recharts-layer recharts-cartesian-axis recharts-xAxis xAxis"
+            >
+              <line
+                angle="0"
+                class="recharts-cartesian-axis-line"
+                fill="none"
+                height="30"
+                orientation="bottom"
+                stroke="#e2e8f0"
+                width="516"
+                x="68"
+                x1="68"
+                x2="584"
+                y="266"
+                y1="266"
+                y2="266"
+              />
+              <g
+                class="recharts-cartesian-axis-ticks recharts-xAxis-ticks"
+              >
+                <g
+                  class="recharts-cartesian-axis-tick-lines recharts-xAxis-tick-lines"
+                >
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                </g>
+              </g>
+            </g>
+            <g
+              class="recharts-layer recharts-cartesian-axis recharts-yAxis yAxis"
+            >
+              <g
+                class="recharts-cartesian-axis-ticks recharts-yAxis-ticks"
+              >
+                <g
+                  class="recharts-cartesian-axis-tick-lines recharts-yAxis-tick-lines"
+                >
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                  <g
+                    class="recharts-layer recharts-cartesian-axis-tick"
+                  />
+                </g>
+              </g>
+            </g>
+          </g>
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          />
+          <g
+            tabindex="-1"
+          >
+            <g
+              class="recharts-cartesian-axis-tick-labels recharts-xAxis-tick-labels"
+            >
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="30"
+                  orientation="bottom"
+                  stroke="none"
+                  text-anchor="middle"
+                  width="516"
+                  x="119.6"
+                  y="274"
+                >
+                  <tspan
+                    dy="0.71em"
+                    x="119.6"
+                  >
+                    FY2019
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="30"
+                  orientation="bottom"
+                  stroke="none"
+                  text-anchor="middle"
+                  width="516"
+                  x="222.79999999999998"
+                  y="274"
+                >
+                  <tspan
+                    dy="0.71em"
+                    x="222.79999999999998"
+                  >
+                    FY2020
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="30"
+                  orientation="bottom"
+                  stroke="none"
+                  text-anchor="middle"
+                  width="516"
+                  x="326"
+                  y="274"
+                >
+                  <tspan
+                    dy="0.71em"
+                    x="326"
+                  >
+                    FY2021
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="30"
+                  orientation="bottom"
+                  stroke="none"
+                  text-anchor="middle"
+                  width="516"
+                  x="429.20000000000005"
+                  y="274"
+                >
+                  <tspan
+                    dy="0.71em"
+                    x="429.20000000000005"
+                  >
+                    FY2022
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="30"
+                  orientation="bottom"
+                  stroke="none"
+                  text-anchor="middle"
+                  width="516"
+                  x="532.4"
+                  y="274"
+                >
+                  <tspan
+                    dy="0.71em"
+                    x="532.4"
+                  >
+                    FY2023
+                  </tspan>
+                </text>
+              </g>
+            </g>
+            <g
+              class="recharts-cartesian-axis-tick-labels recharts-yAxis-tick-labels"
+            >
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="242"
+                  orientation="left"
+                  stroke="none"
+                  text-anchor="end"
+                  width="60"
+                  x="60"
+                  y="266"
+                >
+                  <tspan
+                    dy="0.355em"
+                    x="60"
+                  >
+                    ($15.0B)
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="242"
+                  orientation="left"
+                  stroke="none"
+                  text-anchor="end"
+                  width="60"
+                  x="60"
+                  y="205.5"
+                >
+                  <tspan
+                    dy="0.355em"
+                    x="60"
+                  >
+                    $0
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="242"
+                  orientation="left"
+                  stroke="none"
+                  text-anchor="end"
+                  width="60"
+                  x="60"
+                  y="145"
+                >
+                  <tspan
+                    dy="0.355em"
+                    x="60"
+                  >
+                    $15.0B
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="242"
+                  orientation="left"
+                  stroke="none"
+                  text-anchor="end"
+                  width="60"
+                  x="60"
+                  y="84.5"
+                >
+                  <tspan
+                    dy="0.355em"
+                    x="60"
+                  >
+                    $30.0B
+                  </tspan>
+                </text>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis-tick-label"
+              >
+                <text
+                  class="recharts-text recharts-cartesian-axis-tick-value"
+                  fill="#94a3b8"
+                  font-size="12"
+                  height="242"
+                  orientation="left"
+                  stroke="none"
+                  text-anchor="end"
+                  width="60"
+                  x="60"
+                  y="24"
+                >
+                  <tspan
+                    dy="0.355em"
+                    x="60"
+                  >
+                    $45.0B
+                  </tspan>
+                </text>
+              </g>
+            </g>
+            <g
+              class="recharts-layer recharts-label-list"
+            >
+              <text
+                class="fcf-chart__yoy-label"
+                data-testid="yoy-label"
+                text-anchor="middle"
+                x="222.51999999999998"
+                y="165.23333333333332"
+              >
+                N/A
+              </text>
+              <text
+                class="fcf-chart__yoy-label"
+                data-testid="yoy-label"
+                text-anchor="middle"
+                x="325.71999999999997"
+                y="209.60000000000002"
+              >
+                N/A
+              </text>
+              <text
+                class="fcf-chart__yoy-label"
+                data-testid="yoy-label"
+                text-anchor="middle"
+                x="428.92"
+                y="96.66666666666667"
+              >
+                N/A
+              </text>
+              <text
+                class="fcf-chart__yoy-label"
+                data-testid="yoy-label"
+                text-anchor="middle"
+                x="532.12"
+                y="28.10000000000001"
+              >
+                +68.0%
+              </text>
+            </g>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <table
+    class="sr-only"
+  >
+    <caption>
+      Annual free cash flow data
+    </caption>
+    <thead>
+      <tr>
+        <th
+          scope="col"
+        >
+          Year
+        </th>
+        <th
+          scope="col"
+        >
+          Free Cash Flow
+        </th>
+        <th
+          scope="col"
+        >
+          Operating Cash Flow
+        </th>
+        <th
+          scope="col"
+        >
+          Capital Expenditures
+        </th>
+        <th
+          scope="col"
+        >
+          YoY Growth
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          FY2019
+        </td>
+        <td>
+          ($15.0B)
+        </td>
+        <td>
+          $5.0B
+        </td>
+        <td>
+          $20.0B
+        </td>
+        <td>
+          N/A
+        </td>
+      </tr>
+      <tr>
+        <td>
+          FY2020
+        </td>
+        <td>
+          $8.0B
+        </td>
+        <td>
+          $18.0B
+        </td>
+        <td>
+          $10.0B
+        </td>
+        <td>
+          N/A
+        </td>
+      </tr>
+      <tr>
+        <td>
+          FY2021
+        </td>
+        <td>
+          ($3.0B)
+        </td>
+        <td>
+          $12.0B
+        </td>
+        <td>
+          $15.0B
+        </td>
+        <td>
+          N/A
+        </td>
+      </tr>
+      <tr>
+        <td>
+          FY2022
+        </td>
+        <td>
+          $25.0B
+        </td>
+        <td>
+          $35.0B
+        </td>
+        <td>
+          $10.0B
+        </td>
+        <td>
+          N/A
+        </td>
+      </tr>
+      <tr>
+        <td>
+          FY2023
+        </td>
+        <td>
+          $42.0B
+        </td>
+        <td>
+          $52.0B
+        </td>
+        <td>
+          $10.0B
+        </td>
+        <td>
+          +68.0%
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+`;
