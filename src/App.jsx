@@ -8,10 +8,12 @@ import {
   MetricCard,
   ChartContainer,
   FCFChart,
+  MarginsChart,
   DashboardSkeleton,
 } from './components/Dashboard'
 import { useCompanySearch } from './hooks/useCompanySearch'
 import gaapNormalizer from './utils/gaapNormalizer'
+import { calculateMargins } from './utils/calculateMargins'
 
 /**
  * Formats a large number into a human-readable string with suffix.
@@ -362,12 +364,15 @@ function App() {
                 />
               </ChartContainer>,
               <ChartContainer key="margins-chart" title="Margins" loading={false}>
-                <div
-                  className="flex items-center justify-center h-full"
-                  style={{ color: 'var(--color-text-muted)' }}
-                >
-                  Chart placeholder — Recharts integration coming in Issue #7
-                </div>
+                <MarginsChart
+                  data={calculateMargins({
+                    revenue: data?.metrics?.revenue?.annual,
+                    grossProfit: data?.metrics?.grossProfit?.annual,
+                    operatingIncome: data?.metrics?.operatingIncome?.annual,
+                    netIncome: data?.metrics?.netIncome?.annual,
+                  })}
+                  animationDisabled={false}
+                />
               </ChartContainer>,
             ]}
           />
