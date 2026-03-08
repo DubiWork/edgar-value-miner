@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "edgar-value-miner"
+  },
+  "targets": {
+    "edgar-value-miner": {
+      "hosting": {
+        "production": [
+          "edgar-value-miner"
+        ],
+        "staging": [
+          "edgar-value-miner-staging"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
