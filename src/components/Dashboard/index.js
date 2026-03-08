@@ -3,6 +3,7 @@ export { CompanyBanner } from './CompanyBanner';
 export { MetricCard } from './MetricCard';
 export { ChartContainer } from './ChartContainer';
 export { RevenueChart } from './RevenueChart';
+export { FCFChart } from './FCFChart';
 export { CompanyBannerSkeleton } from './CompanyBannerSkeleton';
 export { MetricCardSkeleton } from './MetricCardSkeleton';
 export { ChartContainerSkeleton } from './ChartContainerSkeleton';
