@@ -1,0 +1,88 @@
+name: Daily Regression
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  staging-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run regression on staging
+        id: staging
+        run: npx playwright test tests/e2e/regression/ --reporter=json --output-file=staging-results.json
+        env:
+          BASE_URL: https://edgar-value-miner-staging.web.app
+        continue-on-error: true
+      - name: Report on baking epic
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'staging-bake',
+              state: 'open'
+            });
+            const passed = '${{ steps.staging.outcome }}' === 'success';
+            const emoji = passed ? 'PASSED' : 'FAILED';
+            const date = new Date().toISOString().split('T')[0];
+            for (const issue of issues.data) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `### Daily Staging Regression - ${date}\n\n**Result:** ${emoji}\n**URL:** https://edgar-value-miner-staging.web.app`
+              });
+              if (!passed) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: ['staging-regression-failed']
+                });
+              }
+            }
+
+  prod-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run regression on production
+        id: prod
+        run: npx playwright test tests/e2e/regression/ --reporter=json --output-file=prod-results.json
+        env:
+          BASE_URL: https://edgar-value-miner.web.app
+        continue-on-error: true
+      - name: Create issue on failure
+        if: steps.prod.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const date = new Date().toISOString().split('T')[0];
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Production regression failed - ${date}`,
+              body: `Daily production regression tests failed.\n\n**URL:** https://edgar-value-miner.web.app\n**Workflow run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              labels: ['bug', 'prod-regression', 'P0-critical']
+            });
