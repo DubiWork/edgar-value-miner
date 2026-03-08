@@ -25,13 +25,14 @@ describe('DashboardLayout', () => {
     const { container } = renderLayout();
 
     const layout = container.querySelector('[data-testid="dashboard-layout"]');
+    expect(layout.className).toContain('dashboard-layout');
     expect(layout.className).toContain('max-w-7xl');
     expect(layout.className).toContain('mx-auto');
     expect(layout.className).toContain('py-6');
 
-    // gap-6 is on the inner grid div
-    const innerGrid = layout.querySelector('div');
-    expect(innerGrid.className).toContain('gap-6');
+    // Inner grid div uses BEM class
+    const innerGrid = layout.querySelector('.dashboard-layout__grid');
+    expect(innerGrid).toBeTruthy();
   });
 
   it('renders with no sections when all props are undefined', () => {
@@ -77,12 +78,8 @@ describe('DashboardLayout', () => {
     expect(section).toBeTruthy();
     expect(section.tagName).toBe('SECTION');
 
-    const grid = section.querySelector('div');
-    expect(grid.className).toContain('grid');
-    expect(grid.className).toContain('grid-cols-1');
-    expect(grid.className).toContain('md:grid-cols-2');
-    expect(grid.className).toContain('lg:grid-cols-3');
-    expect(grid.className).toContain('gap-6');
+    const grid = section.querySelector('.dashboard-layout__metrics-grid');
+    expect(grid).toBeTruthy();
   });
 
   it('renders each metric inside an article element', () => {
@@ -136,7 +133,7 @@ describe('DashboardLayout', () => {
   // Secondary charts section
   // =========================================================================
 
-  it('renders secondary charts section with correct 2-col grid', () => {
+  it('renders secondary charts section with correct grid class', () => {
     const charts = [
       <div key="1">Margin Chart</div>,
       <div key="2">Growth Chart</div>,
@@ -148,11 +145,8 @@ describe('DashboardLayout', () => {
     expect(section).toBeTruthy();
     expect(section.tagName).toBe('SECTION');
 
-    const grid = section.querySelector('div');
-    expect(grid.className).toContain('grid');
-    expect(grid.className).toContain('grid-cols-1');
-    expect(grid.className).toContain('lg:grid-cols-2');
-    expect(grid.className).toContain('gap-6');
+    const grid = section.querySelector('.dashboard-layout__charts-grid');
+    expect(grid).toBeTruthy();
   });
 
   it('renders each secondary chart inside an article element', () => {
@@ -293,6 +287,7 @@ describe('DashboardLayout', () => {
     const { container } = renderLayout({ className: 'extra' });
 
     const layout = container.querySelector('[data-testid="dashboard-layout"]');
+    expect(layout.className).toContain('dashboard-layout');
     expect(layout.className).toContain('max-w-7xl');
     expect(layout.className).toContain('mx-auto');
     expect(layout.className).toContain('extra');
@@ -343,40 +338,45 @@ describe('DashboardLayout', () => {
   });
 
   // =========================================================================
-  // Responsive grid classes
+  // Responsive grid classes (via CSS)
   // =========================================================================
 
-  it('applies mobile-first single column to outer grid', () => {
+  it('applies dashboard-layout class to outer container', () => {
     const { container } = renderLayout({
       banner: <div>B</div>,
       metrics: [<div key="1">M</div>],
     });
 
-    const outerGrid = container.querySelector('[data-testid="dashboard-layout"] > div');
-    expect(outerGrid.className).toContain('grid-cols-1');
+    const layout = container.querySelector('[data-testid="dashboard-layout"]');
+    expect(layout.className).toContain('dashboard-layout');
   });
 
-  it('applies 3-breakpoint responsive grid to metrics', () => {
+  it('applies dashboard-layout__grid class to inner grid', () => {
+    const { container } = renderLayout({
+      banner: <div>B</div>,
+      metrics: [<div key="1">M</div>],
+    });
+
+    const outerGrid = container.querySelector('[data-testid="dashboard-layout"] > .dashboard-layout__grid');
+    expect(outerGrid).toBeTruthy();
+  });
+
+  it('applies dashboard-layout__metrics-grid class to metrics container', () => {
     renderLayout({
       metrics: [<div key="1">M1</div>],
     });
 
-    const metricsGrid = screen.getByLabelText('Key metrics').querySelector('div');
-    // Mobile: 1 col, Tablet: 2 col, Desktop: 3 col
-    expect(metricsGrid.className).toContain('grid-cols-1');
-    expect(metricsGrid.className).toContain('md:grid-cols-2');
-    expect(metricsGrid.className).toContain('lg:grid-cols-3');
+    const metricsGrid = screen.getByLabelText('Key metrics').querySelector('.dashboard-layout__metrics-grid');
+    expect(metricsGrid).toBeTruthy();
   });
 
-  it('applies 2-breakpoint responsive grid to secondary charts', () => {
+  it('applies dashboard-layout__charts-grid class to secondary charts container', () => {
     renderLayout({
       secondaryCharts: [<div key="1">C1</div>],
     });
 
-    const chartsGrid = screen.getByLabelText('Secondary charts').querySelector('div');
-    // Mobile: 1 col, Desktop: 2 col
-    expect(chartsGrid.className).toContain('grid-cols-1');
-    expect(chartsGrid.className).toContain('lg:grid-cols-2');
+    const chartsGrid = screen.getByLabelText('Secondary charts').querySelector('.dashboard-layout__charts-grid');
+    expect(chartsGrid).toBeTruthy();
   });
 
   // =========================================================================

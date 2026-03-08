@@ -1,0 +1,60 @@
+/* =================================================================
+   DashboardLayout Component Styles
+   Mobile-first responsive layout adjustments.
+   Uses semantic CSS variables for theme support.
+
+   Breakpoints:
+   - Mobile:  < 768px  (default)
+   - Tablet:  768px+   (md)
+   - Desktop: 1024px+  (lg)
+   ================================================================= */
+
+/* ---- Base (mobile-first) ---- */
+.dashboard-layout {
+  width: 100%;
+}
+
+.dashboard-layout__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.dashboard-layout__metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.dashboard-layout__charts-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+/* ---- Tablet (768px+) ---- */
+@media (min-width: 768px) {
+  .dashboard-layout__grid {
+    gap: 1.5rem;
+  }
+
+  .dashboard-layout__metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+
+  .dashboard-layout__charts-grid {
+    gap: 1.5rem;
+  }
+}
+
+/* ---- Desktop (1024px+) ---- */
+@media (min-width: 1024px) {
+  .dashboard-layout__metrics-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .dashboard-layout__charts-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import './DashboardLayout.css';
 
 /**
  * DashboardLayout - Main dashboard container using CSS Grid.
@@ -10,9 +11,9 @@ import PropTypes from 'prop-types';
  * - secondaryCharts: 2-column grid of secondary charts
  * - valuation:       Full-width valuation section
  *
- * Breakpoints:
- * - Mobile  (< 768px):  single column, metrics 1-col
- * - Tablet  (768px+):   metrics 2-col, charts stacked
+ * Breakpoints (mobile-first via DashboardLayout.css):
+ * - Mobile  (< 768px):  single column, 1rem gap, compact padding
+ * - Tablet  (768px+):   metrics 2-col, 1.5rem gap
  * - Desktop (1024px+):  metrics 3-col, charts 2-col
  */
 export function DashboardLayout({
@@ -29,10 +30,10 @@ export function DashboardLayout({
 
   return (
     <div
-      className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 ${className}`.trim()}
+      className={`dashboard-layout max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 ${className}`.trim()}
       data-testid="dashboard-layout"
     >
-      <div className="grid grid-cols-1 gap-6">
+      <div className="dashboard-layout__grid">
         {/* Banner Section */}
         {banner && (
           <section aria-label="Company banner">
@@ -43,7 +44,7 @@ export function DashboardLayout({
         {/* Metrics Section */}
         {hasMetrics && (
           <section aria-label="Key metrics">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="dashboard-layout__metrics-grid">
               {metrics.map((metric, index) => (
                 <article key={index} aria-label={`Metric ${index + 1}`}>
                   {metric}
@@ -63,7 +64,7 @@ export function DashboardLayout({
         {/* Secondary Charts Section */}
         {hasSecondaryCharts && (
           <section aria-label="Secondary charts">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="dashboard-layout__charts-grid">
               {secondaryCharts.map((chart, index) => (
                 <article key={index} aria-label={`Chart ${index + 1}`}>
                   {chart}
