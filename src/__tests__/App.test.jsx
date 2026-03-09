@@ -53,6 +53,13 @@ vi.mock('../utils/gaapNormalizer', () => ({
   },
 }));
 
+// Mock useKeyMetrics hook — returns metrics array based on data
+let mockKeyMetricsReturn = [];
+vi.mock('../hooks/useKeyMetrics', () => ({
+  useKeyMetrics: () => mockKeyMetricsReturn,
+  default: () => mockKeyMetricsReturn,
+}));
+
 // Mock TickerSearch to simplify — avoid autocomplete complexity
 vi.mock('../components/TickerSearch', () => ({
   TickerSearch: ({ variant, onSearch, isSearching, autoFocus, className }) => (
@@ -122,8 +129,8 @@ vi.mock('../components/Dashboard', () => ({
       {price !== undefined && <span data-testid="banner-price">{price}</span>}
     </div>
   ),
-  MetricCard: ({ title, value, unit, trend }) => (
-    <div data-testid={`metric-card-${title}`}>
+  MetricCard: ({ title, value, unit, trend, style }) => (
+    <div data-testid={`metric-card-${title}`} style={style}>
       <span data-testid="metric-title">{title}</span>
       <span data-testid="metric-value">{value}</span>
       {unit && <span data-testid="metric-unit">{unit}</span>}
@@ -240,6 +247,7 @@ function createMockCompanyData(overrides = {}) {
 describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockKeyMetricsReturn = [];
     mockHookReturn = {
       data: null,
       loading: false,
@@ -387,6 +395,14 @@ describe('App', () => {
     beforeEach(() => {
       mockData = createMockCompanyData();
       mockHookReturn.data = mockData;
+      mockKeyMetricsReturn = [
+        { id: 'revenue', title: 'Revenue', value: '$394.0B', unit: 'FY2024', trend: 'up' },
+        { id: 'eps', title: 'EPS', value: '$6.42', unit: 'FY2024', trend: 'up' },
+        { id: 'fcf', title: 'FCF', value: '$111.0B', unit: 'FY2024', trend: 'up' },
+        { id: 'gross-margin', title: 'Gross Margin', value: '28.4%', unit: 'FY2024', trend: undefined },
+        { id: 'debt-to-equity', title: 'Debt-to-Equity', value: '--', unit: 'Ratio', trend: undefined },
+        { id: 'market-cap', title: 'Market Cap', value: '--', unit: 'Awaiting price data', trend: undefined },
+      ];
     });
 
     it('renders DashboardLayout when data is loaded', () => {
@@ -420,8 +436,18 @@ describe('App', () => {
 
       expect(screen.getByTestId('dashboard-metrics')).toBeTruthy();
       expect(screen.getByTestId('metric-card-Revenue')).toBeTruthy();
-      expect(screen.getByTestId('metric-card-Net Income')).toBeTruthy();
-      expect(screen.getByTestId('metric-card-Free Cash Flow')).toBeTruthy();
+      expect(screen.getByTestId('metric-card-EPS')).toBeTruthy();
+      expect(screen.getByTestId('metric-card-FCF')).toBeTruthy();
+    });
+
+    it('passes --card-index style to MetricCard for staggered animation', () => {
+      render(<App />);
+
+      const revenueCard = screen.getByTestId('metric-card-Revenue');
+      expect(revenueCard.style.getPropertyValue('--card-index')).toBe('0');
+
+      const epsCard = screen.getByTestId('metric-card-EPS');
+      expect(epsCard.style.getPropertyValue('--card-index')).toBe('1');
     });
 
     it('formats revenue as large number', () => {
@@ -481,19 +507,25 @@ describe('App', () => {
   // ===========================================================================
 
   describe('Metrics Extraction', () => {
-    it('renders gross margin as percentage when gross profit and revenue available', () => {
+    it('renders gross margin from useKeyMetrics hook', () => {
       mockHookReturn.data = createMockCompanyData();
+      mockKeyMetricsReturn = [
+        { id: 'revenue', title: 'Revenue', value: '$394.0B', unit: 'FY2024', trend: 'up' },
+        { id: 'gross-margin', title: 'Gross Margin', value: '28.4%', unit: 'FY2024', trend: undefined },
+      ];
       render(<App />);
 
       expect(screen.getByTestId('metric-card-Gross Margin')).toBeTruthy();
       const marginCard = screen.getByTestId('metric-card-Gross Margin');
       const value = marginCard.querySelector('[data-testid="metric-value"]');
-      // 112B / 394B = 0.2842... -> "28.4%"
       expect(value.textContent).toBe('28.4%');
     });
 
-    it('renders EPS formatted with dollar sign and decimals', () => {
+    it('renders EPS from useKeyMetrics hook', () => {
       mockHookReturn.data = createMockCompanyData();
+      mockKeyMetricsReturn = [
+        { id: 'eps', title: 'EPS', value: '$6.42', unit: 'FY2024', trend: 'up' },
+      ];
       render(<App />);
 
       expect(screen.getByTestId('metric-card-EPS')).toBeTruthy();
@@ -504,6 +536,14 @@ describe('App', () => {
 
     it('renders at most 6 metrics', () => {
       mockHookReturn.data = createMockCompanyData();
+      mockKeyMetricsReturn = [
+        { id: 'revenue', title: 'Revenue', value: '$394.0B', unit: 'FY2024', trend: 'up' },
+        { id: 'eps', title: 'EPS', value: '$6.42', unit: 'FY2024', trend: 'up' },
+        { id: 'fcf', title: 'FCF', value: '$111.0B', unit: 'FY2024', trend: 'up' },
+        { id: 'gross-margin', title: 'Gross Margin', value: '28.4%', unit: 'FY2024', trend: undefined },
+        { id: 'debt-to-equity', title: 'Debt-to-Equity', value: '--', unit: 'Ratio', trend: undefined },
+        { id: 'market-cap', title: 'Market Cap', value: '--', unit: 'Awaiting price data', trend: undefined },
+      ];
       render(<App />);
 
       const metricsContainer = screen.getByTestId('dashboard-metrics');
@@ -513,6 +553,7 @@ describe('App', () => {
 
     it('handles company with no metrics gracefully', () => {
       mockHookReturn.data = createMockCompanyData({ metrics: {} });
+      mockKeyMetricsReturn = [];
       render(<App />);
 
       // Dashboard should still render, just without metrics section
@@ -532,12 +573,14 @@ describe('App', () => {
           },
         },
       });
+      mockKeyMetricsReturn = [
+        { id: 'revenue', title: 'Revenue', value: '$100.0B', unit: 'FY2024', trend: undefined },
+      ];
       render(<App />);
 
       expect(screen.getByTestId('metric-card-Revenue')).toBeTruthy();
-      // No net income, no FCF — those metric cards should not exist
-      expect(screen.queryByTestId('metric-card-Net Income')).toBeNull();
-      expect(screen.queryByTestId('metric-card-Free Cash Flow')).toBeNull();
+      // No FCF — that metric card should not exist
+      expect(screen.queryByTestId('metric-card-FCF')).toBeNull();
     });
   });
 

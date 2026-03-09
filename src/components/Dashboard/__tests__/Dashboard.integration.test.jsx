@@ -364,7 +364,7 @@ describe('Dashboard Integration Tests', () => {
   // ===========================================================================
 
   describe('Empty and edge-case data handling', () => {
-    it('IT-DASH-07: company with empty metrics renders dashboard without metric cards', () => {
+    it('IT-DASH-07: company with empty metrics renders dashboard with placeholder metric cards', () => {
       setHookState({ data: mockNullDataCompany });
       renderApp();
 
@@ -373,8 +373,13 @@ describe('Dashboard Integration Tests', () => {
       expect(screen.getByTestId('company-banner')).toBeTruthy();
       expect(screen.getByText('No Data Corp')).toBeTruthy();
 
-      // No metric cards should be rendered (all metrics are empty)
-      expect(screen.queryAllByTestId('metric-card').length).toBe(0);
+      // useKeyMetrics always returns 6 metric cards (with '--' for missing values)
+      expect(screen.queryAllByTestId('metric-card').length).toBe(6);
+
+      // All values should be '--' placeholders
+      const values = document.querySelectorAll('.metric-card__value');
+      const allPlaceholder = Array.from(values).every((v) => v.textContent === '--');
+      expect(allPlaceholder).toBe(true);
     });
 
     it('IT-DASH-09: company with 1 year of data renders single data points', () => {
@@ -420,9 +425,10 @@ describe('Dashboard Integration Tests', () => {
       const revenueHeading = headings.find((h) => h.textContent === 'Revenue');
       expect(revenueHeading).toBeTruthy();
 
-      // Net Income should exist (1 year)
-      const niHeading = headings.find((h) => h.textContent === 'Net Income');
-      expect(niHeading).toBeTruthy();
+      // useKeyMetrics returns fixed 6 metrics: Revenue, EPS, FCF, Gross Margin, D/E, Market Cap
+      // EPS should exist (even if value is '--' for empty annual data)
+      const epsHeading = headings.find((h) => h.textContent === 'EPS');
+      expect(epsHeading).toBeTruthy();
     });
 
     it('handles company with negative values correctly', () => {
