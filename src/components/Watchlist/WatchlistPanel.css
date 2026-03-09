@@ -1,0 +1,138 @@
+/* =================================================================
+   WatchlistPanel Component Styles
+   Container for WatchlistCards with responsive grid layout.
+   Uses semantic CSS variables from index.css for theme support.
+   BEM naming convention matching DashboardLayout patterns.
+
+   Breakpoints (mobile-first):
+   - Mobile:  < 768px  (default, 1 column)
+   - Tablet:  768px+   (2 columns)
+   - Desktop: 1024px+  (3 columns)
+   ================================================================= */
+
+/* ---- Root container ---- */
+.watchlist-panel {
+  width: 100%;
+}
+
+/* ---- Header: title + count badge ---- */
+.watchlist-panel__header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-4);
+}
+
+.watchlist-panel__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Count pill badge (e.g., "2/3") */
+.watchlist-panel__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--color-accent);
+  background-color: var(--color-bg-secondary);
+  border-radius: 999px;
+  letter-spacing: 0.025em;
+}
+
+/* ---- Responsive card grid ---- */
+.watchlist-panel__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+/* Tablet (768px+): 2 columns */
+@media (min-width: 768px) {
+  .watchlist-panel__grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+/* Desktop (1024px+): 3 columns */
+@media (min-width: 1024px) {
+  .watchlist-panel__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ---- Upgrade prompt ---- */
+.watchlist-panel__upgrade-prompt {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  margin-top: var(--spacing-4);
+  padding: var(--spacing-3) var(--spacing-4);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+}
+
+.watchlist-panel__upgrade-text {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.watchlist-panel__upgrade-link {
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 150ms ease;
+}
+
+.watchlist-panel__upgrade-link:hover {
+  color: var(--color-accent-hover, var(--color-accent));
+  text-decoration: underline;
+}
+
+.watchlist-panel__upgrade-link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---- Responsive: compact sizing on mobile ---- */
+@media (max-width: 767px) {
+  .watchlist-panel__header {
+    margin-bottom: var(--spacing-3);
+  }
+
+  .watchlist-panel__title {
+    font-size: 1.125rem;
+  }
+
+  .watchlist-panel__upgrade-prompt {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-2);
+  }
+}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .watchlist-panel__upgrade-link {
+    transition: none;
+  }
+}
