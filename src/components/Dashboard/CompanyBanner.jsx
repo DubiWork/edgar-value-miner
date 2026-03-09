@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { Star } from 'lucide-react';
 import './CompanyBanner.css';
 
 /**
@@ -13,8 +14,16 @@ import './CompanyBanner.css';
  * - Price with "--" fallback when unavailable
  * - Long company names truncated with ellipsis
  * - Responsive: stacks vertically on mobile
+ * - Optional star toggle for watchlist (backward compatible)
  */
-export function CompanyBanner({ companyName, ticker, price }) {
+export function CompanyBanner({
+  companyName,
+  ticker,
+  price,
+  isWatchlisted,
+  onToggleWatchlist,
+  watchlistFull,
+}) {
   const hasPriceValue = price !== undefined && price !== null;
 
   const formattedPrice = hasPriceValue
@@ -22,6 +31,9 @@ export function CompanyBanner({ companyName, ticker, price }) {
       ? `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       : `$${price}`
     : '--';
+
+  const showWatchlistButton = typeof onToggleWatchlist === 'function';
+  const isDisabled = watchlistFull && !isWatchlisted;
 
   return (
     <div className="company-banner" data-testid="company-banner">
@@ -33,13 +45,32 @@ export function CompanyBanner({ companyName, ticker, price }) {
           {ticker}
         </span>
       </div>
-      <span
-        className={`company-banner__price${!hasPriceValue ? ' company-banner__price--unavailable' : ''}`}
-        data-testid="price-display"
-        aria-label={hasPriceValue ? `Stock price ${formattedPrice}` : 'Price unavailable'}
-      >
-        {formattedPrice}
-      </span>
+      <div className="company-banner__actions">
+        <span
+          className={`company-banner__price${!hasPriceValue ? ' company-banner__price--unavailable' : ''}`}
+          data-testid="price-display"
+          aria-label={hasPriceValue ? `Stock price ${formattedPrice}` : 'Price unavailable'}
+        >
+          {formattedPrice}
+        </span>
+        {showWatchlistButton && (
+          <button
+            type="button"
+            className={`company-banner__watchlist-btn${isWatchlisted ? ' company-banner__watchlist-btn--active' : ''}`}
+            onClick={onToggleWatchlist}
+            disabled={isDisabled}
+            aria-pressed={isWatchlisted}
+            aria-label={isWatchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
+            data-testid="watchlist-toggle"
+          >
+            <Star
+              size={20}
+              fill={isWatchlisted ? 'currentColor' : 'none'}
+              aria-hidden="true"
+            />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -51,6 +82,12 @@ CompanyBanner.propTypes = {
   ticker: PropTypes.string.isRequired,
   /** Current stock price. Shows "--" when undefined/null. */
   price: PropTypes.number,
+  /** Whether the company is currently in the watchlist. */
+  isWatchlisted: PropTypes.bool,
+  /** Callback to toggle watchlist membership. Star button only renders when provided. */
+  onToggleWatchlist: PropTypes.func,
+  /** Whether the watchlist is at capacity (disables add when true). */
+  watchlistFull: PropTypes.bool,
 };
 
 export default CompanyBanner;

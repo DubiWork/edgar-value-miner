@@ -21,13 +21,17 @@ exports[`CompanyBanner > matches snapshot with price 1`] = `
       AAPL
     </span>
   </div>
-  <span
-    aria-label="Stock price $178.50"
-    class="company-banner__price"
-    data-testid="price-display"
+  <div
+    class="company-banner__actions"
   >
-    $178.50
-  </span>
+    <span
+      aria-label="Stock price $178.50"
+      class="company-banner__price"
+      data-testid="price-display"
+    >
+      $178.50
+    </span>
+  </div>
 </div>
 `;
 
@@ -52,12 +56,16 @@ exports[`CompanyBanner > matches snapshot without price 1`] = `
       AAPL
     </span>
   </div>
-  <span
-    aria-label="Price unavailable"
-    class="company-banner__price company-banner__price--unavailable"
-    data-testid="price-display"
+  <div
+    class="company-banner__actions"
   >
-    --
-  </span>
+    <span
+      aria-label="Price unavailable"
+      class="company-banner__price company-banner__price--unavailable"
+      data-testid="price-display"
+    >
+      --
+    </span>
+  </div>
 </div>
 `;
