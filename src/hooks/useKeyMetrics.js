@@ -1,8 +1,9 @@
 /**
  * useKeyMetrics - Hook that extracts key financial metrics from normalized data.
  *
- * Transforms gaapNormalizer output into an array of 6 metric card objects
- * for display in the dashboard MetricCard grid.
+ * Transforms gaapNormalizer output into an array of 7 metric card objects
+ * for display in the dashboard MetricCard grid. When a stockQuote is provided,
+ * Market Cap and P/E Ratio display live data; otherwise they show placeholders.
  *
  * @module useKeyMetrics
  */
@@ -102,7 +103,7 @@ function getDebtToEquityTrend(currentRatio, previousRatio) {
 // =============================================================================
 
 /**
- * useKeyMetrics extracts and formats 6 key financial metrics from normalized data.
+ * useKeyMetrics extracts and formats key financial metrics from normalized data.
  *
  * Returns an array of metric objects suitable for MetricCard components:
  * 1. Revenue (FY[Year])
@@ -110,12 +111,18 @@ function getDebtToEquityTrend(currentRatio, previousRatio) {
  * 3. FCF (FY[Year])
  * 4. Gross Margin (FY[Year])
  * 5. Debt-to-Equity (Ratio)
- * 6. Market Cap (placeholder)
+ * 6. Market Cap (live from stockQuote, or placeholder)
+ * 7. P/E Ratio (live from stockQuote, or placeholder)
  *
  * @param {Object|null} normalizedData - Output from gaapNormalizer.normalizeCompanyFacts
+ * @param {Object|null} [stockQuote=null] - Output from useStockQuote hook's data field
+ * @param {number} [stockQuote.marketCap] - Market capitalization in dollars
+ * @param {number} [stockQuote.pe] - Price-to-earnings ratio
+ * @param {number} [stockQuote.price] - Current stock price
+ * @param {number} [stockQuote.changesPercentage] - Daily price change percentage
  * @returns {Array<{ id: string, title: string, value: string, unit: string, trend: string|undefined }>}
  */
-export function useKeyMetrics(normalizedData) {
+export function useKeyMetrics(normalizedData, stockQuote = null) {
   return useMemo(() => {
     if (!normalizedData?.metrics) return [];
 
@@ -215,18 +222,51 @@ export function useKeyMetrics(normalizedData) {
     });
 
     // -----------------------------------------------------------------------
-    // 6. Market Cap (placeholder — deferred to #9)
+    // 6. Market Cap (live from stockQuote or placeholder)
     // -----------------------------------------------------------------------
-    metrics.push({
-      id: 'market-cap',
-      title: 'Market Cap',
-      value: '--',
-      unit: 'Awaiting price data',
-      trend: undefined,
-    });
+    if (stockQuote && stockQuote.marketCap != null) {
+      metrics.push({
+        id: 'market-cap',
+        title: 'Market Cap',
+        value: formatLargeNumber(stockQuote.marketCap),
+        unit: 'Live',
+        trend: stockQuote.changesPercentage != null
+          ? (stockQuote.changesPercentage > 0 ? 'up' : stockQuote.changesPercentage < 0 ? 'down' : 'neutral')
+          : undefined,
+      });
+    } else {
+      metrics.push({
+        id: 'market-cap',
+        title: 'Market Cap',
+        value: '--',
+        unit: 'Awaiting price data',
+        trend: undefined,
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    // 7. P/E Ratio (live from stockQuote or placeholder)
+    // -----------------------------------------------------------------------
+    if (stockQuote && stockQuote.pe != null) {
+      metrics.push({
+        id: 'pe-ratio',
+        title: 'P/E Ratio',
+        value: Number(stockQuote.pe).toFixed(1),
+        unit: 'TTM',
+        trend: undefined,
+      });
+    } else {
+      metrics.push({
+        id: 'pe-ratio',
+        title: 'P/E Ratio',
+        value: '--',
+        unit: 'Awaiting price data',
+        trend: undefined,
+      });
+    }
 
     return metrics;
-  }, [normalizedData]);
+  }, [normalizedData, stockQuote]);
 }
 
 export default useKeyMetrics;

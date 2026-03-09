@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useKeyMetrics } from '../useKeyMetrics';
 
@@ -79,6 +79,22 @@ function createMockNormalizedData(overrides = {}) {
   };
 }
 
+/**
+ * Creates a mock stock quote object matching FMP API / useStockQuote data shape.
+ */
+function createMockStockQuote(overrides = {}) {
+  return {
+    price: 178.72,
+    eps: 6.13,
+    pe: 29.15,
+    marketCap: 2810000000000,
+    sharesOutstanding: 15728700000,
+    changesPercentage: 1.25,
+    name: 'Apple Inc.',
+    ...overrides,
+  };
+}
+
 // =============================================================================
 // Tests
 // =============================================================================
@@ -94,12 +110,12 @@ describe('useKeyMetrics', () => {
   // ===========================================================================
 
   describe('return structure', () => {
-    it('returns an array of 6 metric objects', () => {
+    it('returns an array of 7 metric objects', () => {
       calculateDebtToEquity.mockReturnValue({ ratio: 4.67, previousRatio: 5.96 });
 
       const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData()));
 
-      expect(result.current).toHaveLength(6);
+      expect(result.current).toHaveLength(7);
     });
 
     it('each metric has required properties: id, title, value, unit, trend', () => {
@@ -135,7 +151,7 @@ describe('useKeyMetrics', () => {
   // ===========================================================================
 
   describe('metric order and content', () => {
-    it('returns metrics in the correct order: Revenue, EPS, FCF, Gross Margin, D/E, Market Cap', () => {
+    it('returns metrics in the correct order: Revenue, EPS, FCF, Gross Margin, D/E, Market Cap, P/E Ratio', () => {
       calculateDebtToEquity.mockReturnValue({ ratio: 4.67, previousRatio: 5.96 });
 
       const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData()));
@@ -148,6 +164,7 @@ describe('useKeyMetrics', () => {
         'Gross Margin',
         'Debt-to-Equity',
         'Market Cap',
+        'P/E Ratio',
       ]);
     });
   });
@@ -345,29 +362,241 @@ describe('useKeyMetrics', () => {
   });
 
   // ===========================================================================
-  // Market Cap placeholder
+  // Market Cap — without stockQuote (backward compatible)
   // ===========================================================================
 
-  describe('Market Cap placeholder', () => {
-    it('shows "--" value', () => {
+  describe('Market Cap without stockQuote (backward compatible)', () => {
+    it('shows "--" value when stockQuote is not provided', () => {
       const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData()));
 
       const marketCap = result.current.find((m) => m.id === 'market-cap');
       expect(marketCap.value).toBe('--');
     });
 
-    it('shows "Awaiting price data" unit', () => {
+    it('shows "Awaiting price data" unit when stockQuote is not provided', () => {
       const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData()));
 
       const marketCap = result.current.find((m) => m.id === 'market-cap');
       expect(marketCap.unit).toBe('Awaiting price data');
     });
 
-    it('has undefined trend', () => {
+    it('has undefined trend when stockQuote is not provided', () => {
       const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData()));
 
       const marketCap = result.current.find((m) => m.id === 'market-cap');
       expect(marketCap.trend).toBeUndefined();
+    });
+
+    it('shows "--" when stockQuote is explicitly null', () => {
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), null));
+
+      const marketCap = result.current.find((m) => m.id === 'market-cap');
+      expect(marketCap.value).toBe('--');
+      expect(marketCap.unit).toBe('Awaiting price data');
+    });
+
+    it('shows "--" when stockQuote is explicitly undefined', () => {
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), undefined));
+
+      const marketCap = result.current.find((m) => m.id === 'market-cap');
+      expect(marketCap.value).toBe('--');
+      expect(marketCap.unit).toBe('Awaiting price data');
+    });
+  });
+
+  // ===========================================================================
+  // Market Cap — with stockQuote (live data)
+  // ===========================================================================
+
+  describe('Market Cap with stockQuote', () => {
+    it('fills Market Cap from stockQuote.marketCap', () => {
+      const quote = createMockStockQuote({ marketCap: 2810000000000 });
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const marketCap = result.current.find((m) => m.id === 'market-cap');
+      expect(marketCap.value).toBe('$2.8T');
+    });
+
+    it('formats Market Cap in trillions correctly ($X.XT)', () => {
+      const quote = createMockStockQuote({ marketCap: 3500000000000 });
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const marketCap = result.current.find((m) => m.id === 'market-cap');
+      expect(marketCap.value).toBe('$3.5T');
+    });
+
+    it('formats Market Cap in billions correctly ($X.XB)', () => {
+      const quote = createMockStockQuote({ marketCap: 2100000000 });
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const marketCap = result.current.find((m) => m.id === 'market-cap');
+      expect(marketCap.value).toBe('$2.1B');
+    });
+
+    it('formats Market Cap in millions correctly ($X.XM)', () => {
+      const quote = createMockStockQuote({ marketCap: 850000000 });
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const marketCap = result.current.find((m) => m.id === 'market-cap');
+      expect(marketCap.value).toBe('$850.0M');
+    });
+
+    it('shows "Live" unit when stockQuote provides marketCap', () => {
+      const quote = createMockStockQuote();
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const marketCap = result.current.find((m) => m.id === 'market-cap');
+      expect(marketCap.unit).toBe('Live');
+    });
+
+    it('derives up trend from positive changesPercentage', () => {
+      const quote = createMockStockQuote({ changesPercentage: 1.25 });
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const marketCap = result.current.find((m) => m.id === 'market-cap');
+      expect(marketCap.trend).toBe('up');
+    });
+
+    it('derives down trend from negative changesPercentage', () => {
+      const quote = createMockStockQuote({ changesPercentage: -2.50 });
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const marketCap = result.current.find((m) => m.id === 'market-cap');
+      expect(marketCap.trend).toBe('down');
+    });
+
+    it('derives neutral trend from zero changesPercentage', () => {
+      const quote = createMockStockQuote({ changesPercentage: 0 });
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const marketCap = result.current.find((m) => m.id === 'market-cap');
+      expect(marketCap.trend).toBe('neutral');
+    });
+
+    it('shows undefined trend when changesPercentage is missing', () => {
+      const quote = createMockStockQuote({ changesPercentage: undefined });
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const marketCap = result.current.find((m) => m.id === 'market-cap');
+      expect(marketCap.trend).toBeUndefined();
+    });
+
+    it('shows "--" when stockQuote has missing marketCap field', () => {
+      const quote = createMockStockQuote({ marketCap: undefined });
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const marketCap = result.current.find((m) => m.id === 'market-cap');
+      expect(marketCap.value).toBe('--');
+      expect(marketCap.unit).toBe('Awaiting price data');
+    });
+
+    it('shows "--" when stockQuote has null marketCap', () => {
+      const quote = createMockStockQuote({ marketCap: null });
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const marketCap = result.current.find((m) => m.id === 'market-cap');
+      expect(marketCap.value).toBe('--');
+      expect(marketCap.unit).toBe('Awaiting price data');
+    });
+  });
+
+  // ===========================================================================
+  // P/E Ratio — without stockQuote (backward compatible)
+  // ===========================================================================
+
+  describe('P/E Ratio without stockQuote (backward compatible)', () => {
+    it('shows "--" value when stockQuote is not provided', () => {
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData()));
+
+      const pe = result.current.find((m) => m.id === 'pe-ratio');
+      expect(pe.value).toBe('--');
+    });
+
+    it('shows "Awaiting price data" unit when stockQuote is not provided', () => {
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData()));
+
+      const pe = result.current.find((m) => m.id === 'pe-ratio');
+      expect(pe.unit).toBe('Awaiting price data');
+    });
+
+    it('has undefined trend when stockQuote is not provided', () => {
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData()));
+
+      const pe = result.current.find((m) => m.id === 'pe-ratio');
+      expect(pe.trend).toBeUndefined();
+    });
+  });
+
+  // ===========================================================================
+  // P/E Ratio — with stockQuote (live data)
+  // ===========================================================================
+
+  describe('P/E Ratio with stockQuote', () => {
+    it('fills P/E from stockQuote.pe', () => {
+      const quote = createMockStockQuote({ pe: 29.15 });
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const pe = result.current.find((m) => m.id === 'pe-ratio');
+      expect(pe.value).toBe('29.1');
+    });
+
+    it('formats P/E correctly with one decimal place (XX.X)', () => {
+      const quote = createMockStockQuote({ pe: 15.678 });
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const pe = result.current.find((m) => m.id === 'pe-ratio');
+      expect(pe.value).toBe('15.7');
+    });
+
+    it('shows "TTM" unit when stockQuote provides pe', () => {
+      const quote = createMockStockQuote();
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const pe = result.current.find((m) => m.id === 'pe-ratio');
+      expect(pe.unit).toBe('TTM');
+    });
+
+    it('shows "--" when stockQuote has missing pe field', () => {
+      const quote = createMockStockQuote({ pe: undefined });
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const pe = result.current.find((m) => m.id === 'pe-ratio');
+      expect(pe.value).toBe('--');
+      expect(pe.unit).toBe('Awaiting price data');
+    });
+
+    it('shows "--" when stockQuote has null pe', () => {
+      const quote = createMockStockQuote({ pe: null });
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const pe = result.current.find((m) => m.id === 'pe-ratio');
+      expect(pe.value).toBe('--');
+      expect(pe.unit).toBe('Awaiting price data');
+    });
+
+    it('handles pe value of 0 (displays 0.0)', () => {
+      const quote = createMockStockQuote({ pe: 0 });
+
+      const { result } = renderHook(() => useKeyMetrics(createMockNormalizedData(), quote));
+
+      const pe = result.current.find((m) => m.id === 'pe-ratio');
+      expect(pe.value).toBe('0.0');
     });
   });
 
@@ -390,6 +619,14 @@ describe('useKeyMetrics', () => {
 
     it('returns empty array when normalizedData.metrics is missing', () => {
       const { result } = renderHook(() => useKeyMetrics({ ticker: 'AAPL' }));
+
+      expect(result.current).toEqual([]);
+    });
+
+    it('returns empty array even when stockQuote is provided but normalizedData is null', () => {
+      const quote = createMockStockQuote();
+
+      const { result } = renderHook(() => useKeyMetrics(null, quote));
 
       expect(result.current).toEqual([]);
     });
@@ -477,18 +714,18 @@ describe('useKeyMetrics', () => {
       const data = createMockNormalizedData();
 
       const { result, rerender } = renderHook(
-        ({ normalizedData }) => useKeyMetrics(normalizedData),
-        { initialProps: { normalizedData: data } }
+        ({ normalizedData, stockQuote }) => useKeyMetrics(normalizedData, stockQuote),
+        { initialProps: { normalizedData: data, stockQuote: null } }
       );
 
       const firstResult = result.current;
-      rerender({ normalizedData: data });
+      rerender({ normalizedData: data, stockQuote: null });
       const secondResult = result.current;
 
       expect(firstResult).toBe(secondResult);
     });
 
-    it('returns a new array reference when input changes', () => {
+    it('returns a new array reference when normalizedData changes', () => {
       const data1 = createMockNormalizedData();
       const data2 = createMockNormalizedData({
         revenue: {
@@ -502,12 +739,45 @@ describe('useKeyMetrics', () => {
       });
 
       const { result, rerender } = renderHook(
-        ({ normalizedData }) => useKeyMetrics(normalizedData),
-        { initialProps: { normalizedData: data1 } }
+        ({ normalizedData, stockQuote }) => useKeyMetrics(normalizedData, stockQuote),
+        { initialProps: { normalizedData: data1, stockQuote: null } }
       );
 
       const firstResult = result.current;
-      rerender({ normalizedData: data2 });
+      rerender({ normalizedData: data2, stockQuote: null });
+      const secondResult = result.current;
+
+      expect(firstResult).not.toBe(secondResult);
+    });
+
+    it('returns a new array reference when stockQuote changes', () => {
+      const data = createMockNormalizedData();
+      const quote1 = createMockStockQuote({ marketCap: 2800000000000 });
+      const quote2 = createMockStockQuote({ marketCap: 3000000000000 });
+
+      const { result, rerender } = renderHook(
+        ({ normalizedData, stockQuote }) => useKeyMetrics(normalizedData, stockQuote),
+        { initialProps: { normalizedData: data, stockQuote: quote1 } }
+      );
+
+      const firstResult = result.current;
+      rerender({ normalizedData: data, stockQuote: quote2 });
+      const secondResult = result.current;
+
+      expect(firstResult).not.toBe(secondResult);
+    });
+
+    it('returns a new array reference when stockQuote goes from null to a value', () => {
+      const data = createMockNormalizedData();
+      const quote = createMockStockQuote();
+
+      const { result, rerender } = renderHook(
+        ({ normalizedData, stockQuote }) => useKeyMetrics(normalizedData, stockQuote),
+        { initialProps: { normalizedData: data, stockQuote: null } }
+      );
+
+      const firstResult = result.current;
+      rerender({ normalizedData: data, stockQuote: quote });
       const secondResult = result.current;
 
       expect(firstResult).not.toBe(secondResult);
