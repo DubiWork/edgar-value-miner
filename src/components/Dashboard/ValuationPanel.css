@@ -1,0 +1,371 @@
+/* =================================================================
+   ValuationPanel Component Styles
+   Uses semantic CSS variables from index.css for theme support.
+   Follows BEM naming (valuation-panel__element--modifier).
+   ================================================================= */
+
+.valuation-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  animation: valuation-panel-enter 300ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* Entrance animation keyframe */
+@keyframes valuation-panel-enter {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Title */
+.valuation-panel__title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* =================================================================
+   2-Column Grid
+   ================================================================= */
+
+.valuation-panel__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-4);
+  align-items: start;
+}
+
+.valuation-panel__prices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.valuation-panel__price,
+.valuation-panel__fair-value {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.valuation-panel__label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.valuation-panel__value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1.2;
+}
+
+.valuation-panel__value--na {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.valuation-panel__pe-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* =================================================================
+   Margin of Safety (right column — hero metric)
+   ================================================================= */
+
+.valuation-panel__margin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  align-items: flex-end;
+  text-align: right;
+}
+
+.valuation-panel__margin-value {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+/* =================================================================
+   Status Badge — pill with background color
+   ================================================================= */
+
+.valuation-panel__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  padding: var(--spacing-1) var(--spacing-3);
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.valuation-panel__status--undervalued {
+  color: var(--color-success);
+  background-color: color-mix(in srgb, var(--color-success) 12%, transparent);
+}
+
+.valuation-panel__status--fair {
+  color: var(--color-warning);
+  background-color: color-mix(in srgb, var(--color-warning) 12%, transparent);
+}
+
+.valuation-panel__status--overvalued {
+  color: var(--color-danger);
+  background-color: color-mix(in srgb, var(--color-danger) 12%, transparent);
+}
+
+.valuation-panel__status--unavailable {
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-hover);
+}
+
+.valuation-panel__status-icon {
+  font-size: 0.875rem;
+}
+
+/* =================================================================
+   N/A Message
+   ================================================================= */
+
+.valuation-panel__message {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin: 0;
+  padding: var(--spacing-3);
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+/* =================================================================
+   Slider Section — full width bottom
+   ================================================================= */
+
+.valuation-panel__slider-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.valuation-panel__slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.valuation-panel__slider-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.valuation-panel__slider-output {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+/* =================================================================
+   Range Input — Cross-browser Styling
+   ================================================================= */
+
+.valuation-panel__slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-border);
+  outline: none;
+  cursor: pointer;
+  transition: opacity 200ms ease;
+}
+
+.valuation-panel__slider:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* WebKit thumb */
+.valuation-panel__slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 2px solid var(--color-bg-tertiary);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.valuation-panel__slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: var(--shadow-lg);
+}
+
+.valuation-panel__slider:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+/* Firefox thumb */
+.valuation-panel__slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 2px solid var(--color-bg-tertiary);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.valuation-panel__slider::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: var(--shadow-lg);
+}
+
+.valuation-panel__slider:focus::-moz-range-thumb {
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+/* Firefox track */
+.valuation-panel__slider::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-border);
+}
+
+/* Slider range labels (min/max) */
+.valuation-panel__slider-range {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+}
+
+/* =================================================================
+   Touch Target — 44px minimum on coarse pointer devices
+   ================================================================= */
+
+@media (pointer: coarse) {
+  .valuation-panel__slider {
+    height: 10px;
+    border-radius: 5px;
+  }
+
+  .valuation-panel__slider::-webkit-slider-thumb {
+    width: 44px;
+    height: 44px;
+  }
+
+  .valuation-panel__slider::-moz-range-thumb {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* =================================================================
+   Loading Shimmer State
+   ================================================================= */
+
+.valuation-panel--loading {
+  min-height: 200px;
+}
+
+.valuation-panel--loading .valuation-panel__shimmer {
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    to right,
+    var(--color-border),
+    var(--color-bg-hover),
+    var(--color-border)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+.valuation-panel__shimmer--title {
+  height: 1rem;
+  width: 40%;
+}
+
+.valuation-panel__shimmer--grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-4);
+}
+
+.valuation-panel__shimmer--value {
+  height: 3rem;
+  width: 100%;
+}
+
+.valuation-panel__shimmer--slider {
+  height: 2rem;
+  width: 100%;
+}
+
+/* =================================================================
+   Responsive: single column on mobile (<640px)
+   ================================================================= */
+
+@media (max-width: 639px) {
+  .valuation-panel__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .valuation-panel__margin {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .valuation-panel__margin-value {
+    font-size: 1.75rem;
+  }
+
+  .valuation-panel__value {
+    font-size: 1.25rem;
+  }
+}
+
+/* =================================================================
+   Reduced Motion
+   ================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .valuation-panel {
+    animation: none;
+  }
+
+  .valuation-panel--loading .valuation-panel__shimmer {
+    animation: none;
+  }
+
+  .valuation-panel__slider::-webkit-slider-thumb {
+    transition: none;
+  }
+
+  .valuation-panel__slider::-moz-range-thumb {
+    transition: none;
+  }
+}
