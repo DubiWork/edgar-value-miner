@@ -1,0 +1,240 @@
+/* =================================================================
+   WatchlistCard Component Styles
+   Uses semantic CSS variables from index.css for theme support.
+   BEM naming convention matching MetricCard patterns.
+   ================================================================= */
+
+.watchlist-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  cursor: pointer;
+  animation: watchlist-card-enter 300ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(var(--card-index, 0) * 80ms);
+  position: relative;
+}
+
+/* Entrance animation keyframe */
+@keyframes watchlist-card-enter {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Focus visible outline for keyboard navigation */
+.watchlist-card:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Hover state — only on devices that support hover */
+@media (hover: hover) {
+  .watchlist-card {
+    transition: transform 200ms ease, box-shadow 200ms ease;
+  }
+
+  .watchlist-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-xl);
+  }
+}
+
+/* =================================================================
+   Header: ticker badge, company name, remove button
+   ================================================================= */
+
+.watchlist-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  min-width: 0;
+}
+
+/* Ticker badge — matches CompanyBanner pattern */
+.watchlist-card__ticker {
+  flex-shrink: 0;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--color-accent);
+  background-color: var(--color-bg-secondary);
+  border-radius: 0.375rem;
+  letter-spacing: 0.025em;
+}
+
+/* Company name with ellipsis truncation */
+.watchlist-card__name {
+  flex: 1;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Remove button — X icon, WCAG 44px min touch target */
+.watchlist-card__remove {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -10px -10px -10px 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.watchlist-card__remove:hover {
+  color: var(--color-danger);
+  background-color: var(--color-bg-hover);
+}
+
+.watchlist-card__remove:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+/* =================================================================
+   Body: price and change percentage
+   ================================================================= */
+
+.watchlist-card__body {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-3);
+  min-height: 2rem;
+}
+
+/* Price display */
+.watchlist-card__price {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1.2;
+}
+
+/* Change percentage */
+.watchlist-card__change {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.watchlist-card__change--up {
+  color: var(--color-success);
+}
+
+.watchlist-card__change--down {
+  color: var(--color-danger);
+}
+
+.watchlist-card__change--neutral {
+  color: var(--color-text-secondary);
+}
+
+/* Arrow icon */
+.watchlist-card__arrow {
+  font-size: 0.625rem;
+  line-height: 1;
+}
+
+/* =================================================================
+   Shimmer loading state for price area
+   ================================================================= */
+
+.watchlist-card__shimmer-group {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-3);
+  width: 100%;
+}
+
+.watchlist-card__shimmer {
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    to right,
+    var(--color-border),
+    var(--color-bg-hover),
+    var(--color-border)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+.watchlist-card__shimmer--price {
+  height: 1.5rem;
+  width: 40%;
+}
+
+.watchlist-card__shimmer--change {
+  height: 0.875rem;
+  width: 20%;
+}
+
+/* =================================================================
+   Footer: timestamp
+   ================================================================= */
+
+.watchlist-card__footer {
+  display: flex;
+  align-items: center;
+}
+
+.watchlist-card__timestamp {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  line-height: 1.25;
+}
+
+/* =================================================================
+   Responsive: compact sizing on mobile (<768px)
+   ================================================================= */
+@media (max-width: 767px) {
+  .watchlist-card__price {
+    font-size: 1.25rem;
+  }
+
+  .watchlist-card__name {
+    font-size: 0.8125rem;
+  }
+
+  .watchlist-card__ticker {
+    font-size: 0.75rem;
+    padding: 0.0625rem 0.375rem;
+  }
+}
+
+/* =================================================================
+   Reduced motion
+   ================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  .watchlist-card {
+    animation: none;
+  }
+
+  .watchlist-card__shimmer {
+    animation: none;
+  }
+
+  @media (hover: hover) {
+    .watchlist-card {
+      transition: none;
+    }
+  }
+}
