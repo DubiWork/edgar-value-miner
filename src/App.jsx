@@ -9,14 +9,20 @@ import {
   ChartContainer,
   FCFChart,
   MarginsChart,
+  ValuationPanel,
   DashboardSkeleton,
 } from './components/Dashboard'
 import { useCompanySearch } from './hooks/useCompanySearch'
+import { useStockQuote } from './hooks/useStockQuote'
 import { useKeyMetrics } from './hooks/useKeyMetrics'
+import gaapNormalizer from './utils/gaapNormalizer'
 import { calculateMargins } from './utils/calculateMargins'
 
 function App() {
   const { data, loading, error, metadata, searchCompany, clearError } = useCompanySearch()
+
+  // Fetch live stock quote from FMP API when company data is available
+  const { data: stockQuote, loading: priceLoading } = useStockQuote(data?.ticker)
 
   const handleSearch = (ticker) => {
     searchCompany(ticker)
@@ -26,7 +32,11 @@ function App() {
   const showCompactSearch = data || loading
 
   // Extract formatted metrics from normalized data using the hook
-  const metricCards = useKeyMetrics(data)
+  // Pass stockQuote for live Market Cap and P/E
+  const metricCards = useKeyMetrics(data, stockQuote)
+
+  // Extract latest EPS for ValuationPanel
+  const latestEps = data?.metrics ? gaapNormalizer.getLatestValue(data.metrics.eps) : null
 
   return (
     <div
@@ -248,6 +258,14 @@ function App() {
                 />
               </ChartContainer>,
             ]}
+            valuation={
+              <ValuationPanel
+                eps={latestEps?.value}
+                currentPrice={stockQuote?.price}
+                companyName={data?.companyName}
+                loading={priceLoading}
+              />
+            }
           />
         )}
 
