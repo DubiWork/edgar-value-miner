@@ -1,0 +1,229 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ValuationPanel > matches snapshot for a fully populated panel 1`] = `
+<section
+  aria-label="P/E Fair Value analysis for Apple Inc."
+  class="card valuation-panel"
+  data-testid="valuation-panel"
+>
+  <h3
+    class="valuation-panel__title"
+  >
+    P/E Fair Value
+  </h3>
+  <div
+    class="valuation-panel__grid"
+  >
+    <div
+      class="valuation-panel__prices"
+    >
+      <div
+        class="valuation-panel__price"
+      >
+        <span
+          class="valuation-panel__label"
+        >
+          Current Price
+        </span>
+        <span
+          class="valuation-panel__value"
+        >
+          $175.00
+        </span>
+      </div>
+      <div
+        class="valuation-panel__fair-value"
+      >
+        <span
+          class="valuation-panel__label"
+        >
+          Fair Value
+        </span>
+        <span
+          class="valuation-panel__value"
+        >
+          $104.55
+        </span>
+        <span
+          class="valuation-panel__pe-label"
+        >
+          at 
+          15.0
+           P/E
+        </span>
+      </div>
+    </div>
+    <div
+      class="valuation-panel__margin"
+    >
+      <span
+        class="valuation-panel__label"
+      >
+        Margin of Safety
+      </span>
+      <span
+        class="valuation-panel__margin-value"
+        style="color: var(--color-danger);"
+      >
+        -67.4%
+      </span>
+      <span
+        aria-label="Valuation status: Overvalued"
+        class="valuation-panel__status valuation-panel__status--overvalued"
+        role="img"
+      >
+        <span
+          aria-hidden="true"
+          class="valuation-panel__status-icon"
+        >
+          ↑
+        </span>
+        Overvalued
+      </span>
+    </div>
+  </div>
+  <div
+    class="valuation-panel__slider-section"
+  >
+    <div
+      class="valuation-panel__slider-header"
+    >
+      <span
+        class="valuation-panel__slider-label"
+      >
+        Target P/E
+      </span>
+      <output
+        class="valuation-panel__slider-output"
+      >
+        15.0
+      </output>
+    </div>
+    <input
+      aria-label="Target P/E ratio"
+      aria-valuemax="50"
+      aria-valuemin="5"
+      aria-valuenow="15"
+      class="valuation-panel__slider"
+      max="50"
+      min="5"
+      step="0.5"
+      type="range"
+      value="15"
+    />
+    <div
+      class="valuation-panel__slider-range"
+    >
+      <span>
+        5
+      </span>
+      <span>
+        50
+      </span>
+    </div>
+  </div>
+  <div
+    aria-live="polite"
+    class="sr-only"
+  />
+</section>
+`;
+
+exports[`ValuationPanel > matches snapshot for loading state 1`] = `
+<section
+  aria-label="Loading valuation data"
+  class="card valuation-panel valuation-panel--loading"
+  data-testid="valuation-panel"
+  role="status"
+>
+  <div
+    class="valuation-panel__shimmer valuation-panel__shimmer--title"
+  />
+  <div
+    class="valuation-panel__shimmer valuation-panel__shimmer--grid"
+  >
+    <div
+      class="valuation-panel__shimmer valuation-panel__shimmer--value"
+    />
+    <div
+      class="valuation-panel__shimmer valuation-panel__shimmer--value"
+    />
+  </div>
+  <div
+    class="valuation-panel__shimmer valuation-panel__shimmer--slider"
+  />
+  <span
+    class="sr-only"
+  >
+    Loading valuation data...
+  </span>
+</section>
+`;
+
+exports[`ValuationPanel > matches snapshot for negative EPS 1`] = `
+<section
+  aria-label="P/E Fair Value analysis for Apple Inc."
+  class="card valuation-panel"
+  data-testid="valuation-panel"
+>
+  <h3
+    class="valuation-panel__title"
+  >
+    P/E Fair Value
+  </h3>
+  <div
+    class="valuation-panel__grid"
+  >
+    <div
+      class="valuation-panel__price"
+    >
+      <span
+        class="valuation-panel__label"
+      >
+        Current Price
+      </span>
+      <span
+        class="valuation-panel__value"
+      >
+        $175.00
+      </span>
+    </div>
+    <div
+      class="valuation-panel__fair-value"
+    >
+      <span
+        class="valuation-panel__label"
+      >
+        Fair Value
+      </span>
+      <span
+        class="valuation-panel__value valuation-panel__value--na"
+      >
+        N/A
+      </span>
+    </div>
+  </div>
+  <p
+    class="valuation-panel__message"
+  >
+    N/A — P/E requires positive earnings
+  </p>
+  <div
+    class="valuation-panel__slider-section"
+  >
+    <input
+      aria-label="Target P/E ratio"
+      aria-valuemax="50"
+      aria-valuemin="5"
+      aria-valuenow="15"
+      class="valuation-panel__slider"
+      disabled=""
+      max="50"
+      min="5"
+      step="0.5"
+      type="range"
+      value="15"
+    />
+  </div>
+</section>
+`;
