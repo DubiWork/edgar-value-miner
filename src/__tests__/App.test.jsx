@@ -60,6 +60,13 @@ vi.mock('../hooks/useKeyMetrics', () => ({
   default: () => mockKeyMetricsReturn,
 }));
 
+// Mock useStockQuote hook
+let mockStockQuoteReturn = { data: null, loading: false, error: null, refetch: vi.fn() };
+vi.mock('../hooks/useStockQuote', () => ({
+  useStockQuote: () => mockStockQuoteReturn,
+  default: () => mockStockQuoteReturn,
+}));
+
 // Mock TickerSearch to simplify — avoid autocomplete complexity
 vi.mock('../components/TickerSearch', () => ({
   TickerSearch: ({ variant, onSearch, isSearching, autoFocus, className }) => (
@@ -151,6 +158,17 @@ vi.mock('../components/Dashboard', () => ({
   MarginsChart: ({ data }) => (
     <div data-testid="margins-chart" data-has-data={Array.isArray(data) && data.length > 0}>
       MarginsChart mock
+    </div>
+  ),
+  ValuationPanel: ({ eps, currentPrice, companyName, loading: vpLoading }) => (
+    <div
+      data-testid="valuation-panel"
+      data-eps={eps}
+      data-price={currentPrice}
+      data-company={companyName}
+      data-loading={vpLoading}
+    >
+      ValuationPanel mock
     </div>
   ),
   DashboardSkeleton: () => (
@@ -248,6 +266,7 @@ describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockKeyMetricsReturn = [];
+    mockStockQuoteReturn = { data: null, loading: false, error: null, refetch: vi.fn() };
     mockHookReturn = {
       data: null,
       loading: false,
@@ -395,13 +414,20 @@ describe('App', () => {
     beforeEach(() => {
       mockData = createMockCompanyData();
       mockHookReturn.data = mockData;
+      mockStockQuoteReturn = {
+        data: { price: 178.72, eps: 6.42, pe: 27.8, marketCap: 2780000000000, changesPercentage: 1.2 },
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      };
       mockKeyMetricsReturn = [
         { id: 'revenue', title: 'Revenue', value: '$394.0B', unit: 'FY2024', trend: 'up' },
         { id: 'eps', title: 'EPS', value: '$6.42', unit: 'FY2024', trend: 'up' },
         { id: 'fcf', title: 'FCF', value: '$111.0B', unit: 'FY2024', trend: 'up' },
         { id: 'gross-margin', title: 'Gross Margin', value: '28.4%', unit: 'FY2024', trend: undefined },
         { id: 'debt-to-equity', title: 'Debt-to-Equity', value: '--', unit: 'Ratio', trend: undefined },
-        { id: 'market-cap', title: 'Market Cap', value: '--', unit: 'Awaiting price data', trend: undefined },
+        { id: 'market-cap', title: 'Market Cap', value: '$2.8T', unit: 'Live', trend: 'up' },
+        { id: 'pe-ratio', title: 'P/E Ratio', value: '27.8', unit: 'TTM', trend: undefined },
       ];
     });
 
@@ -489,6 +515,42 @@ describe('App', () => {
       expect(screen.getByTestId('chart-container-Margins')).toBeTruthy();
     });
 
+    it('renders ValuationPanel in the valuation slot', () => {
+      render(<App />);
+
+      expect(screen.getByTestId('dashboard-valuation')).toBeTruthy();
+      expect(screen.getByTestId('valuation-panel')).toBeTruthy();
+    });
+
+    it('passes EPS from normalized data to ValuationPanel', () => {
+      render(<App />);
+
+      const panel = screen.getByTestId('valuation-panel');
+      expect(panel.getAttribute('data-eps')).toBe('6.42');
+    });
+
+    it('passes stock price from useStockQuote to ValuationPanel', () => {
+      render(<App />);
+
+      const panel = screen.getByTestId('valuation-panel');
+      expect(panel.getAttribute('data-price')).toBe('178.72');
+    });
+
+    it('passes company name to ValuationPanel', () => {
+      render(<App />);
+
+      const panel = screen.getByTestId('valuation-panel');
+      expect(panel.getAttribute('data-company')).toBe('Apple Inc.');
+    });
+
+    it('passes priceLoading state to ValuationPanel', () => {
+      mockStockQuoteReturn = { data: null, loading: true, error: null, refetch: vi.fn() };
+      render(<App />);
+
+      const panel = screen.getByTestId('valuation-panel');
+      expect(panel.getAttribute('data-loading')).toBe('true');
+    });
+
     it('shows compact search bar in header when data loaded', () => {
       render(<App />);
 
@@ -534,7 +596,7 @@ describe('App', () => {
       expect(value.textContent).toBe('$6.42');
     });
 
-    it('renders at most 6 metrics', () => {
+    it('renders 7 metric cards when all metrics plus live data available', () => {
       mockHookReturn.data = createMockCompanyData();
       mockKeyMetricsReturn = [
         { id: 'revenue', title: 'Revenue', value: '$394.0B', unit: 'FY2024', trend: 'up' },
@@ -542,13 +604,14 @@ describe('App', () => {
         { id: 'fcf', title: 'FCF', value: '$111.0B', unit: 'FY2024', trend: 'up' },
         { id: 'gross-margin', title: 'Gross Margin', value: '28.4%', unit: 'FY2024', trend: undefined },
         { id: 'debt-to-equity', title: 'Debt-to-Equity', value: '--', unit: 'Ratio', trend: undefined },
-        { id: 'market-cap', title: 'Market Cap', value: '--', unit: 'Awaiting price data', trend: undefined },
+        { id: 'market-cap', title: 'Market Cap', value: '$2.8T', unit: 'Live', trend: 'up' },
+        { id: 'pe-ratio', title: 'P/E Ratio', value: '27.8', unit: 'TTM', trend: undefined },
       ];
       render(<App />);
 
       const metricsContainer = screen.getByTestId('dashboard-metrics');
       const metricSlots = metricsContainer.querySelectorAll('[data-testid^="metric-slot-"]');
-      expect(metricSlots.length).toBeLessThanOrEqual(6);
+      expect(metricSlots.length).toBe(7);
     });
 
     it('handles company with no metrics gracefully', () => {
