@@ -13,6 +13,12 @@ export const mockAppleData = {
   ticker: 'AAPL',
   cik: '0000320193',
   companyName: 'Apple Inc.',
+  // Balance sheet fields for D/E calculation (AAPL-like FY2025)
+  totalDebt: 111088000000,
+  stockholdersEquity: 62146000000,
+  // Previous year balance sheet for D/E trend
+  previousTotalDebt: 120000000000,
+  previousStockholdersEquity: 50672000000,
   metrics: {
     revenue: {
       annual: [
@@ -107,6 +113,9 @@ export const mockPreRevenueCompany = {
   ticker: 'NEWCO',
   cik: '999999',
   companyName: 'New IPO Corp',
+  // Balance sheet: startup with low debt and positive equity
+  totalDebt: 5000000,
+  stockholdersEquity: 80000000,
   metrics: {
     revenue: {
       annual: [{ value: 0, period: '2025-12-31', fiscalYear: 2025 }],
@@ -183,6 +192,9 @@ export const mockNegativeCompany = {
   ticker: 'LOSS',
   cik: '111111',
   companyName: 'Money Losing Inc.',
+  // Balance sheet: negative equity (accumulated losses)
+  totalDebt: 200000000,
+  stockholdersEquity: -50000000,
   metrics: {
     revenue: {
       annual: [
@@ -253,6 +265,9 @@ export const mockLongNameCompany = {
   ticker: 'LONG',
   cik: '222222',
   companyName: 'The Very Long International Holding Corporation of Americas and Europe Ltd.',
+  // Balance sheet
+  totalDebt: 1500000000,
+  stockholdersEquity: 3000000000,
   metrics: {
     revenue: {
       annual: [
@@ -297,6 +312,9 @@ export const mockTenYearCompany = {
   ticker: 'MSFT',
   cik: '0000789019',
   companyName: 'Microsoft Corporation',
+  // Balance sheet (MSFT-like)
+  totalDebt: 47000000000,
+  stockholdersEquity: 206000000000,
   metrics: {
     revenue: {
       annual: Array.from({ length: 10 }, (_, i) => ({
@@ -345,6 +363,10 @@ export const mockPartialDataCompany = {
   ticker: 'PART',
   cik: '333333',
   companyName: 'Partial Data Inc.',
+  // Balance sheet: only component debt (no totalDebt)
+  shortTermDebt: 5000000,
+  longTermDebt: 15000000,
+  stockholdersEquity: 30000000,
   metrics: {
     revenue: {
       annual: [
