@@ -2,7 +2,7 @@
  * Key Metrics Integration Tests
  *
  * Tests the full data flow from company search data through useKeyMetrics hook
- * to MetricCard rendering. Verifies that all 6 metric cards display correct
+ * to MetricCard rendering. Verifies that all 7 metric cards display correct
  * values, labels, trends, animations, and accessibility attributes when the
  * dashboard components work together.
  *
@@ -194,12 +194,12 @@ describe('Key Metrics Integration Tests', () => {
   // ===========================================================================
 
   describe('A. End-to-End Data Flow', () => {
-    it('renders 6 MetricCards when company data is loaded', () => {
+    it('renders 7 MetricCards when company data is loaded', () => {
       setHookState({ data: mockAppleData });
       renderApp();
 
       const metricCards = screen.getAllByTestId('metric-card');
-      expect(metricCards.length).toBe(6);
+      expect(metricCards.length).toBe(7);
     });
 
     it('displays Revenue value from fixture data', () => {
@@ -286,7 +286,7 @@ describe('Key Metrics Integration Tests', () => {
       expect(de.unit).toBe('Ratio');
     });
 
-    it('displays all 6 metrics in correct order: Revenue, EPS, FCF, Gross Margin, D/E, Market Cap', () => {
+    it('displays all 7 metrics in correct order: Revenue, EPS, FCF, Gross Margin, D/E, Market Cap, P/E Ratio', () => {
       setHookState({ data: mockAppleData });
       renderApp();
 
@@ -299,6 +299,7 @@ describe('Key Metrics Integration Tests', () => {
         'Gross Margin',
         'Debt-to-Equity',
         'Market Cap',
+        'P/E Ratio',
       ]);
     });
   });
@@ -571,18 +572,18 @@ describe('Key Metrics Integration Tests', () => {
   // ===========================================================================
 
   describe('D. Animation Integration', () => {
-    it('all 6 cards have the metric-card class for entrance animation', () => {
+    it('all 7 cards have the metric-card class for entrance animation', () => {
       setHookState({ data: mockAppleData });
       renderApp();
 
       const cards = screen.getAllByTestId('metric-card');
-      expect(cards.length).toBe(6);
+      expect(cards.length).toBe(7);
       cards.forEach((card) => {
         expect(card.className).toContain('metric-card');
       });
     });
 
-    it('cards have sequential --card-index values (0-5)', () => {
+    it('cards have sequential --card-index values (0-6)', () => {
       setHookState({ data: mockAppleData });
       renderApp();
 
@@ -601,12 +602,12 @@ describe('Key Metrics Integration Tests', () => {
       expect(cards[0].style.getPropertyValue('--card-index')).toBe('0');
     });
 
-    it('last card has --card-index of 5', () => {
+    it('last card has --card-index of 6', () => {
       setHookState({ data: mockAppleData });
       renderApp();
 
       const cards = screen.getAllByTestId('metric-card');
-      expect(cards[5].style.getPropertyValue('--card-index')).toBe('5');
+      expect(cards[6].style.getPropertyValue('--card-index')).toBe('6');
     });
 
     it('animation delay increases per card via --card-index CSS custom property', () => {
@@ -658,7 +659,7 @@ describe('Key Metrics Integration Tests', () => {
       });
       // If we reached here without errors, the class is properly applied
       // and the CSS rule in MetricCard.css handles reduced-motion
-      expect(cards.length).toBe(6);
+      expect(cards.length).toBe(7);
     });
   });
 
@@ -680,18 +681,18 @@ describe('Key Metrics Integration Tests', () => {
       expect(metricSkeletons.length).toBeGreaterThan(0);
     });
 
-    it('no data results in graceful empty state with 6 placeholder metric cards', () => {
+    it('no data results in graceful empty state with 7 placeholder metric cards', () => {
       setHookState({ data: mockNullDataCompany });
       mockCalculateDebtToEquity.mockReturnValue(null);
       renderApp();
 
-      // useKeyMetrics returns 6 metrics, all with '--' values
+      // useKeyMetrics returns 7 metrics, all with '--' values
       const cards = screen.getAllByTestId('metric-card');
-      expect(cards.length).toBe(6);
+      expect(cards.length).toBe(7);
 
       const values = document.querySelectorAll('.metric-card__value');
       const valueTexts = Array.from(values).map((v) => v.textContent);
-      // Revenue, EPS, FCF, Gross Margin all '--', D/E '--' (null return), Market Cap '--'
+      // Revenue, EPS, FCF, Gross Margin all '--', D/E '--' (null return), Market Cap '--', P/E '--'
       expect(valueTexts.every((v) => v === '--')).toBe(true);
     });
 
@@ -734,7 +735,7 @@ describe('Key Metrics Integration Tests', () => {
 
       expect(screen.queryByTestId('dashboard-skeleton')).toBeNull();
       const cards = screen.getAllByTestId('metric-card');
-      expect(cards.length).toBe(6);
+      expect(cards.length).toBe(7);
     });
 
     it('error state does not render metric cards', () => {
@@ -814,7 +815,7 @@ describe('Key Metrics Integration Tests', () => {
       renderApp();
 
       const valueElements = document.querySelectorAll('.metric-card__value');
-      expect(valueElements.length).toBe(6);
+      expect(valueElements.length).toBe(7);
       valueElements.forEach((valueEl) => {
         const ariaLabel = valueEl.getAttribute('aria-label');
         expect(ariaLabel).toBeTruthy();
@@ -831,7 +832,7 @@ describe('Key Metrics Integration Tests', () => {
 
       // All metric cards should be inside this section
       const cardsInSection = keyMetricsSection.querySelectorAll('[data-testid="metric-card"]');
-      expect(cardsInSection.length).toBe(6);
+      expect(cardsInSection.length).toBe(7);
     });
   });
 });

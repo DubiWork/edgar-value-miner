@@ -373,8 +373,8 @@ describe('Dashboard Integration Tests', () => {
       expect(screen.getByTestId('company-banner')).toBeTruthy();
       expect(screen.getByText('No Data Corp')).toBeTruthy();
 
-      // useKeyMetrics always returns 6 metric cards (with '--' for missing values)
-      expect(screen.queryAllByTestId('metric-card').length).toBe(6);
+      // useKeyMetrics always returns 7 metric cards (with '--' for missing values)
+      expect(screen.queryAllByTestId('metric-card').length).toBe(7);
 
       // All values should be '--' placeholders
       const values = document.querySelectorAll('.metric-card__value');
@@ -425,7 +425,7 @@ describe('Dashboard Integration Tests', () => {
       const revenueHeading = headings.find((h) => h.textContent === 'Revenue');
       expect(revenueHeading).toBeTruthy();
 
-      // useKeyMetrics returns fixed 6 metrics: Revenue, EPS, FCF, Gross Margin, D/E, Market Cap
+      // useKeyMetrics returns fixed 7 metrics: Revenue, EPS, FCF, Gross Margin, D/E, Market Cap, P/E Ratio
       // EPS should exist (even if value is '--' for empty annual data)
       const epsHeading = headings.find((h) => h.textContent === 'EPS');
       expect(epsHeading).toBeTruthy();
