@@ -8,7 +8,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.js'],
-    exclude: ['**/e2e/**', '**/node_modules/**'],
+    exclude: ['**/e2e/**', '**/node_modules/**', '**/.claude/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
@@ -20,6 +20,7 @@ export default defineConfig({
         'src/services/cacheInvalidation.js',
         'src/hooks/useTickerAutocomplete.js',
         'src/hooks/useRecentSearches.js',
+        'src/hooks/useWatchlist.js',
         'src/components/TickerSearch/TickerSearch.jsx',
         'src/contexts/ThemeProvider.jsx',
         'src/hooks/useTheme.js',
@@ -27,6 +28,7 @@ export default defineConfig({
         'src/utils/storage.js',
         'src/utils/formatCurrency.js',
         'src/utils/calculateYoY.js',
+        'src/utils/formatTimeAgo.js',
         'src/components/Dashboard/RevenueChart.jsx',
       ],
       exclude: [
