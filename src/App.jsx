@@ -12,9 +12,11 @@ import {
   ValuationPanel,
   DashboardSkeleton,
 } from './components/Dashboard'
+import { WatchlistPanel } from './components/Watchlist'
 import { useCompanySearch } from './hooks/useCompanySearch'
 import { useStockQuote } from './hooks/useStockQuote'
 import { useKeyMetrics } from './hooks/useKeyMetrics'
+import { useWatchlist } from './hooks/useWatchlist'
 import gaapNormalizer from './utils/gaapNormalizer'
 import { calculateMargins } from './utils/calculateMargins'
 
@@ -24,8 +26,20 @@ function App() {
   // Fetch live stock quote from FMP API when company data is available
   const { data: stockQuote, loading: priceLoading } = useStockQuote(data?.ticker)
 
+  // Watchlist state
+  const { watchlist, addToWatchlist, removeFromWatchlist, isInWatchlist, isFull } = useWatchlist()
+
   const handleSearch = (ticker) => {
     searchCompany(ticker)
+  }
+
+  const handleToggleWatchlist = () => {
+    if (!data) return
+    if (isInWatchlist(data.ticker)) {
+      removeFromWatchlist(data.ticker)
+    } else {
+      addToWatchlist(data.ticker, data.companyName)
+    }
   }
 
   // Show compact search in header when we have data or are loading (not in welcome state)
@@ -108,6 +122,18 @@ function App() {
               autoFocus
               className="mb-12"
             />
+
+            {/* Watchlist Panel (shown when user has watchlist items) */}
+            {watchlist.length > 0 && (
+              <div className="mb-12 max-w-4xl mx-auto">
+                <WatchlistPanel
+                  watchlist={watchlist}
+                  onRemove={removeFromWatchlist}
+                  onSelect={handleSearch}
+                  isFull={isFull}
+                />
+              </div>
+            )}
 
             {/* Feature Cards */}
             <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
@@ -217,6 +243,9 @@ function App() {
               <CompanyBanner
                 companyName={data.companyName}
                 ticker={data.ticker}
+                isWatchlisted={isInWatchlist(data.ticker)}
+                onToggleWatchlist={handleToggleWatchlist}
+                watchlistFull={isFull}
               />
             }
             metrics={metricCards.map((metric, index) => (
