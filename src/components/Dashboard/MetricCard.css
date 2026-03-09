@@ -8,6 +8,32 @@
   flex-direction: column;
   gap: var(--spacing-2);
   min-height: 120px;
+  animation: metric-card-enter 300ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(var(--card-index, 0) * 50ms);
+}
+
+/* Entrance animation keyframe */
+@keyframes metric-card-enter {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Hover state — only on devices that support hover */
+@media (hover: hover) {
+  .metric-card {
+    transition: transform 200ms ease, box-shadow 200ms ease;
+  }
+
+  .metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-xl);
+  }
 }
 
 /* Title */
@@ -57,7 +83,7 @@
 }
 
 .metric-card__trend--neutral {
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
 }
 
 /* Loading shimmer state */
@@ -107,6 +133,10 @@
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
+  .metric-card {
+    animation: none;
+  }
+
   .metric-card--loading .metric-card__shimmer {
     animation: none;
   }

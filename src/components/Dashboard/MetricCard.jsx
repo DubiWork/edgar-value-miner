@@ -40,6 +40,7 @@ function formatValue(value) {
  * @param {'up'|'down'|'neutral'} [props.trend] - Trend direction
  * @param {boolean} [props.loading=false] - Whether to show loading shimmer
  * @param {string} [props.className] - Additional CSS classes
+ * @param {Object} [props.style] - Inline styles (e.g., for --card-index custom property)
  */
 export function MetricCard({
   title,
@@ -48,6 +49,7 @@ export function MetricCard({
   trend,
   loading = false,
   className = '',
+  style,
 }) {
   if (loading) {
     return (
@@ -56,6 +58,7 @@ export function MetricCard({
         role="status"
         aria-label={`Loading ${title || 'metric'}`}
         data-testid="metric-card"
+        style={style}
       >
         <div className="metric-card__shimmer metric-card__shimmer--title" />
         <div className="metric-card__shimmer metric-card__shimmer--value" />
@@ -77,6 +80,7 @@ export function MetricCard({
     <div
       className={`card metric-card ${className}`.trim()}
       data-testid="metric-card"
+      style={style}
     >
       <h3 className="metric-card__title">{title}</h3>
 
@@ -114,6 +118,7 @@ MetricCard.propTypes = {
   trend: PropTypes.oneOf(['up', 'down', 'neutral']),
   loading: PropTypes.bool,
   className: PropTypes.string,
+  style: PropTypes.object,
 };
 
 export default MetricCard;

@@ -321,4 +321,58 @@ describe('MetricCard', () => {
 
     expect(container.firstChild).toMatchSnapshot();
   });
+
+  // =========================================================================
+  // style prop forwarding
+  // =========================================================================
+
+  it('forwards style prop to the root element', () => {
+    const { container } = renderCard({
+      value: '$394B',
+      style: { '--card-index': 2 },
+    });
+
+    const card = container.querySelector('[data-testid="metric-card"]');
+    expect(card.style.getPropertyValue('--card-index')).toBe('2');
+  });
+
+  it('forwards style prop to the root element in loading state', () => {
+    const { container } = renderCard({
+      loading: true,
+      style: { '--card-index': 3 },
+    });
+
+    const card = container.querySelector('[data-testid="metric-card"]');
+    expect(card.style.getPropertyValue('--card-index')).toBe('3');
+  });
+
+  it('renders without error when style is undefined', () => {
+    const { container } = renderCard({ value: '$394B', style: undefined });
+
+    const card = container.querySelector('[data-testid="metric-card"]');
+    expect(card).toBeTruthy();
+  });
+
+  // =========================================================================
+  // Entrance animation CSS class
+  // =========================================================================
+
+  it('applies the metric-card class that carries the entrance animation', () => {
+    const { container } = renderCard({ value: '$394B' });
+
+    const card = container.querySelector('[data-testid="metric-card"]');
+    expect(card.className).toContain('metric-card');
+  });
+
+  it('supports staggered animation delay via --card-index custom property', () => {
+    const { container } = renderCard({
+      value: '$394B',
+      style: { '--card-index': 4 },
+    });
+
+    const card = container.querySelector('[data-testid="metric-card"]');
+    // The CSS uses animation-delay: calc(var(--card-index, 0) * 50ms)
+    // Verify the custom property is set on the element so CSS can pick it up
+    expect(card.style.getPropertyValue('--card-index')).toBe('4');
+  });
 });
