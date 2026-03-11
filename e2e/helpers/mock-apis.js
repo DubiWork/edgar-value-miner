@@ -39,26 +39,76 @@ export async function mockAPIs(page, options = {}) {
 
   // -----------------------------------------------------------------------
   // 1. Company tickers (used by useTickerAutocomplete)
+  //    In dev mode the app fetches /api/sec-tickers (Vite proxy).
+  //    In production it fetches the direct SEC URL. We mock both.
   // -----------------------------------------------------------------------
+  const tickersBody = JSON.stringify(COMPANY_TICKERS);
+
   await page.route(
     '**/www.sec.gov/files/company_tickers.json',
     (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(COMPANY_TICKERS),
+        body: tickersBody,
+      }),
+  );
+
+  await page.route(
+    '**/api/sec-tickers',
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: tickersBody,
       }),
   );
 
   // -----------------------------------------------------------------------
-  // 2. Company facts — specific routes FIRST, wildcard LAST
-  //    Playwright matches first-registered first, so specific CIK routes
-  //    must be registered before the catch-all wildcard.
+  // 2. Company facts — wildcard FIRST, specific routes LAST.
+  //    Playwright matches last-registered first (LIFO), so the wildcard
+  //    must be registered BEFORE specific CIK routes so the specific
+  //    routes take precedence.
   // -----------------------------------------------------------------------
 
-  // AAPL (CIK 0000320193)
+  // Wildcard: any unknown CIK returns 404 (registered first = lowest priority)
   await page.route(
-    '**/data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json',
+    /data\.sec\.gov\/api\/xbrl\/companyfacts\/CIK\d+\.json/,
+    (route) =>
+      route.fulfill({
+        status: SEC_ERROR_RESPONSES.notFound.status,
+        contentType: SEC_ERROR_RESPONSES.notFound.contentType,
+        body: SEC_ERROR_RESPONSES.notFound.body,
+      }),
+  );
+
+  // MSFT (CIK 0000789019)
+  await page.route(
+    /data\.sec\.gov\/api\/xbrl\/companyfacts\/CIK0000789019\.json/,
+    async (route) => {
+      if (errorOnFacts) {
+        return route.fulfill({
+          status: SEC_ERROR_RESPONSES.serverError.status,
+          contentType: SEC_ERROR_RESPONSES.serverError.contentType,
+          body: SEC_ERROR_RESPONSES.serverError.body,
+        });
+      }
+
+      if (delay > 0) {
+        await new Promise((r) => setTimeout(r, delay));
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(MSFT_COMPANY_FACTS),
+      });
+    },
+  );
+
+  // AAPL (CIK 0000320193) — registered last = highest priority
+  await page.route(
+    /data\.sec\.gov\/api\/xbrl\/companyfacts\/CIK0000320193\.json/,
     async (route) => {
       if (errorOnFacts) {
         return route.fulfill({
@@ -82,41 +132,6 @@ export async function mockAPIs(page, options = {}) {
     },
   );
 
-  // MSFT (CIK 0000789019)
-  await page.route(
-    '**/data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json',
-    async (route) => {
-      if (errorOnFacts) {
-        return route.fulfill({
-          status: SEC_ERROR_RESPONSES.serverError.status,
-          contentType: SEC_ERROR_RESPONSES.serverError.contentType,
-          body: SEC_ERROR_RESPONSES.serverError.body,
-        });
-      }
-
-      if (delay > 0) {
-        await new Promise((r) => setTimeout(r, delay));
-      }
-
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(MSFT_COMPANY_FACTS),
-      });
-    },
-  );
-
-  // Wildcard: any unknown CIK returns 404
-  await page.route(
-    '**/data.sec.gov/api/xbrl/companyfacts/CIK*.json',
-    (route) =>
-      route.fulfill({
-        status: SEC_ERROR_RESPONSES.notFound.status,
-        contentType: SEC_ERROR_RESPONSES.notFound.contentType,
-        body: SEC_ERROR_RESPONSES.notFound.body,
-      }),
-  );
-
   // -----------------------------------------------------------------------
   // 3. Block all Firebase / Firestore / Google auth requests
   // -----------------------------------------------------------------------
@@ -124,4 +139,9 @@ export async function mockAPIs(page, options = {}) {
   await page.route('**/identitytoolkit.googleapis.com/**', (route) => route.abort());
   await page.route('**/securetoken.googleapis.com/**', (route) => route.abort());
   await page.route('**/googleapis.com/v1/**', (route) => route.abort());
+
+  // -----------------------------------------------------------------------
+  // 4. Block FMP (stock quote) API
+  // -----------------------------------------------------------------------
+  await page.route('**/financialmodelingprep.com/**', (route) => route.abort());
 }

@@ -4,8 +4,11 @@
  * Grouped by component/feature area. Dynamic selectors that depend on
  * an index or key are exposed as functions.
  *
- * Keep this file in sync with the JSX source — when a component adds or
+ * Keep this file in sync with the JSX source -- when a component adds or
  * renames a data-testid, update the corresponding entry here.
+ *
+ * Values are the raw data-testid strings. Wrap with `[data-testid="..."]`
+ * before passing to Playwright locators.
  */
 
 export const SELECTORS = {
@@ -33,9 +36,9 @@ export const SELECTORS = {
   companyBanner: {
     root: 'company-banner',
     skeleton: 'company-banner-skeleton',
-    companyName: 'banner-company-name',
-    ticker: 'banner-ticker',
-    price: 'banner-price',
+    ticker: 'ticker-badge',
+    price: 'price-display',
+    watchlistToggle: 'watchlist-toggle',
   },
 
   // -----------------------------------------------------------------------
@@ -75,8 +78,6 @@ export const SELECTORS = {
     marginsChartEmpty: 'margins-chart-empty',
     marginsLegend: 'margins-legend',
     marginsTooltip: 'margins-tooltip',
-    /** Returns the data-testid for a legend item with the given key. */
-    legendKey: (key) => `legend-${key}`,
   },
 
   // -----------------------------------------------------------------------
@@ -85,10 +86,6 @@ export const SELECTORS = {
   metricCard: {
     root: 'metric-card',
     skeleton: 'metric-card-skeleton',
-    title: 'metric-title',
-    value: 'metric-value',
-    unit: 'metric-unit',
-    trend: 'metric-trend',
   },
 
   // -----------------------------------------------------------------------
@@ -103,7 +100,6 @@ export const SELECTORS = {
   // -----------------------------------------------------------------------
   watchlist: {
     panel: 'watchlist-panel',
-    toggle: 'watchlist-toggle',
     grid: 'watchlist-grid',
     card: 'watchlist-card',
     tickerBadge: 'watchlist-ticker-badge',
