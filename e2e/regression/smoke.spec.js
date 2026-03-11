@@ -10,6 +10,11 @@ const IGNORED_ERRORS = [
   'ChunkLoadError',
   'Loading chunk',
   'dynamically imported module',
+  // SEC.gov does not serve CORS headers — browser blocks the request,
+  // but the app handles this gracefully via try/catch fallback.
+  'sec.gov',
+  'CORS',
+  'Cross-Origin',
 ];
 
 function isIgnoredError(text) {

@@ -18,8 +18,14 @@
 const SEC_CONFIG = {
   /** Base URL for Company Facts API */
   COMPANY_FACTS_BASE_URL: 'https://data.sec.gov/api/xbrl/companyfacts',
-  /** URL for Company Tickers list */
-  COMPANY_TICKERS_URL: 'https://www.sec.gov/files/company_tickers.json',
+  /**
+   * URL for Company Tickers list.
+   * In development, Vite proxies /api/sec-tickers to SEC to avoid CORS.
+   * In production, use VITE_SEC_TICKERS_PROXY_URL env var or fall back to direct SEC URL.
+   */
+  COMPANY_TICKERS_URL: import.meta.env.DEV
+    ? '/api/sec-tickers'
+    : (import.meta.env.VITE_SEC_TICKERS_PROXY_URL || 'https://www.sec.gov/files/company_tickers.json'),
   /** User-Agent header required by SEC (from environment variable) */
   USER_AGENT: import.meta.env.VITE_SEC_USER_AGENT || 'getedgar (admincontact@getedgar.com)',
   /** Maximum CIK length with leading zeros */

@@ -399,7 +399,7 @@ describe('edgarApi', () => {
   describe('fetchCompanyFactsByTicker', () => {
     beforeEach(() => {
       global.fetch = vi.fn((url) => {
-        if (url.includes('company_tickers.json')) {
+        if (url.includes('company_tickers.json') || url.includes('sec-tickers')) {
           return Promise.resolve({
             ok: true,
             status: 200,
