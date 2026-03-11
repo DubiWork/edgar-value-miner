@@ -27,6 +27,29 @@ import {
 } from '../fixtures/mock-sec-data.js';
 import { SEC_ERROR_RESPONSES } from '../fixtures/mock-error-data.js';
 
+// Known non-critical console errors to ignore
+const IGNORED_ERRORS = [
+  'Firebase',
+  'firestore',
+  'googleapis',
+  'Failed to load resource',
+  'net::ERR',
+  'ChunkLoadError',
+  'Loading chunk',
+  'dynamically imported module',
+  'sec.gov',
+  'CORS',
+  'Cross-Origin',
+];
+
+/**
+ * Returns true if the given console error text matches a known
+ * non-critical pattern that should be ignored in E2E tests.
+ */
+export function isIgnoredError(text) {
+  return IGNORED_ERRORS.some((pattern) => text.includes(pattern));
+}
+
 /**
  * @param {import('@playwright/test').Page} page
  * @param {Object} [options]
@@ -39,47 +62,36 @@ export async function mockAPIs(page, options = {}) {
 
   // -----------------------------------------------------------------------
   // 1. Company tickers (used by useTickerAutocomplete)
+  //    In dev mode the app fetches via Vite proxy: /api/sec-tickers
+  //    In production it fetches: https://www.sec.gov/files/company_tickers.json
+  //    We intercept both patterns so tests pass in either environment.
   // -----------------------------------------------------------------------
+  const tickersHandler = (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(COMPANY_TICKERS),
+    });
+
+  await page.route('**/api/sec-tickers', tickersHandler);
+  await page.route('**/www.sec.gov/files/company_tickers.json', tickersHandler);
+
+  // -----------------------------------------------------------------------
+  // 2. Company facts
+  //    Playwright uses LAST-registered-wins when multiple patterns match
+  //    the same URL, so register the wildcard FIRST, then specific CIK
+  //    routes LAST so they take precedence over the catch-all.
+  // -----------------------------------------------------------------------
+
+  // Wildcard: any unknown CIK returns 404 (registered first = lowest priority)
   await page.route(
-    '**/www.sec.gov/files/company_tickers.json',
+    '**/data.sec.gov/api/xbrl/companyfacts/CIK*.json',
     (route) =>
       route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(COMPANY_TICKERS),
+        status: SEC_ERROR_RESPONSES.notFound.status,
+        contentType: SEC_ERROR_RESPONSES.notFound.contentType,
+        body: SEC_ERROR_RESPONSES.notFound.body,
       }),
-  );
-
-  // -----------------------------------------------------------------------
-  // 2. Company facts — specific routes FIRST, wildcard LAST
-  //    Playwright matches first-registered first, so specific CIK routes
-  //    must be registered before the catch-all wildcard.
-  // -----------------------------------------------------------------------
-
-  // AAPL (CIK 0000320193)
-  await page.route(
-    '**/data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json',
-    async (route) => {
-      if (errorOnFacts) {
-        return route.fulfill({
-          status: SEC_ERROR_RESPONSES.serverError.status,
-          contentType: SEC_ERROR_RESPONSES.serverError.contentType,
-          body: SEC_ERROR_RESPONSES.serverError.body,
-        });
-      }
-
-      const payload = factsData || AAPL_COMPANY_FACTS;
-
-      if (delay > 0) {
-        await new Promise((r) => setTimeout(r, delay));
-      }
-
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(payload),
-      });
-    },
   );
 
   // MSFT (CIK 0000789019)
@@ -106,15 +118,30 @@ export async function mockAPIs(page, options = {}) {
     },
   );
 
-  // Wildcard: any unknown CIK returns 404
+  // AAPL (CIK 0000320193) — registered last = highest priority
   await page.route(
-    '**/data.sec.gov/api/xbrl/companyfacts/CIK*.json',
-    (route) =>
-      route.fulfill({
-        status: SEC_ERROR_RESPONSES.notFound.status,
-        contentType: SEC_ERROR_RESPONSES.notFound.contentType,
-        body: SEC_ERROR_RESPONSES.notFound.body,
-      }),
+    '**/data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json',
+    async (route) => {
+      if (errorOnFacts) {
+        return route.fulfill({
+          status: SEC_ERROR_RESPONSES.serverError.status,
+          contentType: SEC_ERROR_RESPONSES.serverError.contentType,
+          body: SEC_ERROR_RESPONSES.serverError.body,
+        });
+      }
+
+      const payload = factsData || AAPL_COMPANY_FACTS;
+
+      if (delay > 0) {
+        await new Promise((r) => setTimeout(r, delay));
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(payload),
+      });
+    },
   );
 
   // -----------------------------------------------------------------------

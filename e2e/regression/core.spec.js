@@ -38,7 +38,9 @@ test.describe('Core Flows', () => {
     await expect(page.getByText('EDGAR Value Miner')).toBeVisible();
 
     // Welcome state should be rendered (initial state)
-    await expect(page.locator(SELECTORS.welcomeState)).toBeVisible();
+    await expect(
+      page.locator(`[data-testid="${SELECTORS.app.welcomeState}"]`),
+    ).toBeVisible();
 
     // Hero heading
     await expect(
@@ -58,22 +60,10 @@ test.describe('Core Flows', () => {
   test('RT-02: Search AAPL and verify company data appears on dashboard', async ({
     page,
   }) => {
-    // Debug: log all requests to understand URL patterns
-    const requestUrls = [];
-    page.on('request', (req) => {
-      requestUrls.push(req.url());
-    });
-    const failedRequests = [];
-    page.on('requestfailed', (req) => {
-      failedRequests.push(`${req.url()} => ${req.failure()?.errorText}`);
-    });
-    const consoleMessages = [];
-    page.on('console', (msg) => {
-      consoleMessages.push(`[${msg.type()}] ${msg.text()}`);
-    });
-
     // Locate the hero search input
-    const input = page.locator(SELECTORS.tickerSearchInput).first();
+    const input = page
+      .locator(`[data-testid="${SELECTORS.tickerSearch.input}"]`)
+      .first();
     await expect(input).toBeVisible();
 
     // Type AAPL and submit
@@ -83,34 +73,31 @@ test.describe('Core Flows', () => {
 
     // Dashboard should render (allow extra time for cache-layer fallthrough)
     await expect(
-      page.locator(SELECTORS.dashboardLayout),
+      page.locator(`[data-testid="${SELECTORS.dashboard.layout}"]`),
     ).toBeVisible({ timeout: 15_000 });
 
-    // Company banner with name
-    // Debug: print all requests
-    console.log('=== ALL REQUESTS ===');
-    requestUrls.forEach(u => console.log(u));
-    console.log('=== FAILED REQUESTS ===');
-    failedRequests.forEach(u => console.log(u));
-    console.log('=== CONSOLE MESSAGES ===');
-    consoleMessages.forEach(m => console.log(m));
-    console.log('=== END DEBUG ===');
-
+    // Company banner with name (wait for real data after cache-layer fallthrough)
     await expect(
-      page.locator(SELECTORS.companyBanner),
-    ).toBeVisible({ timeout: 5_000 });
+      page.locator(`[data-testid="${SELECTORS.companyBanner.root}"]`),
+    ).toBeVisible({ timeout: 15_000 });
     await expect(
       page.getByRole('heading', { name: 'Apple Inc.' }),
     ).toBeVisible();
 
     // Ticker badge
-    await expect(page.locator(SELECTORS.tickerBadge)).toHaveText('AAPL');
+    await expect(
+      page.locator(`[data-testid="${SELECTORS.companyBanner.ticker}"]`),
+    ).toHaveText('AAPL');
 
     // At least one chart container
-    const charts = page.locator(SELECTORS.chartContainer);
+    const charts = page.locator(
+      `[data-testid="${SELECTORS.charts.container}"]`,
+    );
     await expect(charts.first()).toBeVisible({ timeout: 5_000 });
 
     // Welcome state should no longer be visible
-    await expect(page.locator(SELECTORS.welcomeState)).not.toBeVisible();
+    await expect(
+      page.locator(`[data-testid="${SELECTORS.app.welcomeState}"]`),
+    ).not.toBeVisible();
   });
 });

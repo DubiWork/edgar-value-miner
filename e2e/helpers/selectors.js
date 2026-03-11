@@ -34,8 +34,8 @@ export const SELECTORS = {
     root: 'company-banner',
     skeleton: 'company-banner-skeleton',
     companyName: 'banner-company-name',
-    ticker: 'banner-ticker',
-    price: 'banner-price',
+    ticker: 'ticker-badge',
+    price: 'price-display',
   },
 
   // -----------------------------------------------------------------------
