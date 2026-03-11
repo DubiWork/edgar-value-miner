@@ -94,6 +94,7 @@ jobs:
   e2e:
     needs: preview
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -104,9 +105,16 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Wait for GH Pages deployment
         run: sleep 30
-      - name: Run e2e tests on preview
-        run: npx playwright test e2e/features/ --reporter=github
+      - name: Run smoke tests on preview
+        run: npx playwright test --project=smoke
         env:
+          CI: 'true'
+          BASE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.number }}/
+      - name: Run feature tests on preview
+        if: always()
+        run: npx playwright test --project=features
+        env:
+          CI: 'true'
           BASE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.number }}/
         continue-on-error: true
       - name: Upload test results
