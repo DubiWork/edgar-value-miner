@@ -11,6 +11,9 @@ import { VIEWPORTS } from '../helpers/viewports.js';
 // and error boundary display.
 // ---------------------------------------------------------------------------
 
+/** Helper: build a data-testid locator from a SELECTORS string value. */
+const tid = (page, id) => page.getByTestId(id);
+
 test.describe('Dashboard Flow', () => {
   // -----------------------------------------------------------------------
   // RT-20: Dashboard layout renders all expected panels after search
@@ -20,62 +23,58 @@ test.describe('Dashboard Flow', () => {
     await page.goto('/');
 
     // Perform search
-    const input = page.locator(SELECTORS.TICKER_SEARCH_INPUT).first();
+    const input = tid(page, SELECTORS.tickerSearch.input).first();
     await input.click();
     await input.fill('AAPL');
     await input.press('Enter');
 
     // Wait for dashboard to fully render
-    const dashboard = page.locator(SELECTORS.DASHBOARD_LAYOUT);
-    await expect(dashboard).toBeVisible({ timeout: 10_000 });
+    await expect(tid(page, SELECTORS.dashboard.layout)).toBeVisible({ timeout: 10_000 });
 
     // Banner section
-    const banner = page.locator(SELECTORS.COMPANY_BANNER);
-    await expect(banner).toBeVisible();
+    await expect(tid(page, SELECTORS.companyBanner.root)).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Apple Inc.' })).toBeVisible();
 
     // Ticker badge
-    const tickerBadge = page.locator(SELECTORS.TICKER_BADGE);
-    await expect(tickerBadge).toHaveText('AAPL');
+    await expect(page.locator('[data-testid="ticker-badge"]')).toHaveText('AAPL');
 
     // Metric cards (at least 3 expected)
-    const metricCards = page.locator(SELECTORS.METRIC_CARD);
+    const metricCards = tid(page, SELECTORS.metricCard.root);
     await expect(metricCards.first()).toBeVisible();
     const metricCount = await metricCards.count();
     expect(metricCount).toBeGreaterThanOrEqual(3);
 
     // Chart containers (at least 1 expected)
-    const chartContainers = page.locator(SELECTORS.CHART_CONTAINER);
+    const chartContainers = tid(page, SELECTORS.charts.container);
     await expect(chartContainers.first()).toBeVisible();
     const chartCount = await chartContainers.count();
     expect(chartCount).toBeGreaterThanOrEqual(1);
 
     // Welcome state should be gone
-    await expect(page.locator(SELECTORS.WELCOME_STATE)).not.toBeVisible();
+    await expect(tid(page, SELECTORS.app.welcomeState)).not.toBeVisible();
   });
 
   // -----------------------------------------------------------------------
-  // RT-21: Mobile layout (375px) — single column, no horizontal overflow
+  // RT-21: Mobile layout (375px) -- single column, no horizontal overflow
   // -----------------------------------------------------------------------
   test('RT-21: Mobile layout is single column with no horizontal overflow', async ({ page }) => {
-    await page.setViewportSize(VIEWPORTS.MOBILE);
+    await page.setViewportSize(VIEWPORTS.mobile);
     await mockAPIs(page);
     await page.goto('/');
 
     // Perform search
-    const input = page.locator(SELECTORS.TICKER_SEARCH_INPUT).first();
+    const input = tid(page, SELECTORS.tickerSearch.input).first();
     await input.click();
     await input.fill('AAPL');
     await input.press('Enter');
 
     // Wait for dashboard
-    const dashboard = page.locator(SELECTORS.DASHBOARD_LAYOUT);
-    await expect(dashboard).toBeVisible({ timeout: 10_000 });
+    await expect(tid(page, SELECTORS.dashboard.layout)).toBeVisible({ timeout: 10_000 });
 
     // All major sections should be visible
-    await expect(page.locator(SELECTORS.COMPANY_BANNER)).toBeVisible();
-    await expect(page.locator(SELECTORS.METRIC_CARD).first()).toBeVisible();
-    await expect(page.locator(SELECTORS.CHART_CONTAINER).first()).toBeVisible();
+    await expect(tid(page, SELECTORS.companyBanner.root)).toBeVisible();
+    await expect(tid(page, SELECTORS.metricCard.root).first()).toBeVisible();
+    await expect(tid(page, SELECTORS.charts.container).first()).toBeVisible();
 
     // No horizontal overflow: document scroll width should not exceed viewport
     const hasOverflow = await page.evaluate(() => {
@@ -85,22 +84,21 @@ test.describe('Dashboard Flow', () => {
   });
 
   // -----------------------------------------------------------------------
-  // RT-22: Tablet layout (768px) — 2-column metric cards, stacked charts
+  // RT-22: Tablet layout (768px) -- 2-column metric cards, stacked charts
   // -----------------------------------------------------------------------
   test('RT-22: Tablet layout shows 2-column metrics and stacked charts', async ({ page }) => {
-    await page.setViewportSize(VIEWPORTS.TABLET);
+    await page.setViewportSize(VIEWPORTS.tablet);
     await mockAPIs(page);
     await page.goto('/');
 
     // Perform search
-    const input = page.locator(SELECTORS.TICKER_SEARCH_INPUT).first();
+    const input = tid(page, SELECTORS.tickerSearch.input).first();
     await input.click();
     await input.fill('AAPL');
     await input.press('Enter');
 
     // Wait for dashboard
-    const dashboard = page.locator(SELECTORS.DASHBOARD_LAYOUT);
-    await expect(dashboard).toBeVisible({ timeout: 10_000 });
+    await expect(tid(page, SELECTORS.dashboard.layout)).toBeVisible({ timeout: 10_000 });
 
     // Verify metrics grid is 2-column at 768px
     // The CSS rule at 768px: grid-template-columns: repeat(2, 1fr)
@@ -134,24 +132,24 @@ test.describe('Dashboard Flow', () => {
     await page.goto('/');
 
     // Perform search
-    const input = page.locator(SELECTORS.TICKER_SEARCH_INPUT).first();
+    const input = tid(page, SELECTORS.tickerSearch.input).first();
     await input.click();
     await input.fill('AAPL');
     await input.press('Enter');
 
     // Skeletons should appear while API is delayed
-    const skeleton = page.locator(SELECTORS.DASHBOARD_SKELETON);
+    const skeleton = tid(page, SELECTORS.dashboard.skeleton);
     await expect(skeleton).toBeVisible({ timeout: 5_000 });
 
     // Verify individual skeleton components are present
-    await expect(page.locator(SELECTORS.COMPANY_BANNER_SKELETON)).toBeVisible();
-    await expect(page.locator(SELECTORS.METRIC_CARD_SKELETON).first()).toBeVisible();
-    await expect(page.locator(SELECTORS.CHART_CONTAINER_SKELETON).first()).toBeVisible();
+    await expect(tid(page, SELECTORS.companyBanner.skeleton)).toBeVisible();
+    await expect(tid(page, SELECTORS.metricCard.skeleton).first()).toBeVisible();
+    await expect(tid(page, SELECTORS.charts.containerSkeleton).first()).toBeVisible();
 
     // After the delay resolves, the real dashboard should replace skeletons.
     // Wait for the real company banner (only rendered when data loads) rather
     // than dashboard-layout (which also exists inside DashboardSkeleton).
-    await expect(page.locator(SELECTORS.COMPANY_BANNER)).toBeVisible({ timeout: 15_000 });
+    await expect(tid(page, SELECTORS.companyBanner.root)).toBeVisible({ timeout: 15_000 });
     await expect(skeleton).not.toBeVisible();
   });
 
@@ -164,17 +162,17 @@ test.describe('Dashboard Flow', () => {
     await page.goto('/');
 
     // Perform search
-    const input = page.locator(SELECTORS.TICKER_SEARCH_INPUT).first();
+    const input = tid(page, SELECTORS.tickerSearch.input).first();
     await input.click();
     await input.fill('AAPL');
     await input.press('Enter');
 
     // Error state should appear
-    const errorState = page.locator(SELECTORS.ERROR_STATE);
+    const errorState = tid(page, SELECTORS.app.errorState);
     await expect(errorState).toBeVisible({ timeout: 10_000 });
 
     // Dashboard should NOT be visible
-    await expect(page.locator(SELECTORS.DASHBOARD_LAYOUT)).not.toBeVisible();
+    await expect(tid(page, SELECTORS.dashboard.layout)).not.toBeVisible();
 
     // A retry button should be available (btn-primary with RefreshCw icon)
     const retryButton = errorState.locator('button.btn-primary');

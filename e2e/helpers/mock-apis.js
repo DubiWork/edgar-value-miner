@@ -38,48 +38,42 @@ export async function mockAPIs(page, options = {}) {
   const { delay = 0, errorOnFacts = false, factsData } = options;
 
   // -----------------------------------------------------------------------
-  // 1. Company tickers (used by useTickerAutocomplete)
+  // 1. Company tickers (used by useTickerAutocomplete and edgarApi)
+  //    In development, Vite proxies /api/sec-tickers to SEC, so we must
+  //    intercept both the proxy path and the direct SEC URL.
   // -----------------------------------------------------------------------
+  const fulfillTickers = (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(COMPANY_TICKERS),
+    });
+
+  // Direct SEC URL (production builds)
   await page.route(
     '**/www.sec.gov/files/company_tickers.json',
-    (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(COMPANY_TICKERS),
-      }),
+    fulfillTickers,
   );
 
+  // Vite dev-server proxy path (development builds)
+  await page.route('**/api/sec-tickers', fulfillTickers);
+
   // -----------------------------------------------------------------------
-  // 2. Company facts — specific routes FIRST, wildcard LAST
-  //    Playwright matches first-registered first, so specific CIK routes
-  //    must be registered before the catch-all wildcard.
+  // 2. Company facts
+  //    Playwright matches routes in LIFO order (last registered wins).
+  //    Register the wildcard FIRST, then specific CIK overrides AFTER
+  //    so they take priority.
   // -----------------------------------------------------------------------
 
-  // AAPL (CIK 0000320193)
+  // Wildcard: any unknown CIK returns 404 (registered first = lowest priority)
   await page.route(
-    '**/data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json',
-    async (route) => {
-      if (errorOnFacts) {
-        return route.fulfill({
-          status: SEC_ERROR_RESPONSES.serverError.status,
-          contentType: SEC_ERROR_RESPONSES.serverError.contentType,
-          body: SEC_ERROR_RESPONSES.serverError.body,
-        });
-      }
-
-      const payload = factsData || AAPL_COMPANY_FACTS;
-
-      if (delay > 0) {
-        await new Promise((r) => setTimeout(r, delay));
-      }
-
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(payload),
-      });
-    },
+    '**/data.sec.gov/api/xbrl/companyfacts/CIK*.json',
+    (route) =>
+      route.fulfill({
+        status: SEC_ERROR_RESPONSES.notFound.status,
+        contentType: SEC_ERROR_RESPONSES.notFound.contentType,
+        body: SEC_ERROR_RESPONSES.notFound.body,
+      }),
   );
 
   // MSFT (CIK 0000789019)
@@ -106,15 +100,30 @@ export async function mockAPIs(page, options = {}) {
     },
   );
 
-  // Wildcard: any unknown CIK returns 404
+  // AAPL (CIK 0000320193) — registered last = highest priority
   await page.route(
-    '**/data.sec.gov/api/xbrl/companyfacts/CIK*.json',
-    (route) =>
-      route.fulfill({
-        status: SEC_ERROR_RESPONSES.notFound.status,
-        contentType: SEC_ERROR_RESPONSES.notFound.contentType,
-        body: SEC_ERROR_RESPONSES.notFound.body,
-      }),
+    '**/data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json',
+    async (route) => {
+      if (errorOnFacts) {
+        return route.fulfill({
+          status: SEC_ERROR_RESPONSES.serverError.status,
+          contentType: SEC_ERROR_RESPONSES.serverError.contentType,
+          body: SEC_ERROR_RESPONSES.serverError.body,
+        });
+      }
+
+      const payload = factsData || AAPL_COMPANY_FACTS;
+
+      if (delay > 0) {
+        await new Promise((r) => setTimeout(r, delay));
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(payload),
+      });
+    },
   );
 
   // -----------------------------------------------------------------------
