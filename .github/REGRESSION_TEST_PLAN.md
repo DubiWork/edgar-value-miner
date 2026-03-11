@@ -1,7 +1,38 @@
 # EDGAR Value Miner - Regression Test Plan
 
 **Purpose:** Living regression suite that grows with each feature. Every row is Playwright-executable.
-**Updated:** 2026-03-08
+**Updated:** 2026-03-11
+
+---
+
+## Test File Mapping
+
+The regression test plan defines the full scope of E2E coverage. The table below maps each
+test-case ID to its current implementation status and spec file.
+
+| ID Range | Flow | Spec File | Status |
+|----------|------|-----------|--------|
+| RT-01 to RT-02 | Core | `e2e/smoke.spec.js` (Welcome State, Search-to-Dashboard) | Implemented |
+| RT-03 to RT-06 | Search | `e2e/smoke.spec.js` (Autocomplete, Enter, Click) | Implemented |
+| RT-07 to RT-09 | Search (edge cases) | Not yet implemented | Planned |
+| RT-10 to RT-13 | Theme | `e2e/smoke.spec.js` (Theme toggle) | Partially implemented |
+| RT-14 to RT-17 | Theme (persistence, a11y, mobile, chart) | Not yet implemented | Planned |
+| RT-18 to RT-19 | Search (mobile, a11y) | Not yet implemented | Planned |
+| RT-20 to RT-24 | Dashboard | `e2e/smoke.spec.js` (Dashboard via Enter/Click) | Partially implemented |
+| RT-30 to RT-32 | Responsive | Not yet implemented | Planned |
+| RT-50 to RT-57 | Revenue Chart | DEFERRED (RevenueChart not wired in App.jsx) | Deferred |
+
+> **Note on RT-50 to RT-57:** These Revenue Chart regression tests are deferred because the
+> `RevenueChart` component is not yet integrated into `App.jsx`. Once wired, these tests should
+> be added to a dedicated `e2e/regression/revenue-chart.spec.js`.
+
+### Current spec files
+
+| File | Tests | Description |
+|------|-------|-------------|
+| `e2e/smoke.spec.js` | 5 | Primary regression suite with API mocking: welcome state, theme toggle, search autocomplete, search-to-dashboard (Enter), search-to-dashboard (click) |
+| `e2e/regression/smoke.spec.js` | 3 | Lightweight deployment smoke tests (no mocking): app loads, no console errors, welcome state renders |
+| `e2e/fixtures/mock-sec-data.js` | -- | Shared mock data (COMPANY_TICKERS, AAPL_COMPANY_FACTS) |
 
 ---
 
@@ -57,7 +88,10 @@
 
 ---
 
-## Revenue Chart Flows (Issue #5 — RevenueChart)
+## Revenue Chart Flows (Issue #5 -- DEFERRED)
+
+> These tests are **deferred** until `RevenueChart` is integrated into `App.jsx`.
+> The component exists but is not yet rendered in the main application layout.
 
 | ID | Preconditions | Steps | Expected Result |
 |----|--------------|-------|-----------------|
@@ -82,7 +116,30 @@
 
 ---
 
-**Total regression cases:** 34
-**Last feature added:** Issue #5 (Revenue Chart) — 8 test cases (RT-50 to RT-57)
+## Summary
 
-*Updated via /groom-issue skill*
+**Total planned regression cases:** 34
+**Implemented:** 8 (across `e2e/smoke.spec.js` and `e2e/regression/smoke.spec.js`)
+**Planned (not yet implemented):** 18 (RT-07 to RT-09, RT-14 to RT-19, RT-21 to RT-24, RT-30 to RT-32)
+**Deferred:** 8 (RT-50 to RT-57 -- RevenueChart not wired in App.jsx)
+
+**Last feature added:** Issue #5 (Revenue Chart) -- 8 test cases (RT-50 to RT-57), currently deferred
+
+### Execution
+
+```bash
+# Run all E2E tests (smoke + regression)
+npm run test:e2e
+
+# Run only the primary regression suite (with API mocking)
+npx playwright test e2e/smoke.spec.js
+
+# Run lightweight deployment smoke tests
+npx playwright test e2e/regression/smoke.spec.js
+```
+
+### Known Limitations
+
+1. **No dedicated regression project in Playwright config** -- all tests run under the `chromium` project. A `regression` project can be added to `playwright.config.js` when the suite grows.
+2. **Revenue Chart tests deferred** -- `RevenueChart` component exists but is not wired into `App.jsx`.
+3. **Single browser only** -- tests currently run in Chromium only. Firefox and WebKit can be added as separate projects.
