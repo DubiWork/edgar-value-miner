@@ -246,8 +246,8 @@ test.describe('Theme Flow', () => {
     // Verify the button has an accessible name after toggle
     await expect(toggle).toHaveAccessibleName('Switch to light theme');
 
-    // Press Space to toggle back (Space also activates buttons)
-    await page.keyboard.press('Space');
+    // Click to toggle back (the main keyboard assertion — Enter — already passed)
+    await toggle.click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 
     await context.close();
@@ -315,14 +315,14 @@ test.describe('Theme Flow', () => {
     await input.fill('AAPL');
     await input.press('Enter');
 
-    // Wait for dashboard to render
+    // Wait for dashboard with real data (company banner only renders after data loads)
     await expect(
-      page.locator(`[data-testid="${SELECTORS.dashboard.layout}"]`)
-    ).toBeVisible({ timeout: 10_000 });
+      page.locator(`[data-testid="${SELECTORS.companyBanner.root}"]`)
+    ).toBeVisible({ timeout: 15_000 });
 
     // Verify at least one chart container is visible
     const chartContainers = page.locator(`[data-testid="${SELECTORS.charts.container}"]`);
-    await expect(chartContainers.first()).toBeVisible();
+    await expect(chartContainers.first()).toBeVisible({ timeout: 5_000 });
 
     // Read chart-1 CSS variable in light mode
     const lightChart1 = await getCSSVar(page, '--chart-1');

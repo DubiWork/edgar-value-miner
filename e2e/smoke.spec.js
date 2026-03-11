@@ -12,15 +12,17 @@ import { COMPANY_TICKERS, AAPL_COMPANY_FACTS } from './fixtures/mock-sec-data.js
  */
 async function mockAPIs(page) {
   // Mock company_tickers.json (used by useTickerAutocomplete)
-  await page.route(
-    '**/www.sec.gov/files/company_tickers.json',
-    (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(COMPANY_TICKERS),
-      }),
-  );
+  // In dev mode the app fetches via Vite proxy: /api/sec-tickers
+  // In production it fetches directly from sec.gov
+  const tickersHandler = (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(COMPANY_TICKERS),
+    });
+
+  await page.route('**/api/sec-tickers', tickersHandler);
+  await page.route('**/www.sec.gov/files/company_tickers.json', tickersHandler);
 
   // Mock companyfacts for AAPL (CIK padded to 10 digits)
   await page.route(
@@ -138,12 +140,9 @@ test.describe('Dashboard smoke tests', () => {
     await input.fill('AAPL');
     await input.press('Enter');
 
-    // Wait for dashboard to render
-    const dashboard = page.locator('[data-testid="dashboard-layout"]');
-    await expect(dashboard).toBeVisible({ timeout: 10000 });
-
-    // Company banner
-    await expect(page.locator('[data-testid="company-banner"]')).toBeVisible();
+    // Wait for dashboard with real data (company-banner only renders after
+    // data loads, unlike dashboard-layout which also exists in the skeleton)
+    await expect(page.locator('[data-testid="company-banner"]')).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole('heading', { name: 'Apple Inc.' })).toBeVisible();
 
     // Ticker badge
@@ -186,9 +185,11 @@ test.describe('Dashboard smoke tests', () => {
     const firstItem = page.locator('[data-testid="suggestion-item-0"]');
     await firstItem.click();
 
-    // Wait for dashboard to render
-    const dashboard = page.locator('[data-testid="dashboard-layout"]');
-    await expect(dashboard).toBeVisible({ timeout: 10000 });
+    // Wait for dashboard with real data (company-banner only renders after
+    // data loads, unlike dashboard-layout which also exists in the skeleton)
+    await expect(
+      page.locator('[data-testid="company-banner"]'),
+    ).toBeVisible({ timeout: 15000 });
 
     // Verify company name is displayed
     await expect(page.getByRole('heading', { name: 'Apple Inc.' })).toBeVisible();
