@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edgar Miner — Strategic Plan</title>
+<style>
+:root { --bg: #fff; --fg: #1a1a1a; --muted: #666; --border: #ddd; --accent: #0066cc; --code-bg: #f5f5f5; --table-stripe: #f9f9f9; --blockquote-bg: #f0f4f8; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1a1a2e; --fg: #e0e0e0; --muted: #999; --border: #333; --accent: #6db3f2; --code-bg: #16213e; --table-stripe: #16213e; --blockquote-bg: #16213e; }
+}
+* { box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 16px; background: var(--bg); color: var(--fg); line-height: 1.6; font-size: 16px; }
+h1 { font-size: 1.8em; border-bottom: 2px solid var(--accent); padding-bottom: 8px; }
+h2 { font-size: 1.4em; margin-top: 2em; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+h3 { font-size: 1.15em; margin-top: 1.5em; }
+h4 { font-size: 1em; margin-top: 1.2em; }
+a { color: var(--accent); }
+hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
+code { background: var(--code-bg); padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+pre { background: var(--code-bg); padding: 12px; border-radius: 6px; overflow-x: auto; }
+pre code { padding: 0; background: none; }
+blockquote { border-left: 3px solid var(--accent); background: var(--blockquote-bg); margin: 1em 0; padding: 8px 16px; border-radius: 0 6px 6px 0; }
+.table-wrap { overflow-x: auto; margin: 1em 0; }
+table { border-collapse: collapse; width: 100%; min-width: 400px; font-size: 0.9em; }
+th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+th { background: var(--code-bg); font-weight: 600; }
+tr:nth-child(even) { background: var(--table-stripe); }
+ul, ol { padding-left: 1.5em; }
+li { margin: 4px 0; }
+.cb { font-size: 1.1em; }
+.cb.done { opacity: 0.7; }
+.toc { background: var(--code-bg); padding: 16px 24px; border-radius: 8px; margin-bottom: 2em; }
+.toc h2 { margin-top: 0; font-size: 1.1em; }
+.toc ul { padding-left: 1.2em; }
+.toc li { margin: 6px 0; }
+strong { color: var(--fg); }
+section { scroll-margin-top: 20px; }
+</style>
+</head>
+<body>
+<h1>Edgar Miner — Strategic Plan</h1>
+<nav class="toc"><h2>Contents</h2><ul><li><a href="#edgar-miner-ceo-strategic-audit-report">Edgar Miner -- CEO Strategic Audit Report</a></li><li><a href="#edgar-miner-execution-plan">Edgar Miner Execution Plan</a></li></ul></nav>
+<section id="edgar-miner-ceo-strategic-audit-report">
+<h1 id="edgar-miner-ceo-strategic-audit-report">Edgar Miner -- CEO Strategic Audit Report</h1>
+<p><strong>Date:</strong> 2026-03-11</p>
+<p><strong>Agent:</strong> cs-ceo-advisor (Strategic Audit Mode)</p>
+<p><strong>Subject:</strong> Edgar Miner -- Value Investing Investigation Tool</p>
+<p><strong>Audience:</strong> Solo Founder/Developer</p>
+<hr>
+<h2 id="executive-summary">Executive Summary</h2>
+<p>Edgar Miner is a pre-revenue, pre-product personal project with a clear vision but severe strategic gaps across nearly every domain. The Strategic Health Score is <strong>27.9/100</strong> (Critical), driven by zero revenue, no users beyond the founder, significant technical debt, intense competition, and a single-person team.</p>
+<p>The core insight of this audit: <strong>Edgar Miner has a genuine problem worth solving</strong> (the founder's own workflow pain is real and validated), <strong>but the current approach is strategically misaligned</strong> with the resources available. The project is attempting to build a full-stack SaaS product with enterprise-grade ambitions on a solo-developer time budget, competing against well-funded tools with thousands of users.</p>
+<p>This audit covers 10 strategic domains. Each finding includes a rule ID, severity rating, and actionable recommendation.</p>
+<hr>
+<h2 id="strategic-health-score-27-9-100">Strategic Health Score: 27.9 / 100</h2>
+<div class="table-wrap"><table><thead>
+<tr><th>Strategic Pillar</th><th>Score</th><th>Level</th><th>Weight</th><th>Weighted</th></tr>
+</thead><tbody>
+<tr><td>Market Position</td><td>16.2</td><td>CRITICAL</td><td>25%</td><td>4.1</td></tr>
+<tr><td>Financial Health</td><td>7.5</td><td>CRITICAL</td><td>25%</td><td>1.9</td></tr>
+<tr><td>Operational Excellence</td><td>28.8</td><td>CRITICAL</td><td>20%</td><td>5.8</td></tr>
+<tr><td>Organizational Capability</td><td>58.8</td><td>ADEQUATE</td><td>20%</td><td>11.8</td></tr>
+<tr><td>Growth Potential</td><td>45.0</td><td>WEAK</td><td>10%</td><td>4.5</td></tr>
+</tbody></table></div>
+<p><strong>Overall Risk Profile: 56.2%</strong> (Execution: 41%, Market: 65%, Financial: 68%)</p>
+<hr>
+<h2 id="domain-1-vision-strategic-direction">Domain 1: Vision & Strategic Direction</h2>
+<h3 id="ceo-vis-01-vision-clarity-severity-high">CEO-VIS-01: Vision Clarity -- SEVERITY: HIGH</h3>
+<p><strong>Finding:</strong> The vision is partially defined but not sharpened into a differentiated strategic position. "Automated value investing investigation tool" describes what the product does, not why it wins. Every competitor from Bloomberg to free screeners claims to help investors analyze companies.</p>
+<p><strong>Evidence:</strong></p>
+<ul>
+<li>No written product vision statement beyond feature descriptions</li>
+<li>No articulated "10x better" claim versus specific alternatives</li>
+<li>Feature list mirrors existing tools (DCF, scoring, portfolio tracking) without a clear wedge</li>
+</ul>
+<p><strong>Recommendation:</strong> Define a one-sentence strategic thesis that answers: "For [specific user], Edgar Miner is the only tool that [unique capability] because [unfair advantage]." The founder's personal workflow (Feroldi Quality Score + Anti-Fragile Checklist + mentor's checklist + dual DCF methods) is actually the differentiator -- it is an opinionated methodology, not a generic tool.</p>
+<h3 id="ceo-vis-02-strategic-focus-severity-critical">CEO-VIS-02: Strategic Focus -- SEVERITY: CRITICAL</h3>
+<p><strong>Finding:</strong> The project is attempting to build features across 6+ domains simultaneously (data fetching, DCF modeling, scoring systems, portfolio tracking, watchlists, company comparison) with a single developer. This guarantees none will reach competitive quality.</p>
+<p><strong>Evidence:</strong></p>
+<ul>
+<li>Backend exposes only 2 of hundreds of available financial metrics</li>
+<li>Frontend fetches SEC data but does not display it</li>
+<li>Portfolio tracking, alerts, comparison tools, export -- all planned, none started</li>
+<li>Azure Functions deployment is broken and unresolved</li>
+</ul>
+<p><strong>Recommendation:</strong> Ruthlessly cut scope to ONE core workflow end-to-end. The highest-value candidate: "Given a ticker, automatically run the full Feroldi + Anti-Fragile + DCF analysis and produce a buy/pass/watch recommendation." Ship that single workflow before touching anything else.</p>
+<hr>
+<h2 id="domain-2-market-position-competitive-landscape">Domain 2: Market Position & Competitive Landscape</h2>
+<h3 id="ceo-mkt-01-competitive-position-severity-critical">CEO-MKT-01: Competitive Position -- SEVERITY: CRITICAL</h3>
+<p><strong>Finding:</strong> The competitive landscape is brutal. Edgar Miner has no defensible position against any incumbent.</p>
+<p><strong>Competitive Map:</strong></p>
+<div class="table-wrap"><table><thead>
+<tr><th>Competitor</th><th>Price</th><th>Users</th><th>Moat</th></tr>
+</thead><tbody>
+<tr><td>Bloomberg Terminal</td><td>$24K/yr</td><td>325K+</td><td>Data monopoly, network effects</td></tr>
+<tr><td>Koyfin</td><td>$0-$468/yr</td><td>100K+</td><td>Data breadth, UI polish</td></tr>
+<tr><td>Simply Wall St</td><td>$0-$240/yr</td><td>3M+</td><td>Visual analysis, brand</td></tr>
+<tr><td>GuruFocus</td><td>$0-$480/yr</td><td>500K+</td><td>Guru tracking, deep value focus</td></tr>
+<tr><td>Finviz</td><td>$0-$300/yr</td><td>10M+ visits/mo</td><td>Speed, screener quality</td></tr>
+<tr><td>Stock Analysis</td><td>Free</td><td>Growing</td><td>AI-powered, modern UX</td></tr>
+<tr><td>Google Sheets</td><td>Free</td><td>Unlimited</td><td>Flexibility, familiarity</td></tr>
+</tbody></table></div>
+<p><strong>Edgar Miner today:</strong> Zero users, zero brand, incomplete features, no data advantage.</p>
+<p><strong>Porter's Five Forces Analysis:</strong></p>
+<ul>
+<li>Competitive Rivalry: 85/100 (extreme)</li>
+<li>Buyer Power: 80/100 (many free alternatives)</li>
+<li>Threat of Substitutes: 90/100 (Excel/Sheets works fine)</li>
+<li>Threat of New Entrants: 70/100 (AI tools flooding the space)</li>
+<li>Supplier Power: 30/100 (SEC data is free, APIs are affordable)</li>
+<li><strong>Industry Attractiveness: 29/100</strong> (very unattractive for a new entrant)</li>
+</ul>
+<h3 id="ceo-mkt-02-target-market-definition-severity-high">CEO-MKT-02: Target Market Definition -- SEVERITY: HIGH</h3>
+<p><strong>Finding:</strong> No defined target market segment beyond "value investors." Value investors range from Warren Buffett managing $900B to a college student with $500 in Robinhood. The product strategy, pricing, and features depend entirely on which segment is targeted.</p>
+<p><strong>Recommendation:</strong> Define ONE target persona. Based on the founder's own profile, the most authentic segment is: "Self-directed value investors with $10K-$500K portfolios who use a systematic checklist-based approach (Feroldi, Greenblatt, Graham-style) and are frustrated with manual spreadsheet workflows." This is a niche -- but niches are where solo products survive.</p>
+<h3 id="ceo-mkt-03-differentiation-strategy-severity-critical">CEO-MKT-03: Differentiation Strategy -- SEVERITY: CRITICAL</h3>
+<p><strong>Finding:</strong> The current feature set (financial data display, DCF, portfolio tracking) is table stakes. Every competitor already does this. The one genuinely unique element -- the founder's specific multi-checklist evaluation methodology (Feroldi + Anti-Fragile + Mentor's Checklist) combined into a single automated workflow -- is not implemented.</p>
+<p><strong>Recommendation:</strong> The differentiation IS the methodology, not the data. Reframe Edgar Miner from "a financial data tool" to "an opinionated investment evaluation system." Think of it as "Turbo Tax for value investing due diligence" -- it walks you through a proven process, not just shows you data.</p>
+<hr>
+<h2 id="domain-3-financial-position-resource-allocation">Domain 3: Financial Position & Resource Allocation</h2>
+<h3 id="ceo-fin-01-revenue-model-severity-critical">CEO-FIN-01: Revenue Model -- SEVERITY: CRITICAL</h3>
+<p><strong>Finding:</strong> Zero revenue. No revenue model defined. No pricing strategy. No monetization timeline.</p>
+<p><strong>Financial Reality:</strong></p>
+<ul>
+<li>Revenue: $0</li>
+<li>Monthly burn: ~$100 (Azure hosting + FMP API)</li>
+<li>Runway: ~50 months at current burn (personal funds)</li>
+<li>Development cost: Opportunity cost of founder's time (the real expense)</li>
+</ul>
+<p><strong>Recommendation:</strong> Decide NOW whether this is (a) a personal productivity tool, (b) a future SaaS product, or (c) an open-source portfolio project. This decision changes everything: architecture, testing standards, security requirements, and time investment. If (a), stop gold-plating and ship something usable. If (b), validate willingness-to-pay before writing more code. If (c), make the repo public and start building community.</p>
+<h3 id="ceo-fin-02-capital-allocation-severity-high">CEO-FIN-02: Capital Allocation -- SEVERITY: HIGH</h3>
+<p><strong>Finding:</strong> The scarcest resource is the founder's development time, and it is being allocated inefficiently. Time is split across two repositories (backend + frontend), two tech stacks (.NET + React/Express), with technical debt accumulating in both.</p>
+<p><strong>Current Time Allocation (Estimated):</strong></p>
+<ul>
+<li>Backend API development: ~30%</li>
+<li>Frontend UI development: ~40%</li>
+<li>Infrastructure/DevOps: ~15%</li>
+<li>Planning/Research: ~15%</li>
+<li>Testing: ~0% (frontend has zero tests)</li>
+</ul>
+<p><strong>Recommended Reallocation:</strong></p>
+<ul>
+<li>Core workflow automation (single end-to-end feature): 60%</li>
+<li>Testing and quality: 20%</li>
+<li>Infrastructure simplification: 10%</li>
+<li>User research/validation: 10%</li>
+</ul>
+<h3 id="ceo-fin-03-build-vs-buy-analysis-severity-high">CEO-FIN-03: Build vs. Buy Analysis -- SEVERITY: HIGH</h3>
+<p><strong>Finding:</strong> The project is building from scratch capabilities that exist as paid services. This may not be the best use of time.</p>
+<div class="table-wrap"><table><thead>
+<tr><th>Capability</th><th>Build Cost (hours)</th><th>Buy Alternative</th><th>Buy Cost</th></tr>
+</thead><tbody>
+<tr><td>Financial data API</td><td>80+ hours invested</td><td>Financial Modeling Prep (already used)</td><td>$29/mo</td></tr>
+<tr><td>SEC EDGAR parsing</td><td>40+ hours invested</td><td>sec-api.io, SEC full-text search</td><td>$0-49/mo</td></tr>
+<tr><td>DCF calculations</td><td>Not started</td><td>Spreadsheet template, Aswath Damodaran models</td><td>Free</td></tr>
+<tr><td>Portfolio tracking</td><td>Not started</td><td>Sharesight, Portfolio Performance (open source)</td><td>Free-$20/mo</td></tr>
+<tr><td>Stock screener</td><td>Not started</td><td>Finviz, Stock Analysis</td><td>Free</td></tr>
+</tbody></table></div>
+<p><strong>Recommendation:</strong> Leverage existing APIs and tools for commodity features. Invest development time ONLY in the unique evaluation workflow that no existing tool provides.</p>
+<hr>
+<h2 id="domain-4-product-strategy">Domain 4: Product Strategy</h2>
+<h3 id="ceo-prd-01-product-market-fit-severity-critical">CEO-PRD-01: Product-Market Fit -- SEVERITY: CRITICAL</h3>
+<p><strong>Finding:</strong> Product-market fit has not been validated with anyone other than the founder. The product is being built based on a single user's workflow, which is a strong starting point but not validated market demand.</p>
+<p><strong>PMF Checklist:</strong></p>
+<ul>
+<li>[x] Founder has the problem personally (strong signal)</li>
+<li>[ ] Others with same problem identified and interviewed</li>
+<li>[ ] Willingness to pay validated</li>
+<li>[ ] MVP tested with external users</li>
+<li>[ ] Retention/engagement measured</li>
+<li>[ ] Word-of-mouth or organic interest observed</li>
+</ul>
+<p><strong>Recommendation:</strong> Before writing more code, find 5-10 value investors who use checklist-based approaches and show them the Google Sheets workflow. Ask: "Would you pay $10/month for a tool that automates this?" If the answer is consistently "yes, take my money" -- build it. If it is "maybe" or "I use [X] already" -- reconsider.</p>
+<h3 id="ceo-prd-02-product-completeness-severity-critical">CEO-PRD-02: Product Completeness -- SEVERITY: CRITICAL</h3>
+<p><strong>Finding:</strong> The product is approximately 10-15% complete relative to a minimum viable product that would replace the Google Sheets workflow.</p>
+<p><strong>Feature Completion Map:</strong></p>
+<div class="table-wrap"><table><thead>
+<tr><th>Feature</th><th>Status</th><th>% Complete</th></tr>
+</thead><tbody>
+<tr><td>Company search/lookup</td><td>Working</td><td>80%</td></tr>
+<tr><td>SEC EDGAR data retrieval</td><td>Partial (2 metrics)</td><td>15%</td></tr>
+<tr><td>Financial data display in UI</td><td>Not working</td><td>5%</td></tr>
+<tr><td>Feroldi Quality Score</td><td>Not started</td><td>0%</td></tr>
+<tr><td>Anti-Fragile Checklist</td><td>Not started</td><td>0%</td></tr>
+<tr><td>Mentor's Checklist</td><td>Not started</td><td>0%</td></tr>
+<tr><td>DCF Valuation (P/E method)</td><td>Not started</td><td>0%</td></tr>
+<tr><td>DCF Valuation (Gordon Growth)</td><td>Not started</td><td>0%</td></tr>
+<tr><td>Buy/Pass/Watch recommendation</td><td>Not started</td><td>0%</td></tr>
+<tr><td>Portfolio tracking</td><td>Not started</td><td>0%</td></tr>
+<tr><td>Watchlist with alerts</td><td>Partial (no alerts)</td><td>30%</td></tr>
+<tr><td>Company comparison</td><td>Not started</td><td>0%</td></tr>
+<tr><td>Report export</td><td>Not started</td><td>0%</td></tr>
+</tbody></table></div>
+<p><strong>Recommendation:</strong> Define a "Version 0.1" that contains ONLY: ticker input, automated data fetch, Feroldi score calculation, DCF output, and buy/pass recommendation. Everything else is V2+.</p>
+<h3 id="ceo-prd-03-technical-architecture-alignment-severity-high">CEO-PRD-03: Technical Architecture Alignment -- SEVERITY: HIGH</h3>
+<p><strong>Finding:</strong> The architecture is over-engineered for a personal tool and under-engineered for a SaaS product. It sits in an awkward middle ground.</p>
+<p><strong>Over-engineered for personal use:</strong></p>
+<ul>
+<li>Separate backend API + frontend SPA + Express server (3 processes)</li>
+<li>Azure Web App + Azure Functions (2 deployment targets)</li>
+<li>Clean Architecture pattern in backend (unnecessary for single-user)</li>
+</ul>
+<p><strong>Under-engineered for SaaS:</strong></p>
+<ul>
+<li>No database (JSON file storage)</li>
+<li>No authentication/authorization</li>
+<li>No TypeScript (type safety missing)</li>
+<li>No frontend tests</li>
+<li>API keys exposed in frontend code</li>
+<li>No rate limiting, no CORS policy, no input validation</li>
+</ul>
+<p><strong>Recommendation:</strong> Simplify. For a personal tool, a single-page React app calling SEC EDGAR directly (with a thin proxy for API keys) would be 10x simpler. For SaaS, the architecture needs a database, auth, and proper security before any new features.</p>
+<hr>
+<h2 id="domain-5-technology-engineering">Domain 5: Technology & Engineering</h2>
+<h3 id="ceo-tech-01-technical-debt-severity-high">CEO-TECH-01: Technical Debt -- SEVERITY: HIGH</h3>
+<p><strong>Finding:</strong> Significant technical debt has accumulated in both repositories despite the project being early-stage. This will compound as features are added.</p>
+<p><strong>Backend Debt:</strong></p>
+<ul>
+<li>Azure Functions deployment broken (dead code)</li>
+<li>File-based caching instead of proper data store</li>
+<li>Only 2 of 100+ financial metrics parsed</li>
+<li>No API versioning</li>
+</ul>
+<p><strong>Frontend Debt:</strong></p>
+<ul>
+<li>No TypeScript -- runtime type errors guaranteed as complexity grows</li>
+<li>10+ levels of prop drilling -- state management is unsustainable</li>
+<li>API key exposed in client-side code (OWASP A01 violation)</li>
+<li>No test coverage (0%)</li>
+<li>Console.logs and unused code in production</li>
+<li>No code splitting or lazy loading</li>
+<li>Create React App (no longer maintained by Meta)</li>
+</ul>
+<h3 id="ceo-tech-02-security-posture-severity-critical">CEO-TECH-02: Security Posture -- SEVERITY: CRITICAL</h3>
+<p><strong>Finding:</strong> The application has active security vulnerabilities that must be fixed before any external user touches it.</p>
+<div class="table-wrap"><table><thead>
+<tr><th>Vulnerability</th><th>OWASP Category</th><th>Severity</th></tr>
+</thead><tbody>
+<tr><td>FMP API key exposed in frontend JS</td><td>A01:2021 Broken Access Control</td><td>CRITICAL</td></tr>
+<tr><td>No authentication</td><td>A07:2021 Identification Failures</td><td>CRITICAL</td></tr>
+<tr><td>No input validation on API endpoints</td><td>A03:2021 Injection</td><td>HIGH</td></tr>
+<tr><td>No HTTPS enforcement</td><td>A02:2021 Cryptographic Failures</td><td>HIGH</td></tr>
+<tr><td>No rate limiting</td><td>A04:2021 Insecure Design</td><td>MEDIUM</td></tr>
+</tbody></table></div>
+<p><strong>Recommendation:</strong> These are not "nice to have" fixes. If the SaaS path is chosen, security must be addressed BEFORE any external access. The API key exposure alone could result in charges on the FMP account.</p>
+<h3 id="ceo-tech-03-data-strategy-severity-high">CEO-TECH-03: Data Strategy -- SEVERITY: HIGH</h3>
+<p><strong>Finding:</strong> SEC EDGAR provides hundreds of financial data points (XBRL taxonomy). The backend currently extracts only Revenue and Operating Income. The entire value proposition depends on comprehensive financial data, yet 98% of available data is ignored.</p>
+<p><strong>Available from SEC EDGAR (examples):</strong></p>
+<ul>
+<li>Income Statement: Revenue, COGS, Gross Profit, Operating Income, Net Income, EPS</li>
+<li>Balance Sheet: Total Assets, Total Liabilities, Current Ratio, Equity</li>
+<li>Cash Flow: Operating CF, CapEx, FCF, Dividends, Buybacks</li>
+<li>Ratios: ROE, ROA, Debt/Equity, Current Ratio, Quick Ratio</li>
+</ul>
+<p><strong>Required for Feroldi Score alone:</strong> Revenue growth, gross margins, operating margins, EPS growth, share count changes, current ratio, leverage ratio, operating CF vs net income, CF growth, CapEx/CF ratio, FCF/CF ratio, P/E ratio, ROE</p>
+<p><strong>Recommendation:</strong> This is the single highest-leverage engineering task. Expanding SEC EDGAR parsing to cover all metrics needed for the scoring checklists unlocks the core product value.</p>
+<hr>
+<h2 id="domain-6-organizational-capability">Domain 6: Organizational Capability</h2>
+<h3 id="ceo-org-01-solo-developer-constraints-severity-high">CEO-ORG-01: Solo Developer Constraints -- SEVERITY: HIGH</h3>
+<p><strong>Finding:</strong> A single developer cannot realistically build, maintain, and market a competitive financial SaaS product. The scope of work required (backend, frontend, data engineering, security, DevOps, marketing, support) exceeds one person's capacity.</p>
+<p><strong>Estimated effort to reach MVP (replacing Google Sheets):</strong></p>
+<ul>
+<li>Expand SEC EDGAR parsing: 40-60 hours</li>
+<li>Implement scoring engines (Feroldi + Anti-Fragile): 30-40 hours</li>
+<li>Implement DCF calculators: 20-30 hours</li>
+<li>Build UI for evaluation workflow: 40-60 hours</li>
+<li>Add database and auth: 20-30 hours</li>
+<li>Fix security issues: 10-15 hours</li>
+<li>Write tests: 20-30 hours</li>
+<li>Total: <strong>180-265 hours</strong> (at 10 hrs/week = 4.5-6.5 months)</li>
+</ul>
+<p><strong>Recommendation:</strong> This timeline is achievable IF scope is ruthlessly controlled. The danger is scope creep -- adding portfolio tracking, comparison views, alerts, and other features before the core workflow works end-to-end.</p>
+<h3 id="ceo-org-02-skill-alignment-severity-low">CEO-ORG-02: Skill Alignment -- SEVERITY: LOW</h3>
+<p><strong>Finding:</strong> The founder has a strong skill profile for this project: .NET backend expertise (SAP professional), React frontend skills (learning), and deep domain knowledge in value investing (personal practice). The weakest area is product design and UX -- the current UI is functional but not polished.</p>
+<p><strong>Recommendation:</strong> Use UI component libraries (shadcn/ui, Radix) and copy proven financial tool layouts rather than designing from scratch. Focus engineering skill on the unique backend logic.</p>
+<hr>
+<h2 id="domain-7-go-to-market-strategy">Domain 7: Go-to-Market Strategy</h2>
+<h3 id="ceo-gtm-01-distribution-strategy-severity-high-if-saas-path-chosen">CEO-GTM-01: Distribution Strategy -- SEVERITY: HIGH (if SaaS path chosen)</h3>
+<p><strong>Finding:</strong> No distribution strategy exists. For a solo developer, distribution is typically the hardest problem -- harder than building the product.</p>
+<p><strong>Viable distribution channels for a niche investing tool:</strong></p>
+<ol>
+<li>Reddit (r/ValueInvesting, r/SecurityAnalysis, r/Stocks) -- free, high intent</li>
+<li>Twitter/X FinTwit community -- free, requires content creation</li>
+<li>YouTube tutorials on value investing methodology -- free, slow build</li>
+<li>Product Hunt launch -- free, one-time spike</li>
+<li>Value investing forums (Corner of Berkshire, Motley Fool boards) -- free, niche</li>
+<li>SEO for "value investing tools," "stock scoring system" -- free, slow</li>
+</ol>
+<p><strong>Recommendation:</strong> If pursuing SaaS: start sharing the methodology (not the tool) on Reddit and Twitter NOW. Build an audience of 500+ followers interested in systematic value investing before launching the product. The methodology content IS the marketing.</p>
+<h3 id="ceo-gtm-02-pricing-strategy-severity-medium-premature-but-needs-thought">CEO-GTM-02: Pricing Strategy -- SEVERITY: MEDIUM (premature but needs thought)</h3>
+<p><strong>Finding:</strong> No pricing research done. Competitor pricing ranges from free to $24K/year.</p>
+<p><strong>Pricing framework for a niche solo-dev tool:</strong></p>
+<ul>
+<li>Free tier: View scores for 3 companies (lead gen)</li>
+<li>Personal: $9.99/mo -- unlimited scoring, basic DCF, watchlist</li>
+<li>Pro: $19.99/mo -- full DCF suite, portfolio tracking, alerts, export</li>
+<li>Reference: Koyfin free-$39/mo, GuruFocus free-$40/mo, Simply Wall St free-$20/mo</li>
+</ul>
+<p><strong>Recommendation:</strong> Do not build pricing infrastructure yet. But validate price sensitivity during user interviews (Domain 4 recommendation).</p>
+<hr>
+<h2 id="domain-8-stakeholder-management">Domain 8: Stakeholder Management</h2>
+<h3 id="ceo-stk-01-stakeholder-alignment-severity-low">CEO-STK-01: Stakeholder Alignment -- SEVERITY: LOW</h3>
+<p><strong>Finding:</strong> As a solo personal project, stakeholder management is simple: the founder is the only stakeholder. However, if the project evolves into a product, early users become critical stakeholders whose feedback shapes the product.</p>
+<p><strong>Recommendation:</strong> If pursuing SaaS, establish a beta tester group of 10-20 value investors before launch. Their feedback loop will be more valuable than any strategic framework.</p>
+<hr>
+<h2 id="domain-9-risk-management">Domain 9: Risk Management</h2>
+<h3 id="ceo-rsk-01-key-person-risk-severity-high">CEO-RSK-01: Key Person Risk -- SEVERITY: HIGH</h3>
+<p><strong>Finding:</strong> 100% key person dependency. If the founder loses interest, gets busy at work, or pivots to another project, Edgar Miner dies. This is the single largest existential risk.</p>
+<p><strong>Mitigation:</strong></p>
+<ul>
+<li>Set a hard deadline: "If I haven't shipped V0.1 by [date], I stop and use Koyfin/GuruFocus instead"</li>
+<li>Time-box development to avoid burnout (max 10 hrs/week)</li>
+<li>Ship incrementally -- each release should be usable, not "almost done"</li>
+</ul>
+<h3 id="ceo-rsk-02-technology-risk-severity-medium">CEO-RSK-02: Technology Risk -- SEVERITY: MEDIUM</h3>
+<p><strong>Finding:</strong> Key technology dependencies carry risk.</p>
+<div class="table-wrap"><table><thead>
+<tr><th>Dependency</th><th>Risk</th><th>Mitigation</th></tr>
+</thead><tbody>
+<tr><td>SEC EDGAR API</td><td>Could change format, rate limits</td><td>Cache aggressively, abstract parser</td></tr>
+<tr><td>Financial Modeling Prep API</td><td>Paid, could increase prices</td><td>Have backup (Alpha Vantage, Yahoo Finance)</td></tr>
+<tr><td>Azure hosting</td><td>Cost could increase</td><td>Lightweight enough to move to Vercel/Railway</td></tr>
+<tr><td>React/CRA</td><td>CRA is deprecated</td><td>Migrate to Vite (should do anyway)</td></tr>
+</tbody></table></div>
+<h3 id="ceo-rsk-03-competitive-risk-severity-critical">CEO-RSK-03: Competitive Risk -- SEVERITY: CRITICAL</h3>
+<p><strong>Finding:</strong> AI-powered financial analysis tools are emerging rapidly. ChatGPT, Claude, and specialized AI tools can already perform ad-hoc financial analysis, DCF modeling, and company scoring from raw SEC filings. Within 12-18 months, AI agents may automate the entire workflow Edgar Miner is trying to build.</p>
+<p><strong>Recommendation:</strong> This is the existential strategic question. If an AI agent can read a 10-K and produce a Feroldi score in 30 seconds, what is the value of a custom-built tool? The answer may be: (a) the structured, repeatable, auditable nature of a dedicated tool, (b) portfolio-level tracking over time, or (c) nothing -- in which case, build Edgar Miner as a personal learning project, not a business.</p>
+<hr>
+<h2 id="domain-10-execution-roadmap">Domain 10: Execution & Roadmap</h2>
+<h3 id="ceo-exe-01-execution-velocity-severity-high">CEO-EXE-01: Execution Velocity -- SEVERITY: HIGH</h3>
+<p><strong>Finding:</strong> The project has been in development since at least early 2026 (based on repo history and memory files). In that time, the backend can fetch 2 financial metrics and the frontend cannot display them. This velocity is insufficient to reach a competitive product.</p>
+<p><strong>Root Cause:</strong> Scope is too broad. The project attempts to build infrastructure (Clean Architecture, Azure Functions, CI/CD) before proving value.</p>
+<p><strong>Recommendation:</strong> Switch from "build infrastructure, then features" to "ship the simplest thing that works, then improve." Specifically:</p>
+<ol>
+<li>Hard-code the Feroldi scoring criteria in the backend</li>
+<li>Fetch the 13 required metrics from SEC EDGAR</li>
+<li>Calculate scores and display them in the UI</li>
+<li>The entire loop should take 2-3 weekends, not months</li>
+</ol>
+<h3 id="ceo-exe-02-decision-framework-severity-high">CEO-EXE-02: Decision Framework -- SEVERITY: HIGH</h3>
+<p><strong>Finding:</strong> The single most important strategic decision has not been made: <strong>What is Edgar Miner?</strong></p>
+<div class="table-wrap"><table><thead>
+<tr><th>Option</th><th>Effort</th><th>Outcome</th><th>Risk</th></tr>
+</thead><tbody>
+<tr><td>A: Personal Productivity Tool</td><td>Low (100-150 hrs)</td><td>Saves founder 10+ hrs/month</td><td>Low -- worst case, learned a lot</td></tr>
+<tr><td>B: Niche SaaS Product</td><td>High (500+ hrs)</td><td>Potential $1K-10K MRR</td><td>High -- market is crowded, AI threat</td></tr>
+<tr><td>C: Open Source Project</td><td>Medium (200-300 hrs)</td><td>Portfolio piece, community</td><td>Medium -- maintenance burden</td></tr>
+<tr><td>D: Abandon and Use Existing Tools</td><td>Zero</td><td>Immediate time savings</td><td>Zero -- Koyfin + Google Sheets works</td></tr>
+</tbody></table></div>
+<p><strong>Recommendation:</strong> Choose Option A first. Build the personal tool. If other value investors organically ask to use it, Option B becomes viable. Do not invest in SaaS infrastructure, auth, pricing, or multi-tenancy until at least 20 people have expressed genuine interest.</p>
+<hr>
+<h2 id="strategic-recommendations-priority-order">Strategic Recommendations (Priority Order)</h2>
+<h3 id="immediate-next-2-weeks">Immediate (Next 2 Weeks)</h3>
+<ol>
+<li><strong>DECIDE: Personal tool vs. product</strong> (CEO-EXE-02). Write it down. Every subsequent decision depends on this.</li>
+</ol>
+<ol>
+<li><strong>Fix the API key exposure</strong> (CEO-TECH-02). This is a security incident waiting to happen regardless of the product path.</li>
+</ol>
+<ol>
+<li><strong>Define V0.1 scope</strong> (CEO-PRD-02). Maximum 5 features. Suggested: (1) Enter ticker, (2) Auto-fetch all required financial metrics, (3) Calculate Feroldi Quality Score, (4) Calculate basic DCF, (5) Display buy/pass/watch recommendation.</li>
+</ol>
+<h3 id="short-term-next-3-months">Short-Term (Next 3 Months)</h3>
+<ol>
+<li><strong>Expand SEC EDGAR parsing</strong> (CEO-TECH-03). This is the highest-leverage engineering task. Go from 2 metrics to the 15-20 required for the scoring checklists.</li>
+</ol>
+<ol>
+<li><strong>Implement ONE scoring engine</strong> (CEO-PRD-02). Start with Feroldi Quality Score -- it has the clearest criteria and the most auto-score-able items.</li>
+</ol>
+<ol>
+<li><strong>Kill the scope creep</strong> (CEO-VIS-02). Remove or defer: portfolio tracking, company comparison, alerts, export, Azure Functions. They are distractions.</li>
+</ol>
+<h3 id="medium-term-3-6-months">Medium-Term (3-6 Months)</h3>
+<ol>
+<li><strong>Ship V0.1 to yourself</strong> (CEO-EXE-01). Use it for your next 5 investment evaluations instead of Google Sheets. Note what is missing, what is slow, what is broken.</li>
+</ol>
+<ol>
+<li><strong>Share the methodology, not the tool</strong> (CEO-GTM-01). Write 3-5 posts on Reddit/Twitter about your systematic evaluation process. Gauge interest.</li>
+</ol>
+<ol>
+<li><strong>Migrate off CRA</strong> (CEO-TECH-01). Move to Vite. Add TypeScript incrementally. This is a one-time investment that pays dividends forever.</li>
+</ol>
+<h3 id="long-term-6-12-months">Long-Term (6-12 Months)</h3>
+<ol>
+<li><strong>Revisit the product decision</strong> (CEO-EXE-02). By now you will have: a working personal tool, feedback from sharing the methodology, and clarity on whether AI tools have made this obsolete. Decide then whether to pursue SaaS.</li>
+</ol>
+<hr>
+<h2 id="swot-summary">SWOT Summary</h2>
+<h3 id="strengths">Strengths</h3>
+<ul>
+<li>Founder has deep domain expertise (practices value investing personally)</li>
+<li>Real, validated problem (founder uses 3 Google Sheets daily)</li>
+<li>SEC EDGAR data is free and public (no data cost barrier)</li>
+<li>.NET backend expertise from professional work</li>
+<li>Disciplined, methodical approach to development</li>
+</ul>
+<h3 id="weaknesses">Weaknesses</h3>
+<ul>
+<li>Zero market presence, brand, or users</li>
+<li>Product is 10-15% complete</li>
+<li>Solo developer with limited time</li>
+<li>No revenue, no funding, no business model</li>
+<li>Significant technical debt and security issues</li>
+<li>Frontend skills are developing (no TypeScript, no tests)</li>
+</ul>
+<h3 id="opportunities">Opportunities</h3>
+<ul>
+<li>Niche market for systematic/checklist-based value investing tools is underserved</li>
+<li>AI-assisted development can accelerate solo developer productivity</li>
+<li>Founder's unique methodology (Feroldi + Anti-Fragile + Mentor) is genuinely differentiated</li>
+<li>Low infrastructure costs (SEC data free, Azure affordable)</li>
+<li>Growing retail investor population post-2020</li>
+</ul>
+<h3 id="threats">Threats</h3>
+<ul>
+<li>AI tools (ChatGPT, Claude) increasingly capable of ad-hoc financial analysis</li>
+<li>Well-funded competitors with established user bases</li>
+<li>API dependencies could change terms or pricing</li>
+<li>Solo developer burnout or life priorities shifting</li>
+<li>Market downturn could reduce investor interest in analysis tools</li>
+</ul>
+<hr>
+<h2 id="final-verdict">Final Verdict</h2>
+<p>Edgar Miner has a genuine problem worth solving and a founder with the rare combination of technical skill and domain expertise. However, the project is currently trying to boil the ocean -- building a comprehensive financial platform when a focused evaluation workflow would deliver 80% of the value at 20% of the effort.</p>
+<p><strong>The brutally honest assessment:</strong> If you continue on the current trajectory -- broad scope, infrastructure-first, feature-scattered -- you will still be "almost done" in 12 months. The project will join the graveyard of ambitious side projects.</p>
+<p><strong>The path to success:</strong> Pick the narrowest possible scope (automated Feroldi scoring for a given ticker), ship it in 4-6 weekends, use it yourself for 3 months, and let real usage -- not strategic frameworks -- tell you what to build next.</p>
+<p>The best CEO advice for a solo founder is the simplest: <strong>ship something, then decide.</strong></p>
+<hr>
+<p><strong>Strategic Health Score:</strong> 27.9/100 (Critical)</p>
+<p><strong>Overall Risk:</strong> 56.2% (High)</p>
+<p><strong>Recommended Path:</strong> Personal tool first (Option A), validate demand before SaaS investment</p>
+<p><strong>Critical Actions:</strong> Fix security, narrow scope, expand data parsing, ship V0.1</p>
+<hr>
+<p><em>Report generated by cs-ceo-advisor agent using Strategy Analyzer (27.9/100) and Financial Scenario Analyzer frameworks, cross-referenced against Executive Decision Framework, Board Governance & Investor Relations, and Leadership & Organizational Culture knowledge bases.</em></p>
+</section>
+<hr>
+<section id="edgar-miner-execution-plan">
+<h1 id="edgar-miner-execution-plan">Edgar Miner Execution Plan</h1>
+<p><strong>Date:</strong> 2026-03-12</p>
+<p><strong>Source:</strong> CEO Strategic Audit (Score: 27.9/100 -- Critical)</p>
+<p><strong>Decision:</strong> Option A -- Personal Productivity Tool First</p>
+<p><strong>Constraint:</strong> Solo developer, 10 hrs/week, 2-week sprints, max 3 stories per sprint</p>
+<p><strong>Goal:</strong> Go from "2 metrics, no display" to "usable personal tool replacing Google Sheets"</p>
+<hr>
+<h2 id="strategic-context">Strategic Context</h2>
+<p>The CEO audit diagnosed Edgar Miner as <strong>strategically misaligned</strong> -- building SaaS infrastructure with solo-developer resources. The path forward is brutally simple: narrow to ONE workflow (ticker -> Feroldi score -> DCF -> buy/pass/watch), ship it as a personal tool, then decide about SaaS based on real usage.</p>
+<p><strong>What we are building:</strong> An opinionated investment evaluation system that automates the founder's manual 3-spreadsheet workflow. Not a generic financial data tool.</p>
+<p><strong>What we are NOT building (explicitly deferred):</strong></p>
+<ul>
+<li>Authentication / multi-tenancy</li>
+<li>Portfolio tracking</li>
+<li>Company comparison views</li>
+<li>Alerts and notifications</li>
+<li>Report export / PDF generation</li>
+<li>Azure Functions</li>
+<li>Database (keep file-based for personal tool)</li>
+</ul>
+<hr>
+<h2 id="technical-approach">Technical Approach</h2>
+<h3 id="architecture-simplified-for-personal-tool">Architecture (Simplified for Personal Tool)</h3>
+<pre><code class="lang-">
+[React UI] --&gt; [.NET 8.0 API] --&gt; [SEC EDGAR]
+     |                |
+     |                +--&gt; [FMP API] (via backend proxy -- NOT from frontend)
+     |                |
+     |                +--&gt; [File Cache]
+     |
+     +--&gt; Express Server (workspace persistence -- existing)
+</code></pre>
+<p><strong>Key architectural decisions:</strong></p>
+<ol>
+<li><strong>Move FMP API key to backend</strong> -- proxy all FMP calls through .NET API. Fixes OWASP A01.</li>
+<li><strong>Keep file-based storage</strong> -- personal tool, no need for database.</li>
+<li><strong>Keep Clean Architecture</strong> -- it already exists, ripping it out wastes time.</li>
+<li><strong>Defer Vite migration</strong> -- CRA works, migration is pure tech debt that does not ship features.</li>
+<li><strong>Add TypeScript incrementally</strong> -- new files only, do not rewrite existing JS files.</li>
+</ol>
+<h3 id="data-strategy">Data Strategy</h3>
+<p>SEC EDGAR XBRL taxonomy provides hundreds of metrics. We need exactly <strong>20 metrics</strong> to power the Feroldi score + DCF calculations. The backend already has the scaffolding in <code>UsGaap.cs</code> (200+ commented-out properties). We uncomment and wire the ones we need.</p>
+<p><strong>Required metrics (grouped by financial statement):</strong></p>
+<p>Income Statement:</p>
+<ol>
+<li>Revenue (DONE -- 7 GAAP variants handled)</li>
+<li>Cost of Goods Sold / Cost of Revenue</li>
+<li>Gross Profit</li>
+<li>Operating Income (DONE)</li>
+<li>Net Income</li>
+<li>Earnings Per Share (Diluted)</li>
+<li>Shares Outstanding</li>
+</ol>
+<p>Balance Sheet:</p>
+<ol>
+<li>Total Assets</li>
+<li>Total Current Assets</li>
+<li>Total Liabilities</li>
+<li>Total Current Liabilities</li>
+<li>Stockholders Equity</li>
+<li>Long Term Debt</li>
+</ol>
+<p>Cash Flow Statement:</p>
+<ol>
+<li>Cash Flow from Operations</li>
+<li>Capital Expenditures</li>
+<li>Free Cash Flow (calculated: CFO - CapEx)</li>
+<li>Dividends Paid</li>
+<li>Share Repurchases</li>
+</ol>
+<p>Market Data (from FMP, proxied through backend):</p>
+<ol>
+<li>Current Stock Price</li>
+<li>P/E Ratio (TTM)</li>
+</ol>
+<hr>
+<h2 id="phase-structure">Phase Structure</h2>
+<div class="table-wrap"><table><thead>
+<tr><th>Phase</th><th>Name</th><th>Sprints</th><th>Focus</th><th>Outcome</th></tr>
+</thead><tbody>
+<tr><td>0</td><td>Security & Foundation</td><td>1</td><td>Fix API key, backend proxy</td><td>No more OWASP violations</td></tr>
+<tr><td>1</td><td>Data Engine</td><td>3</td><td>Parse 20 metrics from SEC EDGAR</td><td>Backend returns all needed data</td></tr>
+<tr><td>2</td><td>Scoring Engine</td><td>2</td><td>Feroldi Quality Score calculation</td><td>Automated 13-point checklist</td></tr>
+<tr><td>3</td><td>Valuation Engine</td><td>2</td><td>P/E DCF + Gordon Growth DCF</td><td>Buy/pass/watch recommendation</td></tr>
+<tr><td>4</td><td>UI: Evaluation Dashboard</td><td>3</td><td>Display scores, DCF, recommendation</td><td>Usable personal tool (V0.1)</td></tr>
+<tr><td>5</td><td>Polish & Self-Use</td><td>1</td><td>Bug fixes from real usage</td><td>Stable daily driver</td></tr>
+</tbody></table></div>
+<p><strong>Total: 12 sprints = 24 weeks = ~6 months</strong></p>
+<p><strong>Hours: ~240 hrs (12 sprints x 2 weeks x 10 hrs/week)</strong></p>
+<hr>
+<h2 id="phase-0-security-foundation-sprint-1">Phase 0: Security & Foundation (Sprint 1)</h2>
+<p><strong>Goal:</strong> Fix the CRITICAL security issue and establish backend-proxied API pattern.</p>
+<h3 id="epic-security-hardening-api-proxy">Epic: Security Hardening & API Proxy</h3>
+<h4 id="story-0-1-move-fmp-api-key-to-backend-proxy">Story 0.1: Move FMP API Key to Backend Proxy</h4>
+<p><strong>Repo:</strong> EDGARMiner (backend) + edgar-miner-ui (frontend)</p>
+<p><strong>Description:</strong> As a developer, I want FMP API calls routed through my .NET backend so that the API key is never exposed in frontend JavaScript.</p>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] New endpoint <code>GET /api/fmp/search?query={ticker}</code> proxies FMP company search</li>
+<li>[ ] New endpoint <code>GET /api/fmp/quote/{symbol}</code> proxies FMP stock quote</li>
+<li>[ ] FMP API key stored in appsettings.json (gitignored) and/or environment variable</li>
+<li>[ ] Frontend <code>useCompanyTickers.js</code> updated to call backend proxy instead of FMP directly</li>
+<li>[ ] No FMP API key present in any frontend code</li>
+<li>[ ] CORS configured to allow frontend origin only</li>
+</ul>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Create <code>FmpProxyController.cs</code> with search and quote endpoints [4h]</li>
+<li>Create <code>IFmpService.cs</code> and <code>FmpService.cs</code> with HttpClient to FMP API [3h]</li>
+<li>Add FMP API key to appsettings.json + environment variable fallback [1h]</li>
+<li>Configure CORS in <code>Program.cs</code> for localhost origins [1h]</li>
+<li>Update frontend <code>useCompanyTickers.js</code> hook to call backend proxy [2h]</li>
+<li>Remove FMP API key from all frontend files (search all <code>.js</code>, <code>.env</code>) [1h]</li>
+<li>Test end-to-end: search works through proxy [1h]</li>
+<li>Add <code>.env</code> and <code>appsettings.Development.json</code> to <code>.gitignore</code> if not already [0.5h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 13.5h (Sprint 1)</p>
+<p><strong>Dependencies:</strong> None</p>
+<p><strong>Backend issues to close:</strong> None (new work)</p>
+<p><strong>Frontend issues to close:</strong> None (new work)</p>
+<h4 id="story-0-2-clean-up-dead-code">Story 0.2: Clean Up Dead Code</h4>
+<p><strong>Repo:</strong> EDGARMiner (backend)</p>
+<p><strong>Description:</strong> Remove broken Azure Functions project and WeatherForecast boilerplate.</p>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] <code>EDGARFunctions</code> project removed from solution</li>
+<li>[ ] <code>WeatherForecastController.cs</code> and <code>WeatherForecast.cs</code> deleted</li>
+<li>[ ] Solution builds and tests pass</li>
+</ul>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Remove <code>EDGARFunctions</code> project reference from <code>EDGARMiner.sln</code> [0.5h]</li>
+<li>Delete <code>WeatherForecastController.cs</code> and <code>WeatherForecast.cs</code> [0.5h]</li>
+<li>Verify build + existing tests pass [0.5h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 1.5h</p>
+<p><strong>Dependencies:</strong> None</p>
+<hr>
+<h2 id="phase-1-data-engine-sprints-2-4">Phase 1: Data Engine (Sprints 2-4)</h2>
+<p><strong>Goal:</strong> Expand SEC EDGAR parsing from 2 metrics to all 18 needed from EDGAR (metrics 19-20 come from FMP, already proxied in Phase 0).</p>
+<h3 id="epic-comprehensive-financial-data-extraction">Epic: Comprehensive Financial Data Extraction</h3>
+<p>The existing <code>UsGaap.cs</code> already has 200+ metrics as commented-out properties with their XBRL class stubs. The work is: uncomment the ~18 we need, ensure their parser classes extract annual data correctly, create a unified <code>FinancialSummary</code> response model, and expose it through a new API endpoint.</p>
+<h4 id="story-1-1-income-statement-metrics-extraction">Story 1.1: Income Statement Metrics Extraction</h4>
+<p><strong>Repo:</strong> EDGARMiner (backend)</p>
+<p><strong>Description:</strong> As a user, I want to retrieve complete income statement data for any public company so that I can evaluate profitability trends.</p>
+<p><strong>Metrics:</strong> Gross Profit, Net Income, EPS (Diluted), Shares Outstanding</p>
+<p>(Revenue and Operating Income already done.)</p>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] <code>UsGaap.cs</code> properties uncommented for: <code>GrossProfit</code>, <code>NetIncomeLoss</code>, <code>EarningsPerShareDiluted</code>, <code>CommonStockSharesOutstanding</code> (+ GAAP variants for each)</li>
+<li>[ ] Each metric returns 5+ years of annual data (10-K filings only, filtered by <code>form</code> field)</li>
+<li>[ ] Cost of Revenue calculable as Revenue - Gross Profit</li>
+<li>[ ] Integration test verifying data retrieval for AAPL, MSFT (known tickers)</li>
+</ul>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Identify all GAAP taxonomy variants for each metric (SEC EDGAR XBRL docs) [2h]</li>
+<li>Uncomment and create/update parser classes for Gross Profit variants [2h]</li>
+<li>Uncomment and create/update parser classes for Net Income variants [2h]</li>
+<li>Uncomment and create/update parser classes for EPS Diluted variants [2h]</li>
+<li>Uncomment and create/update parser classes for Shares Outstanding variants [2h]</li>
+<li>Add annual-data filtering logic (10-K only, deduplicate by fiscal year) [3h]</li>
+<li>Write integration tests for each metric against AAPL and MSFT [3h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 16h (Sprint 2)</p>
+<p><strong>Dependencies:</strong> None</p>
+<p><strong>Backend issues addressed:</strong> #16 (Net Income), #17 (EPS), #18 (Gross Margin), #19 (Operating Margin), #20 (Net Profit Margin), #21 (Shares Outstanding)</p>
+<h4 id="story-1-2-balance-sheet-metrics-extraction">Story 1.2: Balance Sheet Metrics Extraction</h4>
+<p><strong>Repo:</strong> EDGARMiner (backend)</p>
+<p><strong>Description:</strong> As a user, I want balance sheet data to evaluate financial health and leverage.</p>
+<p><strong>Metrics:</strong> Total Assets, Total Current Assets, Total Liabilities, Total Current Liabilities, Stockholders Equity, Long Term Debt</p>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] All 6 balance sheet metrics return 5+ years of annual data</li>
+<li>[ ] Current Ratio calculable as Current Assets / Current Liabilities</li>
+<li>[ ] Debt-to-Equity calculable as Total Liabilities / Stockholders Equity</li>
+<li>[ ] Integration test for AAPL, MSFT</li>
+</ul>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Uncomment and wire parser classes for Assets, AssetsCurrent [2h]</li>
+<li>Uncomment and wire parser classes for Liabilities, LiabilitiesCurrent [2h]</li>
+<li>Uncomment and wire parser classes for StockholdersEquity [2h]</li>
+<li>Uncomment and wire parser classes for LongTermDebt / LongTermDebtNoncurrent [2h]</li>
+<li>Annual-data filtering (same pattern as Story 1.1) [1h]</li>
+<li>Integration tests [2h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 11h (Sprint 3, part 1)</p>
+<p><strong>Dependencies:</strong> Story 1.1 (shared annual filtering logic)</p>
+<p><strong>Backend issues addressed:</strong> #7 (Shareholders Equity), #8 (Cash), #9 (Long Term Debt), #10 (Current Assets), #11 (Current Liabilities), #12 (Total Assets), #13 (Total Liabilities)</p>
+<h4 id="story-1-3-cash-flow-statement-metrics-extraction">Story 1.3: Cash Flow Statement Metrics Extraction</h4>
+<p><strong>Repo:</strong> EDGARMiner (backend)</p>
+<p><strong>Description:</strong> As a user, I want cash flow data to evaluate cash generation quality.</p>
+<p><strong>Metrics:</strong> Cash Flow from Operations, Capital Expenditures, Dividends Paid, Share Repurchases</p>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] All 4 cash flow metrics return 5+ years of annual data</li>
+<li>[ ] Free Cash Flow calculated as CFO - CapEx (derived metric)</li>
+<li>[ ] Integration tests for AAPL, MSFT</li>
+</ul>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Uncomment and wire parser classes for NetCashProvidedByOperatingActivities [2h]</li>
+<li>Uncomment and wire parser classes for PaymentsToAcquirePropertyPlantAndEquipment (CapEx) [2h]</li>
+<li>Uncomment and wire parser classes for PaymentsOfDividendsCommonStock [2h]</li>
+<li>Uncomment and wire parser classes for PaymentsForRepurchaseOfCommonStock [2h]</li>
+<li>Integration tests [2h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 10h (Sprint 3, part 2)</p>
+<p><strong>Dependencies:</strong> Story 1.1 (shared filtering logic)</p>
+<p><strong>Backend issues addressed:</strong> #14 (Dividends), #15 (Equity Repurchase), #23 (FCF), #25 (CFO), #26 (CapEx)</p>
+<h4 id="story-1-4-unified-financial-summary-api-endpoint">Story 1.4: Unified Financial Summary API Endpoint</h4>
+<p><strong>Repo:</strong> EDGARMiner (backend)</p>
+<p><strong>Description:</strong> As a frontend developer, I want a single API call that returns all financial data needed for scoring and valuation, structured by fiscal year.</p>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] New endpoint <code>GET /api/edgar/summary/{symbol}</code> returns structured JSON</li>
+<li>[ ] Response includes 5 years of income statement, balance sheet, cash flow data</li>
+<li>[ ] Response includes derived metrics: FCF, Current Ratio, Debt/Equity, margins (gross, operating, net)</li>
+<li>[ ] Response includes YoY growth rates for key metrics</li>
+<li>[ ] FMP stock quote data (current price, P/E) included in response</li>
+<li>[ ] Swagger documentation complete</li>
+<li>[ ] Integration test validates response shape</li>
+</ul>
+<p><strong>Response shape:</strong></p>
+<pre><code class="lang-json">
+{
+  &quot;symbol&quot;: &quot;AAPL&quot;,
+  &quot;companyName&quot;: &quot;Apple Inc&quot;,
+  &quot;currentPrice&quot;: 178.50,
+  &quot;peRatio&quot;: 28.5,
+  &quot;annualData&quot;: [
+    {
+      &quot;fiscalYear&quot;: 2024,
+      &quot;revenue&quot;: 383285000000,
+      &quot;grossProfit&quot;: 170782000000,
+      &quot;operatingIncome&quot;: 119437000000,
+      &quot;netIncome&quot;: 93736000000,
+      &quot;epsDiluted&quot;: 6.13,
+      &quot;sharesOutstanding&quot;: 15287000000,
+      &quot;totalAssets&quot;: 352583000000,
+      &quot;totalCurrentAssets&quot;: 143566000000,
+      &quot;totalLiabilities&quot;: 290437000000,
+      &quot;totalCurrentLiabilities&quot;: 176392000000,
+      &quot;stockholdersEquity&quot;: 62146000000,
+      &quot;longTermDebt&quot;: 95281000000,
+      &quot;cashFlowFromOperations&quot;: 110543000000,
+      &quot;capitalExpenditures&quot;: 10959000000,
+      &quot;dividendsPaid&quot;: 15025000000,
+      &quot;shareRepurchases&quot;: 77550000000,
+      &quot;freeCashFlow&quot;: 99584000000,
+      &quot;grossMargin&quot;: 0.4457,
+      &quot;operatingMargin&quot;: 0.3116,
+      &quot;netMargin&quot;: 0.2446,
+      &quot;currentRatio&quot;: 0.8138,
+      &quot;debtToEquity&quot;: 4.674,
+      &quot;roe&quot;: 1.508,
+      &quot;revenueGrowth&quot;: 0.02,
+      &quot;netIncomeGrowth&quot;: -0.03,
+      &quot;fcfGrowth&quot;: 0.05
+    }
+  ]
+}
+</code></pre>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Create <code>FinancialSummaryDto</code> response model [2h]</li>
+<li>Create <code>FinancialSummaryService</code> that aggregates all metrics by fiscal year [4h]</li>
+<li>Implement derived metric calculations (FCF, margins, ratios, growth rates) [3h]</li>
+<li>Create <code>FinancialSummaryController</code> with the new endpoint [2h]</li>
+<li>Integrate FMP quote data into the response [1h]</li>
+<li>Write integration tests for the summary endpoint [3h]</li>
+<li>Update Swagger documentation [1h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 16h (Sprint 4)</p>
+<p><strong>Dependencies:</strong> Stories 1.1, 1.2, 1.3</p>
+<p><strong>Backend issues addressed:</strong> #22 (FCF/Share), #24 (ROIC), #28 (Market Cap) -- partial</p>
+<hr>
+<h2 id="phase-2-scoring-engine-sprints-5-6">Phase 2: Scoring Engine (Sprints 5-6)</h2>
+<p><strong>Goal:</strong> Implement the Feroldi Quality Score -- the core differentiator.</p>
+<h3 id="epic-feroldi-quality-score-engine">Epic: Feroldi Quality Score Engine</h3>
+<p>The Feroldi Quality Score is a 13-point checklist that evaluates company quality. Each criterion is pass/fail, scored numerically. Total score determines quality tier.</p>
+<h4 id="story-2-1-feroldi-score-calculation-engine">Story 2.1: Feroldi Score Calculation Engine</h4>
+<p><strong>Repo:</strong> EDGARMiner (backend)</p>
+<p><strong>Description:</strong> As a value investor, I want to automatically calculate the Feroldi Quality Score for any company so that I can quickly assess quality without manually checking each criterion.</p>
+<p><strong>The 13 Feroldi Criteria (from user's Google Sheets):</strong></p>
+<ol>
+<li>Stable and consistent revenue growth (5yr CAGR > 10%)</li>
+<li>Stable and wide gross profit margins (> 40%, stable or expanding)</li>
+<li>Stable and wide operating profit margins (> 15%, stable or expanding)</li>
+<li>EPS growing faster than revenues (EPS CAGR > Revenue CAGR)</li>
+<li>Share buybacks / share count reduction (shares declining)</li>
+<li>Current ratio > 1</li>
+<li>Financial leverage ratio < 1 (Debt/Equity)</li>
+<li>Cash flow from operations > net income</li>
+<li>Growing cash flow (5yr CFO CAGR > 0%)</li>
+<li>CapEx < 50% of cash flow from operations</li>
+<li>FCF > 50% of cash flow from operations</li>
+<li>P/E ratio reasonable (< 30 or < industry average)</li>
+<li>Return on equity > 15%</li>
+</ol>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] New service <code>IFeroldiScoreService</code> evaluates all 13 criteria</li>
+<li>[ ] Each criterion returns: name, pass/fail, actual value, threshold, explanation</li>
+<li>[ ] Total score is sum of passed criteria (0-13)</li>
+<li>[ ] Quality tier: Excellent (11-13), Good (8-10), Fair (5-7), Poor (0-4)</li>
+<li>[ ] All data-driven criteria auto-calculated from <code>FinancialSummary</code></li>
+<li>[ ] Unit tests for each criterion with known-good company data</li>
+<li>[ ] Endpoint: <code>GET /api/scoring/feroldi/{symbol}</code></li>
+</ul>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Create <code>FeroldiCriterion</code> model (name, pass, value, threshold, explanation) [1h]</li>
+<li>Create <code>FeroldiScoreResult</code> model (criteria list, total, tier) [1h]</li>
+<li>Implement revenue growth criterion (5yr CAGR calculation) [2h]</li>
+<li>Implement gross margin criterion (level + stability check) [2h]</li>
+<li>Implement operating margin criterion [1.5h]</li>
+<li>Implement EPS vs revenue growth comparison [1.5h]</li>
+<li>Implement share count change criterion [1.5h]</li>
+<li>Implement current ratio criterion [1h]</li>
+<li>Implement leverage ratio criterion [1h]</li>
+<li>Implement CFO > net income criterion [1h]</li>
+<li>Implement CFO growth criterion [1.5h]</li>
+<li>Implement CapEx/CFO ratio criterion [1h]</li>
+<li>Implement FCF/CFO ratio criterion [1h]</li>
+<li>Implement P/E criterion [1h]</li>
+<li>Implement ROE criterion [1h]</li>
+<li>Create <code>FeroldiScoreController</code> with endpoint [1.5h]</li>
+<li>Unit tests for all 13 criteria [4h]</li>
+<li>Integration test for full score against AAPL [2h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 25h (Sprints 5-6, primary story)</p>
+<p><strong>Dependencies:</strong> Story 1.4 (needs FinancialSummary data)</p>
+<p><strong>Backend issues addressed:</strong> #30-#41 (all CAGR and ratio calculations)</p>
+<h4 id="story-2-2-financial-health-checklist-dcf-pre-check">Story 2.2: Financial Health Checklist (DCF Pre-check)</h4>
+<p><strong>Repo:</strong> EDGARMiner (backend)</p>
+<p><strong>Description:</strong> As a value investor, I want the 13-point financial health checklist from my DCF spreadsheet auto-evaluated, since it overlaps with but is distinct from the Feroldi score.</p>
+<p><strong>Note:</strong> This checklist is embedded in the user's DCF spreadsheet. 11 of 13 items overlap with Feroldi criteria. The 2 unique items are: "Positive and growing FCF > 50% of CF" and the specific margin thresholds. Rather than building a separate engine, this story extends the Feroldi engine with a "health check" variant.</p>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] <code>GET /api/scoring/health-check/{symbol}</code> returns the 13-item financial health checklist</li>
+<li>[ ] Each item shows pass/fail with actual value</li>
+<li>[ ] Reuses existing calculation logic from Feroldi service</li>
+</ul>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Create <code>HealthCheckService</code> delegating to shared calculation logic [3h]</li>
+<li>Map health check criteria to existing Feroldi calculations [2h]</li>
+<li>Create controller endpoint [1h]</li>
+<li>Unit tests [2h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 8h (Sprint 6, secondary story)</p>
+<p><strong>Dependencies:</strong> Story 2.1</p>
+<hr>
+<h2 id="phase-3-valuation-engine-sprints-7-8">Phase 3: Valuation Engine (Sprints 7-8)</h2>
+<p><strong>Goal:</strong> Implement both DCF methods from the user's Google Sheets.</p>
+<h3 id="epic-dual-dcf-valuation-calculator">Epic: Dual DCF Valuation Calculator</h3>
+<h4 id="story-3-1-p-e-multiple-dcf-valuation">Story 3.1: P/E Multiple DCF Valuation</h4>
+<p><strong>Repo:</strong> EDGARMiner (backend)</p>
+<p><strong>Description:</strong> As a value investor, I want to calculate intrinsic value using the P/E multiple forward projection method so that I can determine buy prices at various margins of safety.</p>
+<p><strong>Method (from user's spreadsheet):</strong></p>
+<ol>
+<li>Take current EPS</li>
+<li>Project forward 5 years using estimated earnings growth rate</li>
+<li>Apply terminal P/E multiple to projected Year 5 EPS</li>
+<li>Discount back to present value using discount rate</li>
+<li>Apply margin of safety (35%, 45%, 55%, 65%)</li>
+<li>Output: fair value + buy prices at each safety margin</li>
+</ol>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] Input: symbol, earningsGrowthRate (default: 5yr EPS CAGR), discountRate (default: 10%), terminalPE (default: historical avg P/E)</li>
+<li>[ ] Output: fair value per share, buy prices at 35/45/55/65% margin of safety</li>
+<li>[ ] Shows year-by-year projection table</li>
+<li>[ ] Endpoint: <code>POST /api/valuation/pe-dcf</code></li>
+<li>[ ] Unit tests with hand-calculated expected values</li>
+</ul>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Create <code>PeDcfRequest</code> and <code>PeDcfResult</code> models [1.5h]</li>
+<li>Implement 5-year EPS projection logic [2h]</li>
+<li>Implement terminal value calculation [1.5h]</li>
+<li>Implement present value discounting [2h]</li>
+<li>Implement margin of safety price calculations [1h]</li>
+<li>Create default parameter estimation from historical data [2h]</li>
+<li>Create controller endpoint [1.5h]</li>
+<li>Unit tests with AAPL/MSFT hand-verified values [3h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 14.5h (Sprint 7)</p>
+<p><strong>Dependencies:</strong> Story 1.4 (financial summary for defaults), Story 2.1 (for CAGR logic reuse)</p>
+<h4 id="story-3-2-gordon-growth-model-dcf-valuation">Story 3.2: Gordon Growth Model DCF Valuation</h4>
+<p><strong>Repo:</strong> EDGARMiner (backend)</p>
+<p><strong>Description:</strong> As a value investor, I want to calculate intrinsic value using the Gordon Growth Model so that I have a second independent valuation method.</p>
+<p><strong>Method (from user's spreadsheet):</strong></p>
+<ol>
+<li>Take current FCF per share</li>
+<li>Apply perpetual growth rate (growth to infinity, typically 2-3%)</li>
+<li>Discount using required rate of return (8-12%)</li>
+<li>Fair Value = FCF * (1 + g) / (r - g)</li>
+<li>Apply margin of safety</li>
+</ol>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] Input: symbol, perpetualGrowthRate (default: 2.5%), discountRate (default: 10%)</li>
+<li>[ ] Output: fair value per share, buy prices at 35/45/55/65% margin of safety</li>
+<li>[ ] Endpoint: <code>POST /api/valuation/gordon-growth</code></li>
+<li>[ ] Unit tests with hand-calculated expected values</li>
+</ul>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Create <code>GordonGrowthRequest</code> and <code>GordonGrowthResult</code> models [1h]</li>
+<li>Implement FCF per share calculation [1h]</li>
+<li>Implement Gordon Growth formula [1.5h]</li>
+<li>Implement margin of safety calculations [1h]</li>
+<li>Create controller endpoint [1h]</li>
+<li>Unit tests [2.5h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 8h (Sprint 8, story 1)</p>
+<p><strong>Dependencies:</strong> Story 1.4</p>
+<h4 id="story-3-3-combined-evaluation-report-endpoint">Story 3.3: Combined Evaluation Report Endpoint</h4>
+<p><strong>Repo:</strong> EDGARMiner (backend)</p>
+<p><strong>Description:</strong> As a user, I want a single API call that returns the full evaluation: financial summary + Feroldi score + both DCF valuations + buy/pass/watch recommendation.</p>
+<p><strong>Recommendation Logic:</strong></p>
+<ul>
+<li><strong>BUY:</strong> Feroldi score >= 8 AND current price < lower of the two fair values at 35% margin</li>
+<li><strong>WATCH:</strong> Feroldi score >= 5 AND current price within 20% of fair value</li>
+<li><strong>PASS:</strong> Everything else</li>
+</ul>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] Endpoint: <code>GET /api/evaluate/{symbol}</code> returns complete evaluation</li>
+<li>[ ] Response includes: financial summary, Feroldi score, health check, P/E DCF result, Gordon Growth result, recommendation (BUY/WATCH/PASS) with explanation</li>
+<li>[ ] Default parameters used unless overridden via query params</li>
+<li>[ ] Integration test for full evaluation flow</li>
+</ul>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Create <code>EvaluationResult</code> composite model [2h]</li>
+<li>Create <code>EvaluationService</code> orchestrating all sub-services [3h]</li>
+<li>Implement recommendation logic [2h]</li>
+<li>Create controller endpoint [1.5h]</li>
+<li>Integration test [2.5h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 11h (Sprint 8, story 2)</p>
+<p><strong>Dependencies:</strong> Stories 2.1, 3.1, 3.2</p>
+<hr>
+<h2 id="phase-4-ui-evaluation-dashboard-sprints-9-11">Phase 4: UI -- Evaluation Dashboard (Sprints 9-11)</h2>
+<p><strong>Goal:</strong> Build the frontend that makes the backend usable. One page, one workflow: enter ticker, see everything.</p>
+<h3 id="epic-company-evaluation-dashboard">Epic: Company Evaluation Dashboard</h3>
+<p><strong>Design principle:</strong> Single-page evaluation view. No navigation maze. Enter ticker at top, results cascade below. Think "TurboTax for stock evaluation" -- guided, opinionated, clear.</p>
+<h4 id="story-4-1-migrate-to-vite-typescript-foundation">Story 4.1: Migrate to Vite + TypeScript Foundation</h4>
+<p><strong>Repo:</strong> edgar-miner-ui (frontend)</p>
+<p><strong>Description:</strong> As a developer, I want the frontend on a modern, maintained build tool with TypeScript support so that new components have type safety and builds are fast.</p>
+<p><strong>Why now (not deferred):</strong> Every Phase 4 component will be written in TypeScript. Starting the migration BEFORE building new components avoids rewriting them later. Existing JS files keep working -- Vite handles mixed JS/TS.</p>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] CRA replaced with Vite 5+</li>
+<li>[ ] TypeScript configured (strict mode for new files, loose for existing JS)</li>
+<li>[ ] All existing JS components still work without modification</li>
+<li>[ ] New files use <code>.tsx</code> / <code>.ts</code> extension</li>
+<li>[ ] Build and dev server work</li>
+<li>[ ] <code>tsconfig.json</code> with path aliases configured</li>
+</ul>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Initialize Vite project structure alongside existing code [2h]</li>
+<li>Move source files to Vite structure [2h]</li>
+<li>Configure TypeScript (tsconfig.json with <code>allowJs: true</code>) [1h]</li>
+<li>Update build scripts in package.json [1h]</li>
+<li>Remove CRA dependencies (react-scripts) [1h]</li>
+<li>Verify all existing functionality works [2h]</li>
+<li>Update CI/CD if applicable [1h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 10h (Sprint 9, story 1)</p>
+<p><strong>Dependencies:</strong> None (frontend-only)</p>
+<p><strong>Frontend issues addressed:</strong> Part of audit recommendation CEO-TECH-01</p>
+<h4 id="story-4-2-ticker-evaluation-page-layout-search">Story 4.2: Ticker Evaluation Page -- Layout & Search</h4>
+<p><strong>Repo:</strong> edgar-miner-ui (frontend)</p>
+<p><strong>Description:</strong> As a value investor, I want to enter a ticker symbol and trigger a full evaluation, seeing results organized in clear sections.</p>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] New page/route: <code>/evaluate</code> (or make it the home page)</li>
+<li>[ ] Ticker input at top with search-as-you-type (existing search component reused)</li>
+<li>[ ] On ticker selection, calls <code>GET /api/evaluate/{symbol}</code></li>
+<li>[ ] Loading state while fetching</li>
+<li>[ ] Error handling for invalid tickers or API failures</li>
+<li>[ ] Layout skeleton: sections for Summary, Feroldi Score, DCF, Recommendation</li>
+</ul>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Create <code>EvaluationPage.tsx</code> with layout structure [3h]</li>
+<li>Create <code>TickerSearch.tsx</code> component (adapt from existing search) [2h]</li>
+<li>Create <code>useEvaluation</code> hook calling the evaluate endpoint [2h]</li>
+<li>Add TypeScript types for the evaluation API response [2h]</li>
+<li>Loading and error states [1.5h]</li>
+<li>Route configuration [0.5h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 11h (Sprint 9, story 2)</p>
+<p><strong>Dependencies:</strong> Story 3.3 (evaluate endpoint)</p>
+<p><strong>Frontend issues addressed:</strong> #53 (Ticker Search), #54 (Dashboard Layout) -- adapted</p>
+<h4 id="story-4-3-financial-summary-section">Story 4.3: Financial Summary Section</h4>
+<p><strong>Repo:</strong> edgar-miner-ui (frontend)</p>
+<p><strong>Description:</strong> As a value investor, I want to see key financial metrics displayed in a clear, scannable format with trend indicators.</p>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] Key metrics cards: Revenue, Net Income, EPS, FCF, Gross Margin, Operating Margin, ROE, Current Ratio, Debt/Equity</li>
+<li>[ ] Each card shows: latest value, 5-year trend direction (up/down/flat arrow), 5-year CAGR</li>
+<li>[ ] Revenue and FCF trend mini-charts (sparklines)</li>
+<li>[ ] Color coding: green for improving, red for deteriorating, gray for stable</li>
+<li>[ ] All values properly formatted (currency, percentage, ratios)</li>
+</ul>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Create <code>MetricCard.tsx</code> reusable component [3h]</li>
+<li>Create <code>FinancialSummarySection.tsx</code> with metric card grid [3h]</li>
+<li>Create <code>SparklineChart.tsx</code> using a lightweight chart lib (recharts or similar) [3h]</li>
+<li>Number formatting utilities (currency, pct, ratio) [2h]</li>
+<li>Trend calculation logic (direction + color) [1.5h]</li>
+<li>Responsive layout (desktop-first, readable on tablet) [1.5h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 14h (Sprint 10, primary story)</p>
+<p><strong>Dependencies:</strong> Story 4.2</p>
+<p><strong>Frontend issues addressed:</strong> #46 (Revenue Chart), #47 (FCF Chart), #48 (Profit Margins Chart), #49 (Key Metrics Cards)</p>
+<h4 id="story-4-4-feroldi-score-display">Story 4.4: Feroldi Score Display</h4>
+<p><strong>Repo:</strong> edgar-miner-ui (frontend)</p>
+<p><strong>Description:</strong> As a value investor, I want to see the Feroldi Quality Score as a visual checklist with pass/fail indicators and the overall score prominently displayed.</p>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] Large score display at top (e.g., "9/13 -- Good")</li>
+<li>[ ] Quality tier badge with color (Excellent=green, Good=blue, Fair=yellow, Poor=red)</li>
+<li>[ ] 13-item checklist with pass/fail icons</li>
+<li>[ ] Each item shows: criterion name, threshold, actual value, pass/fail</li>
+<li>[ ] Expanding detail on click (optional -- simple tooltip OK)</li>
+</ul>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Create <code>FeroldiScoreSection.tsx</code> with score header [2h]</li>
+<li>Create <code>CriterionRow.tsx</code> for individual checklist items [2h]</li>
+<li>Create <code>QualityTierBadge.tsx</code> component [1h]</li>
+<li>Style the checklist (pass=green check, fail=red X) [1.5h]</li>
+<li>TypeScript types for Feroldi API response [1h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 7.5h (Sprint 10, secondary story)</p>
+<p><strong>Dependencies:</strong> Story 4.2</p>
+<h4 id="story-4-5-dcf-valuation-display-recommendation">Story 4.5: DCF Valuation Display & Recommendation</h4>
+<p><strong>Repo:</strong> edgar-miner-ui (frontend)</p>
+<p><strong>Description:</strong> As a value investor, I want to see both DCF valuations side-by-side with buy prices at different margins of safety, plus the final buy/pass/watch recommendation.</p>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] Two-column layout: P/E DCF (left) + Gordon Growth (right)</li>
+<li>[ ] Each shows: fair value, current price, margin of safety %, buy prices at 35/45/55/65%</li>
+<li>[ ] Visual price bar: current price position relative to fair value and buy prices</li>
+<li>[ ] Editable inputs: growth rate, discount rate, terminal P/E -- recalculates on change</li>
+<li>[ ] Prominent recommendation banner: BUY (green), WATCH (amber), PASS (red)</li>
+<li>[ ] Recommendation includes 1-sentence explanation</li>
+</ul>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Create <code>DcfSection.tsx</code> with two-column layout [3h]</li>
+<li>Create <code>DcfCard.tsx</code> for individual method display [3h]</li>
+<li>Create <code>PriceBar.tsx</code> visual component [3h]</li>
+<li>Create editable parameter inputs with re-fetch logic [3h]</li>
+<li>Create <code>RecommendationBanner.tsx</code> component [2h]</li>
+<li>TypeScript types for DCF API responses [1h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 15h (Sprint 11)</p>
+<p><strong>Dependencies:</strong> Stories 4.2, 3.1, 3.2</p>
+<p><strong>Frontend issues addressed:</strong> #50 (P/E Fair Value)</p>
+<hr>
+<h2 id="phase-5-polish-self-use-sprint-12">Phase 5: Polish & Self-Use (Sprint 12)</h2>
+<p><strong>Goal:</strong> Use the tool for 5 real company evaluations. Fix what breaks.</p>
+<h4 id="story-5-1-real-world-testing-bug-fixes">Story 5.1: Real-World Testing & Bug Fixes</h4>
+<p><strong>Repo:</strong> Both</p>
+<p><strong>Description:</strong> Evaluate 5 real companies (AAPL, MSFT, GOOGL, META, KO) end-to-end. Document and fix issues.</p>
+<p><strong>Acceptance Criteria:</strong></p>
+<ul>
+<li>[ ] All 5 companies produce complete evaluations without errors</li>
+<li>[ ] Results manually verified against Google Sheets for at least 2 companies</li>
+<li>[ ] All bugs found during testing are fixed</li>
+<li>[ ] Performance is acceptable (< 10 seconds for full evaluation)</li>
+</ul>
+<p><strong>Sub-tasks:</strong></p>
+<ol>
+<li>Test each of the 5 companies, document discrepancies [5h]</li>
+<li>Fix data extraction bugs (GAAP taxonomy edge cases) [5h]</li>
+<li>Fix calculation bugs (verify against spreadsheet) [3h]</li>
+<li>Fix UI display issues [3h]</li>
+<li>Performance tuning if needed (caching, parallel API calls) [2h]</li>
+</ol>
+<p><strong>Estimated total:</strong> 18h (Sprint 12)</p>
+<p><strong>Dependencies:</strong> All previous stories</p>
+<hr>
+<h2 id="dependency-graph">Dependency Graph</h2>
+<pre><code class="lang-">
+Phase 0:
+  Story 0.1 (API Key Proxy) ────────────────────────┐
+  Story 0.2 (Dead Code Cleanup) ─── independent      │
+                                                      v
+Phase 1:                                         [All Phase 2+
+  Story 1.1 (Income Statement) ──┐                need proxy]
+  Story 1.2 (Balance Sheet) ─────┤
+  Story 1.3 (Cash Flow) ─────────┤
+                                  v
+  Story 1.4 (Summary API) ───────────────────────────┐
+                                                      v
+Phase 2:                                         [Scoring needs
+  Story 2.1 (Feroldi Score) ──┐                  Summary API]
+  Story 2.2 (Health Check) ───┘─── (2.2 depends on 2.1)
+                                  │
+Phase 3:                          v
+  Story 3.1 (P/E DCF) ───────────┤ (needs 1.4)
+  Story 3.2 (Gordon Growth) ─────┤ (needs 1.4)
+                                  v
+  Story 3.3 (Combined Eval) ─────────────────────────┐
+                                                      v
+Phase 4:                                         [UI needs
+  Story 4.1 (Vite + TS) ──── independent, start     backend]
+  Story 4.2 (Eval Page) ────── depends on 4.1 + 3.3
+  Story 4.3 (Fin Summary) ──── depends on 4.2
+  Story 4.4 (Feroldi UI) ───── depends on 4.2
+  Story 4.5 (DCF + Rec UI) ── depends on 4.2
+                                  │
+Phase 5:                          v
+  Story 5.1 (Polish) ───── depends on ALL above
+</code></pre>
+<p><strong>Critical path:</strong> 0.1 -> 1.1 -> 1.4 -> 2.1 -> 3.3 -> 4.2 -> 4.5 -> 5.1</p>
+<p><strong>Parallel opportunities:</strong></p>
+<ul>
+<li>Stories 1.1, 1.2, 1.3 can be done in parallel (same sprint)</li>
+<li>Stories 3.1 and 3.2 can be done in parallel</li>
+<li>Story 4.1 (Vite migration) can start while Phase 3 backend work is finishing</li>
+<li>Stories 4.3, 4.4, 4.5 are parallel once 4.2 is done (but budget says sequential)</li>
+</ul>
+<hr>
+<h2 id="sprint-plan-2-week-sprints-20h-each">Sprint Plan (2-week sprints, 20h each)</h2>
+<div class="table-wrap"><table><thead>
+<tr><th>Sprint</th><th>Stories</th><th>Hours</th><th>Backend/Frontend</th></tr>
+</thead><tbody>
+<tr><td>1</td><td>0.1, 0.2</td><td>15h</td><td>Backend + Frontend</td></tr>
+<tr><td>2</td><td>1.1</td><td>16h</td><td>Backend</td></tr>
+<tr><td>3</td><td>1.2, 1.3</td><td>21h</td><td>Backend</td></tr>
+<tr><td>4</td><td>1.4</td><td>16h</td><td>Backend</td></tr>
+<tr><td>5</td><td>2.1 (part 1: criteria 1-7)</td><td>16h</td><td>Backend</td></tr>
+<tr><td>6</td><td>2.1 (part 2: criteria 8-13 + tests), 2.2</td><td>17h</td><td>Backend</td></tr>
+<tr><td>7</td><td>3.1</td><td>14.5h</td><td>Backend</td></tr>
+<tr><td>8</td><td>3.2, 3.3</td><td>19h</td><td>Backend</td></tr>
+<tr><td>9</td><td>4.1, 4.2</td><td>21h</td><td>Frontend</td></tr>
+<tr><td>10</td><td>4.3, 4.4</td><td>21.5h</td><td>Frontend</td></tr>
+<tr><td>11</td><td>4.5</td><td>15h</td><td>Frontend</td></tr>
+<tr><td>12</td><td>5.1</td><td>18h</td><td>Both</td></tr>
+</tbody></table></div>
+<p><strong>Total estimated: ~210h across 12 sprints (24 weeks)</strong></p>
+<p>Note: Sprint 3 is slightly over 20h. Move integration tests from Story 1.3 to Sprint 4 if needed.</p>
+<hr>
+<h2 id="milestones">Milestones</h2>
+<div class="table-wrap"><table><thead>
+<tr><th>Date (approx)</th><th>Milestone</th><th>Validation</th></tr>
+</thead><tbody>
+<tr><td>End Sprint 1 (~late Mar)</td><td>Security fixed, no API key in frontend</td><td><code>grep -r "FMP" client/src/</code> returns no keys</td></tr>
+<tr><td>End Sprint 4 (~late May)</td><td>Backend returns all 20 metrics</td><td><code>GET /api/edgar/summary/AAPL</code> returns full data</td></tr>
+<tr><td>End Sprint 6 (~late Jun)</td><td>Feroldi score works</td><td><code>GET /api/scoring/feroldi/AAPL</code> returns 13 criteria</td></tr>
+<tr><td>End Sprint 8 (~late Jul)</td><td>Full evaluation works</td><td><code>GET /api/evaluate/AAPL</code> returns complete result</td></tr>
+<tr><td>End Sprint 11 (~early Sep)</td><td>UI displays everything</td><td>Open browser, type AAPL, see full evaluation</td></tr>
+<tr><td>End Sprint 12 (~mid Sep)</td><td>V0.1 shipped</td><td>Used for 5 real evaluations, matches Google Sheets</td></tr>
+</tbody></table></div>
+<p><strong>Hard deadline (CEO-RSK-01 mitigation):</strong> If V0.1 is not usable by end of September 2026, stop and evaluate whether to continue or switch to Koyfin/GuruFocus.</p>
+<hr>
+<h2 id="github-issue-creation-plan">GitHub Issue Creation Plan</h2>
+<h3 id="what-to-do-with-existing-issues">What to do with existing issues</h3>
+<p><strong>Backend (EDGARMiner):</strong></p>
+<ul>
+<li>Issues #7-#27 (individual metrics): Close with comment linking to the new Stories 1.1-1.3 that batch them. These per-metric issues are too granular for efficient execution.</li>
+<li>Issues #28-#41 (calculated metrics): Close with comment linking to Stories 1.4 (derived metrics) and 2.1 (Feroldi criteria).</li>
+</ul>
+<p><strong>Frontend (edgar-miner-ui):</strong></p>
+<ul>
+<li>Issues #13-#33 (old dashboard/card/snapshot design): Close. The new evaluation-first design supersedes the card-based dashboard approach.</li>
+<li>Issues #44-#54 (Phase 1 Dashboard Epic): Close #44 epic. Individual issues (#45-#54) are partially addressed by Phase 4 stories.</li>
+</ul>
+<p><strong>Rationale:</strong> The audit fundamentally changed the product direction from "dashboard with cards and progression tracking" to "single evaluation workflow." Keeping 80+ stale issues creates confusion. Fresh issues aligned to the new plan.</p>
+<h3 id="new-issue-structure">New Issue Structure</h3>
+<p><strong>Backend repo (EDGARMiner):</strong></p>
+<div class="table-wrap"><table><thead>
+<tr><th>Type</th><th>Title</th><th>Labels</th><th>Sprint</th></tr>
+</thead><tbody>
+<tr><td>Epic</td><td>V0.1: Personal Investment Evaluation Tool</td><td><code>epic</code>, <code>v0.1</code></td><td>1-12</td></tr>
+<tr><td>Story</td><td>Move FMP API key to backend proxy</td><td><code>security</code>, <code>P0-critical</code>, <code>sprint-1</code></td><td>1</td></tr>
+<tr><td>Story</td><td>Remove dead code (Azure Functions, WeatherForecast)</td><td><code>cleanup</code>, <code>sprint-1</code></td><td>1</td></tr>
+<tr><td>Story</td><td>Income Statement metrics extraction (GP, NI, EPS, Shares)</td><td><code>data-engine</code>, <code>sprint-2</code></td><td>2</td></tr>
+<tr><td>Story</td><td>Balance Sheet metrics extraction (Assets, Liabilities, Equity, Debt)</td><td><code>data-engine</code>, <code>sprint-3</code></td><td>3</td></tr>
+<tr><td>Story</td><td>Cash Flow metrics extraction (CFO, CapEx, Dividends, Buybacks)</td><td><code>data-engine</code>, <code>sprint-3</code></td><td>3</td></tr>
+<tr><td>Story</td><td>Unified Financial Summary API endpoint</td><td><code>data-engine</code>, <code>API</code>, <code>sprint-4</code></td><td>4</td></tr>
+<tr><td>Story</td><td>Feroldi Quality Score calculation engine</td><td><code>scoring</code>, <code>core-feature</code>, <code>sprint-5-6</code></td><td>5-6</td></tr>
+<tr><td>Story</td><td>Financial Health Checklist service</td><td><code>scoring</code>, <code>sprint-6</code></td><td>6</td></tr>
+<tr><td>Story</td><td>P/E Multiple DCF valuation calculator</td><td><code>valuation</code>, <code>core-feature</code>, <code>sprint-7</code></td><td>7</td></tr>
+<tr><td>Story</td><td>Gordon Growth Model DCF valuation calculator</td><td><code>valuation</code>, <code>sprint-8</code></td><td>8</td></tr>
+<tr><td>Story</td><td>Combined Evaluation Report endpoint</td><td><code>evaluation</code>, <code>API</code>, <code>core-feature</code>, <code>sprint-8</code></td><td>8</td></tr>
+</tbody></table></div>
+<p><strong>Frontend repo (edgar-miner-ui):</strong></p>
+<div class="table-wrap"><table><thead>
+<tr><th>Type</th><th>Title</th><th>Labels</th><th>Sprint</th></tr>
+</thead><tbody>
+<tr><td>Epic</td><td>V0.1: Evaluation Dashboard</td><td><code>epic</code>, <code>v0.1</code></td><td>9-12</td></tr>
+<tr><td>Story</td><td>Migrate from CRA to Vite + TypeScript foundation</td><td><code>infrastructure</code>, <code>sprint-9</code></td><td>9</td></tr>
+<tr><td>Story</td><td>Evaluation page layout with ticker search</td><td><code>UI</code>, <code>core-feature</code>, <code>sprint-9</code></td><td>9</td></tr>
+<tr><td>Story</td><td>Financial Summary section with metric cards and sparklines</td><td><code>UI</code>, <code>component</code>, <code>sprint-10</code></td><td>10</td></tr>
+<tr><td>Story</td><td>Feroldi Quality Score display with checklist</td><td><code>UI</code>, <code>component</code>, <code>sprint-10</code></td><td>10</td></tr>
+<tr><td>Story</td><td>DCF valuation display with recommendation banner</td><td><code>UI</code>, <code>component</code>, <code>core-feature</code>, <code>sprint-11</code></td><td>11</td></tr>
+<tr><td>Story</td><td>V0.1 real-world testing and bug fixes</td><td><code>QA</code>, <code>polish</code>, <code>sprint-12</code></td><td>12</td></tr>
+</tbody></table></div>
+<hr>
+<h2 id="risks-mitigations">Risks & Mitigations</h2>
+<div class="table-wrap"><table><thead>
+<tr><th>#</th><th>Risk</th><th>Probability</th><th>Impact</th><th>Mitigation</th></tr>
+</thead><tbody>
+<tr><td>1</td><td>SEC EDGAR XBRL taxonomy inconsistencies across companies</td><td>HIGH</td><td>HIGH</td><td>Test against 10+ companies with different reporting patterns. Build fallback logic for missing metrics.</td></tr>
+<tr><td>2</td><td>GAAP variant proliferation (7+ ways to report Revenue)</td><td>HIGH</td><td>MEDIUM</td><td>Already handled for Revenue. Apply same multi-variant pattern to all metrics.</td></tr>
+<tr><td>3</td><td>Feroldi score thresholds may not match user's exact spreadsheet</td><td>MEDIUM</td><td>LOW</td><td>Verify against user's spreadsheet for 3 companies. Make thresholds configurable.</td></tr>
+<tr><td>4</td><td>Vite migration breaks existing functionality</td><td>LOW</td><td>MEDIUM</td><td>Vite supports JS/TS mixed mode. Existing JS files do not need changes. Test thoroughly before adding new TS code.</td></tr>
+<tr><td>5</td><td>Scope creep into portfolio tracking or comparison features</td><td>HIGH</td><td>HIGH</td><td>This plan explicitly defers those features. Resist the urge. Ship V0.1 first.</td></tr>
+<tr><td>6</td><td>Burnout from 6-month solo development</td><td>MEDIUM</td><td>CRITICAL</td><td>10h/week hard cap. Each sprint delivers something testable. Take breaks between phases.</td></tr>
+<tr><td>7</td><td>AI tools make the project obsolete before V0.1 ships</td><td>LOW</td><td>HIGH</td><td>The structured, repeatable, auditable nature of a dedicated tool has value over ad-hoc AI queries. But the hard deadline exists for a reason.</td></tr>
+</tbody></table></div>
+<hr>
+<h2 id="what-this-plan-does-not-include-explicitly-deferred">What This Plan Does NOT Include (Explicitly Deferred)</h2>
+<ol>
+<li><strong>Authentication</strong> -- personal tool, runs on localhost</li>
+<li><strong>Database migration</strong> -- file cache is fine for one user</li>
+<li><strong>Portfolio tracking</strong> -- V2 feature, only after V0.1 is daily-driven</li>
+<li><strong>Company comparison</strong> -- V2 feature</li>
+<li><strong>Alerts and notifications</strong> -- V2 feature</li>
+<li><strong>Report export / PDF</strong> -- V2 feature</li>
+<li><strong>Anti-Fragile Checklist</strong> -- V2 (many items are qualitative/subjective, hard to automate)</li>
+<li><strong>Mentor's Checklist</strong> -- V2 (same reason as above)</li>
+<li><strong>Azure deployment</strong> -- run locally until there is a reason to deploy</li>
+<li><strong>Mobile responsive design</strong> -- desktop only for personal use</li>
+</ol>
+<hr>
+<h2 id="success-criteria-v0-1-done">Success Criteria (V0.1 = Done)</h2>
+<ol>
+<li>Enter any S&P 500 ticker</li>
+<li>See complete financial summary (5 years of data)</li>
+<li>See automated Feroldi Quality Score (13 criteria, auto-evaluated)</li>
+<li>See two DCF valuations with buy prices</li>
+<li>See clear BUY / WATCH / PASS recommendation</li>
+<li>Results match Google Sheets calculations within 5% tolerance</li>
+<li>Full evaluation completes in under 10 seconds</li>
+<li>No API keys exposed in frontend code</li>
+</ol>
+<p><strong>When all 8 criteria are met, V0.1 is shipped. Use it for 3 months. Then decide what is next.</strong></p>
+<hr>
+<p><em>Plan generated by solution-designer agent based on CEO Strategic Audit (27.9/100) and codebase analysis of EDGARMiner (.NET 8.0) + edgar-miner-ui (React 19).</em></p>
+</section>
+<hr>
+
+<footer style="text-align:center;color:var(--muted);font-size:0.85em;margin-top:3em;padding:1em 0;">
+Generated 2026-03-12
+</footer>
+</body>
+</html>
