@@ -120,114 +120,104 @@ export function WatchlistCard({
     onSelect(ticker);
   };
 
-  const handleCardKeyDown = (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onSelect(ticker);
-    }
-  };
-
-  const handleRemoveClick = (event) => {
-    event.stopPropagation();
+  const handleRemoveClick = () => {
     onRemove(ticker);
-  };
-
-  const handleRemoveKeyDown = (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      event.stopPropagation();
-      onRemove(ticker);
-    }
   };
 
   return (
     <div
       className="card watchlist-card"
       data-testid="watchlist-card"
-      role="button"
-      tabIndex={0}
-      onClick={handleCardClick}
-      onKeyDown={handleCardKeyDown}
-      aria-label={`${ticker} ${companyName}`}
+      role="group"
+      aria-label={`${ticker} - ${companyName}`}
       style={style}
     >
-      {/* Header: ticker badge, company name, remove button */}
-      <div className="watchlist-card__header">
-        <span className="watchlist-card__ticker" data-testid="watchlist-ticker-badge">
-          {ticker}
-        </span>
-        <span className="watchlist-card__name" title={companyName}>
-          {companyName}
-        </span>
-        <button
-          className="watchlist-card__remove"
-          type="button"
-          onClick={handleRemoveClick}
-          onKeyDown={handleRemoveKeyDown}
-          aria-label={`Remove ${ticker} from watchlist`}
-          data-testid="watchlist-remove-btn"
+      {/* Select button wraps all card content */}
+      <button
+        className="watchlist-card__select"
+        type="button"
+        onClick={handleCardClick}
+        data-testid="watchlist-card-select"
+      >
+        {/* Header: ticker badge and company name */}
+        <div className="watchlist-card__header">
+          <span className="watchlist-card__ticker" data-testid="watchlist-ticker-badge">
+            {ticker}
+          </span>
+          <span className="watchlist-card__name" title={companyName}>
+            {companyName}
+          </span>
+        </div>
+
+        {/* Body: price and change */}
+        <div className="watchlist-card__body">
+          {loading ? (
+            <div className="watchlist-card__shimmer-group" data-testid="watchlist-shimmer">
+              <div className="watchlist-card__shimmer watchlist-card__shimmer--price" />
+              <div className="watchlist-card__shimmer watchlist-card__shimmer--change" />
+            </div>
+          ) : (
+            <>
+              <span
+                className="watchlist-card__price"
+                data-testid="watchlist-price"
+                aria-label={price !== null ? `Stock price ${formatPrice(price)}` : 'Price unavailable'}
+              >
+                {formatPrice(price)}
+              </span>
+              <span
+                className={`watchlist-card__change watchlist-card__change--${trend}`}
+                data-testid="watchlist-change"
+                role="img"
+                aria-label={
+                  change !== null
+                    ? `Change ${formatChange(change)}`
+                    : 'Change unavailable'
+                }
+              >
+                {change !== null && (
+                  <span className="watchlist-card__arrow" aria-hidden="true">
+                    {trend === 'up' ? '\u25B2' : trend === 'down' ? '\u25BC' : '\u2014'}
+                  </span>
+                )}
+                {formatChange(change)}
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* Footer: timestamp */}
+        <div className="watchlist-card__footer">
+          <span className="watchlist-card__timestamp" data-testid="watchlist-timestamp">
+            Updated {formatTimeAgo(addedAt)}
+          </span>
+        </div>
+      </button>
+
+      {/* Remove button — sibling of select button */}
+      <button
+        className="watchlist-card__remove"
+        type="button"
+        onClick={handleRemoveClick}
+        aria-label={`Remove ${ticker} from watchlist`}
+        data-testid="watchlist-remove-btn"
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 14 14"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
         >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
-            <path
-              d="M1 1L13 13M1 13L13 1"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
-      </div>
-
-      {/* Body: price and change */}
-      <div className="watchlist-card__body">
-        {loading ? (
-          <div className="watchlist-card__shimmer-group" data-testid="watchlist-shimmer">
-            <div className="watchlist-card__shimmer watchlist-card__shimmer--price" />
-            <div className="watchlist-card__shimmer watchlist-card__shimmer--change" />
-          </div>
-        ) : (
-          <>
-            <span
-              className="watchlist-card__price"
-              data-testid="watchlist-price"
-              aria-label={price !== null ? `Stock price ${formatPrice(price)}` : 'Price unavailable'}
-            >
-              {formatPrice(price)}
-            </span>
-            <span
-              className={`watchlist-card__change watchlist-card__change--${trend}`}
-              data-testid="watchlist-change"
-              role="img"
-              aria-label={
-                change !== null
-                  ? `Change ${formatChange(change)}`
-                  : 'Change unavailable'
-              }
-            >
-              {change !== null && (
-                <span className="watchlist-card__arrow" aria-hidden="true">
-                  {trend === 'up' ? '\u25B2' : trend === 'down' ? '\u25BC' : '\u2014'}
-                </span>
-              )}
-              {formatChange(change)}
-            </span>
-          </>
-        )}
-      </div>
-
-      {/* Footer: timestamp */}
-      <div className="watchlist-card__footer">
-        <span className="watchlist-card__timestamp" data-testid="watchlist-timestamp">
-          Updated {formatTimeAgo(addedAt)}
-        </span>
-      </div>
+          <path
+            d="M1 1L13 13M1 13L13 1"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+      </button>
     </div>
   );
 }
