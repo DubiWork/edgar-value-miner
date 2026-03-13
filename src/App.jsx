@@ -69,7 +69,7 @@ function App() {
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <div className="flex items-center space-x-2">
-              <Gem className="h-8 w-8 text-brand-500" />
+              <Gem className="h-8 w-8 text-brand-500" aria-hidden="true" />
               <span
                 className="text-xl font-bold"
                 style={{ color: 'var(--color-text-primary)' }}
@@ -99,7 +99,7 @@ function App() {
         {/* Welcome State (no data loaded, not loading, no error) */}
         {!data && !loading && !error && (
           <div className="text-center py-16" data-testid="welcome-state">
-            <Gem className="h-20 w-20 text-brand-500 mx-auto mb-6" />
+            <Gem className="h-20 w-20 text-brand-500 mx-auto mb-6" aria-hidden="true" />
             <h1
               className="text-4xl font-bold mb-4"
               style={{ color: 'var(--color-text-primary)' }}
@@ -146,6 +146,7 @@ function App() {
                     <TrendingUp
                       className="h-6 w-6"
                       style={{ color: 'var(--color-success)' }}
+                      aria-hidden="true"
                     />
                   </div>
                   <h3
@@ -172,6 +173,7 @@ function App() {
                     <DollarSign
                       className="h-6 w-6"
                       style={{ color: 'var(--color-accent)' }}
+                      aria-hidden="true"
                     />
                   </div>
                   <h3
@@ -198,6 +200,7 @@ function App() {
                     <BarChart3
                       className="h-6 w-6"
                       style={{ color: 'var(--color-info)' }}
+                      aria-hidden="true"
                     />
                   </div>
                   <h3

@@ -48,7 +48,7 @@ function SuggestionItem({ item, index, isHighlighted, onSelect, type, idPrefix }
     >
       <div className="flex items-center gap-3 min-w-0">
         {type === 'recent' && (
-          <Clock className="h-4 w-4 text-gray-400 dark:text-gray-500 shrink-0" />
+          <Clock className="h-4 w-4 text-gray-400 dark:text-gray-500 shrink-0" aria-hidden="true" />
         )}
         <span className="font-semibold text-sm shrink-0">{item.ticker}</span>
         <span className="text-gray-500 dark:text-gray-400 text-sm truncate">
@@ -388,7 +388,7 @@ export function TickerSearch({
               className={clearBtnClasses}
               data-testid="ticker-search-clear"
             >
-              <X className={isHero ? 'h-5 w-5' : 'h-4 w-4'} />
+              <X className={isHero ? 'h-5 w-5' : 'h-4 w-4'} aria-hidden="true" />
             </button>
           )}
         </div>
