@@ -57,6 +57,8 @@ function App() {
       className="min-h-screen transition-colors duration-200"
       style={{ backgroundColor: 'var(--color-bg-primary)' }}
     >
+      <a href="#main-content" className="skip-link">Skip to main content</a>
+
       {/* Header */}
       <header
         className="border-b"
@@ -95,7 +97,7 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome State (no data loaded, not loading, no error) */}
         {!data && !loading && !error && (
           <div className="text-center py-16" data-testid="welcome-state">

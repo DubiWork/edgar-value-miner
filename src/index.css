@@ -176,6 +176,25 @@
 }
 
 /* =================================================================
+   Skip Navigation Link
+   ================================================================= */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  padding: 8px 16px;
+  z-index: 100;
+  transition: top 0.2s;
+}
+.skip-link:focus {
+  top: 0;
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* =================================================================
    Theme Toggle Animation
    ================================================================= */
 .theme-toggle-icon {
