@@ -208,6 +208,20 @@
 }
 
 /* =================================================================
+   Reduced Motion: Disable all CSS animations
+   ================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin,
+  .animate-pulse,
+  .animate-bounce,
+  [class*="animate-shimmer"],
+  [style*="animation"] {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* =================================================================
    Shimmer Animation Keyframes
    ================================================================= */
 @keyframes shimmer {

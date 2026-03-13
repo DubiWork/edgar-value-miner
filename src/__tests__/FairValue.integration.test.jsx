@@ -118,6 +118,7 @@ vi.mock('../components/Dashboard', () => ({
   ChartContainer: ({ title, children }) => (
     <div data-testid={`chart-container-${title}`}>{children}</div>
   ),
+  RevenueChart: () => <div data-testid="revenue-chart" />,
   FCFChart: () => <div data-testid="fcf-chart" />,
   MarginsChart: () => <div data-testid="margins-chart" />,
   ValuationPanel: ({ eps, currentPrice, companyName, loading: vpLoading }) => (

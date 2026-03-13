@@ -7,6 +7,7 @@ import {
   CompanyBanner,
   MetricCard,
   ChartContainer,
+  RevenueChart,
   FCFChart,
   MarginsChart,
   ValuationPanel,
@@ -17,6 +18,7 @@ import { useCompanySearch } from './hooks/useCompanySearch'
 import { useStockQuote } from './hooks/useStockQuote'
 import { useKeyMetrics } from './hooks/useKeyMetrics'
 import { useWatchlist } from './hooks/useWatchlist'
+import { useReducedMotion } from './hooks/useReducedMotion'
 import gaapNormalizer from './utils/gaapNormalizer'
 import { calculateMargins } from './utils/calculateMargins'
 
@@ -28,6 +30,9 @@ function App() {
 
   // Watchlist state
   const { watchlist, addToWatchlist, removeFromWatchlist, isInWatchlist, isFull } = useWatchlist()
+
+  // Disable JS-driven chart animations when the user prefers reduced motion
+  const prefersReducedMotion = useReducedMotion()
 
   const handleSearch = (ticker) => {
     searchCompany(ticker)
@@ -265,19 +270,17 @@ function App() {
             ))}
             heroChart={
               <ChartContainer title="Revenue" loading={false}>
-                <div
-                  className="flex items-center justify-center h-full"
-                  style={{ color: 'var(--color-text-muted)' }}
-                >
-                  Chart placeholder — Recharts integration coming in Issue #5
-                </div>
+                <RevenueChart
+                  data={data?.metrics?.revenue?.annual}
+                  animationDisabled={prefersReducedMotion}
+                />
               </ChartContainer>
             }
             secondaryCharts={[
               <ChartContainer key="fcf-chart" title="Free Cash Flow" loading={false}>
                 <FCFChart
                   data={data?.metrics?.freeCashFlow?.annual}
-                  animationDisabled={false}
+                  animationDisabled={prefersReducedMotion}
                 />
               </ChartContainer>,
               <ChartContainer key="margins-chart" title="Margins" loading={false}>
@@ -288,7 +291,7 @@ function App() {
                     operatingIncome: data?.metrics?.operatingIncome?.annual,
                     netIncome: data?.metrics?.netIncome?.annual,
                   })}
-                  animationDisabled={false}
+                  animationDisabled={prefersReducedMotion}
                 />
               </ChartContainer>,
             ]}
