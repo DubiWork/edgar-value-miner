@@ -1,232 +1,46 @@
 {
   "version": 2,
-  "lastUpdated": "2026-03-13T15:00:00Z",
+  "lastUpdated": "2026-03-13T16:00:00Z",
   "projectConfig": {
     "owner": "DubiWork",
     "repo": "edgar-value-miner",
     "prodUrl": "https://edgar-value-miner.web.app",
     "stagingUrl": "https://edgar-value-miner-staging.web.app",
-    "ghPagesUrl": "https://dubiwork.github.io/edgar-value-miner",
-    "deployWorkflows": {
-      "staging": "deploy-staging.yml",
-      "production": "deploy-production.yml",
-      "regression": "regression.yml"
-    }
+    "ghPagesUrl": "https://dubiwork.github.io/edgar-value-miner"
   },
   "activeParentIssue": {
     "number": 129,
     "title": "Epic: Sprint 0 — Quick Wins + Accessibility Baseline (v1.1)",
     "epicBranch": "epic/129-sprint-0-accessibility",
-    "epicBranchBase": "main",
-    "epicBranchBaseCommit": "9c5497a",
     "subIssues": [130, 131, 132, 133, 134, 135],
-    "executionPlan": {
-      "createdAt": "2026-03-13T14:00:00Z",
-      "totalEstimate": "4.5h",
-      "criticalPath": "Group 0 (4 parallel) -> merge to epic -> Group 1 (2 parallel) -> merge to epic -> epic PR to main",
-      "preSprintGates": [
-        "Resolve 4 uncommitted snapshot files",
-        "Record Lighthouse Accessibility baseline",
-        "Create epic branch from main"
-      ]
-    },
-    "parallelGroups": [
-      {
-        "groupIndex": 0,
-        "group": "Story 0.1 — WCAG AA Accessibility",
-        "rationale": "Foundation layer — no dependencies. 4 issues touch different primary files, minor index.css overlap (additive, different sections).",
-        "status": "ready",
-        "issues": [
-          {
-            "number": 130,
-            "title": "#129.1: CSS Token Fixes — missing tokens + muted contrast + font-family",
-            "size": "XS",
-            "assignedAgent": "react-specialist",
-            "branch": "feature/130-css-token-fixes",
-            "targetBranch": "epic/129-sprint-0-accessibility",
-            "estimatedEffort": "30m",
-            "primaryFiles": ["src/index.css"],
-            "tasks": ["C-A01", "C-A02", "C-A03", "C-A07"],
-            "rationale": "CSS-only token additions and contrast fixes; trivial scope",
-            "status": "todo"
-          },
-          {
-            "number": 131,
-            "title": "#129.2: Skip Navigation Link",
-            "size": "XS",
-            "assignedAgent": "react-specialist",
-            "branch": "feature/131-skip-navigation",
-            "targetBranch": "epic/129-sprint-0-accessibility",
-            "estimatedEffort": "30m",
-            "primaryFiles": ["src/App.jsx", "src/index.css"],
-            "tasks": ["C-A04"],
-            "rationale": "New skip-link element in App.jsx + .skip-link CSS class; isolated change",
-            "status": "todo"
-          },
-          {
-            "number": 132,
-            "title": "#129.3: WatchlistCard Semantic div[role=group] Conversion",
-            "size": "S",
-            "assignedAgent": "react-specialist",
-            "branch": "feature/132-watchlist-semantic",
-            "targetBranch": "epic/129-sprint-0-accessibility",
-            "estimatedEffort": "1.5h",
-            "primaryFiles": ["src/components/Dashboard/WatchlistCard.jsx", "src/components/Dashboard/WatchlistCard.css", "src/components/Dashboard/__tests__/WatchlistCard.test.jsx"],
-            "tasks": ["C-A05", "C-A08", "C-A10"],
-            "rationale": "Medium complexity — JSX restructure to dual-button pattern, CSS button-reset, test updates for new structure, icon audit, badge contrast fix",
-            "status": "todo"
-          },
-          {
-            "number": 133,
-            "title": "#129.4: Reduced Motion Hook + Chart Integration",
-            "size": "XS",
-            "assignedAgent": "react-specialist",
-            "branch": "feature/133-reduced-motion",
-            "targetBranch": "epic/129-sprint-0-accessibility",
-            "estimatedEffort": "30m",
-            "primaryFiles": ["src/hooks/useReducedMotion.js", "src/index.css", "src/App.jsx"],
-            "tasks": ["C-A06"],
-            "rationale": "New useReducedMotion hook + CSS @media override + Recharts animationDisabled prop wiring",
-            "status": "todo"
-          }
-        ]
-      },
-      {
-        "groupIndex": 1,
-        "group": "Story 0.2 — Critical UX + Bug Fixes",
-        "rationale": "Blocked by Group 0 — depends on index.css token changes (font-family from C-A07). Issues within this group are parallel (different files).",
-        "status": "blocked",
-        "blockedBy": [130, 131, 132, 133],
-        "issues": [
-          {
-            "number": 134,
-            "title": "#129.5: useCompanySearch Stale Closure Fix",
-            "size": "S",
-            "assignedAgent": "react-specialist",
-            "branch": "feature/134-search-stale-closure",
-            "targetBranch": "epic/129-sprint-0-accessibility",
-            "estimatedEffort": "1h",
-            "primaryFiles": ["src/hooks/useCompanySearch.js", "src/hooks/__tests__/useCompanySearch.test.js"],
-            "tasks": ["C-U01"],
-            "rationale": "Medium complexity — TDD required: write 6+ tests first, then implement loadingRef pattern; must verify searchCompany identity stability and deduplication",
-            "status": "todo"
-          },
-          {
-            "number": 135,
-            "title": "#129.6: ErrorBoundary Wrap + Error Text Fix + Favicon",
-            "size": "XS",
-            "assignedAgent": "react-specialist",
-            "branch": "feature/135-error-boundary-favicon",
-            "targetBranch": "epic/129-sprint-0-accessibility",
-            "estimatedEffort": "30m",
-            "primaryFiles": ["src/main.jsx", "src/utils/errorTypes.js", "index.html", "public/"],
-            "tasks": ["C-U02", "C-U03", "C-U04"],
-            "rationale": "3 trivial independent changes across unrelated files",
-            "status": "todo"
-          }
-        ]
-      }
-    ],
-    "qualityGates": {
-      "perPR": [
-        "npm test -- --run (all pass)",
-        "npm run lint (0 errors, 0 warnings)",
-        "Snapshot diffs reviewed and intentionally updated",
-        "Draft PR targeting epic branch"
-      ],
-      "epicLevel": [
-        "Lighthouse Accessibility >= 90",
-        "npx playwright test (E2E smoke passes)",
-        "axe-core: 0 WCAG AA violations (both themes)",
-        "Visual spot-check light + dark themes"
-      ]
-    },
     "allSubIssuesMerged": true,
-    "prs": {
-      "130": 136, "131": 137, "132": 138, "133": 139, "134": 140, "135": 141
-    },
-    "epicPR": 142,
-    "retryCount": 0
+    "epicPR": 142
   },
-  "currentStep": "3.8",
+  "currentStep": "3.5.1",
+  "bakingEpics": [
+    {
+      "number": 129,
+      "mergedToDevelop": "2026-03-13",
+      "bakeStarted": "2026-03-13",
+      "consecutiveGreenDays": 0,
+      "status": "baking"
+    }
+  ],
+  "stagingQueue": {
+    "current": 129,
+    "queue": [],
+    "history": []
+  },
   "completedEpics": [
     {
       "number": 1,
       "title": "Epic: Phase 1 - Beautiful Data Visualization Dashboard",
       "closedAt": "2026-03-11T12:00:00Z",
-      "version": "v1.0.0",
-      "parentIssues": [3, 4, 5, 6, 7, 8, 9, 10, 11],
-      "totalSubIssues": 56,
-      "totalPRs": 35,
-      "features": [
-        "Dark theme + ThemeContext",
-        "Company search + selection (SEC EDGAR)",
-        "Dashboard grid layout (responsive)",
-        "Revenue chart (Recharts)",
-        "FCF chart with dual-color bars",
-        "Margins chart (Gross, Operating, Net)",
-        "Key metrics cards with animations",
-        "P/E Fair Value panel",
-        "Watchlist with localStorage persistence"
-      ]
+      "version": "v1.0.0"
     }
   ],
-  "stagingQueue": {
-    "current": null,
-    "queue": [],
-    "history": []
-  },
-  "bakingEpics": [],
   "groomingPipeline": {
     "queue": [],
     "current": null
-  },
-  "cdPipeline": {
-    "status": "green",
-    "lastVerified": "2026-03-11T17:40:00Z",
-    "lastFixed": "2026-03-11T12:00:00Z",
-    "branches": {
-      "main": "production (Firebase)",
-      "develop": "staging (Firebase)",
-      "gh-pages": "PR previews + epic previews"
-    }
-  },
-  "contextManagement": {
-    "lastFlush": "2026-03-13T15:00:00Z",
-    "estimatedContextUsage": "low",
-    "agentDispatchesSinceCompact": 0
-  },
-  "financials": {
-    "cashBalanceUSD": null,
-    "monthlyBurnUSD": null,
-    "runwayMonths": null,
-    "lastUpdated": null,
-    "notes": "Fill after first month of infrastructure costs"
-  },
-  "okrs": {
-    "quarter": "Q2-2026",
-    "objectives": [
-      {
-        "title": "Ship AI Bull vs Bear Debate",
-        "keyResults": [
-          "KR1: 50 users complete a full debate session",
-          "KR2: Debate-completers show 2x 7-day return rate vs non-completers",
-          "KR3: 5 free users attempt upgrade after encountering paywall"
-        ]
-      }
-    ],
-    "lastUpdated": "2026-03-13"
-  },
-  "weeklyScorecard": {
-    "metrics": [
-      "weekly_unique_users",
-      "companies_researched_per_session",
-      "watchlist_adds",
-      "seven_day_return_rate",
-      "free_to_paid_conversion",
-      "weeks_until_ai_debate"
-    ],
-    "lastReviewed": null,
-    "notes": "Start tracking after PostHog integration (Sprint 1)"
   }
 }
