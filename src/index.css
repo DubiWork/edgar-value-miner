@@ -37,7 +37,7 @@
   /* Text */
   --color-text-primary: #0f172a;
   --color-text-secondary: #475569;
-  --color-text-muted: #94a3b8;
+  --color-text-muted: #64748b;
 
   /* Borders */
   --color-border: #e2e8f0;
@@ -46,6 +46,10 @@
   /* Accent (brand) */
   --color-accent: #0ea5e9;
   --color-accent-hover: #0284c7;
+  --color-accent-text: #0369a1;
+
+  /* Star / watchlist */
+  --color-star-active: #b45309;
 
   /* Status */
   --color-success: #16a34a;
@@ -85,6 +89,10 @@
   /* Accent (brand) */
   --color-accent: #0ea5e9;
   --color-accent-hover: #38bdf8;
+  --color-accent-text: #38bdf8;
+
+  /* Star / watchlist */
+  --color-star-active: #fbbf24;
 
   /* Status */
   --color-success: #22c55e;
@@ -110,6 +118,7 @@
    ================================================================= */
 @layer base {
   body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background-color: var(--color-bg-primary);
     color: var(--color-text-primary);
     transition-property: color, background-color;
@@ -167,6 +176,25 @@
 }
 
 /* =================================================================
+   Skip Navigation Link
+   ================================================================= */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  padding: 8px 16px;
+  z-index: 100;
+  transition: top 0.2s;
+}
+.skip-link:focus {
+  top: 0;
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* =================================================================
    Theme Toggle Animation
    ================================================================= */
 .theme-toggle-icon {
@@ -176,6 +204,20 @@
 @media (prefers-reduced-motion: reduce) {
   .theme-toggle-icon {
     transition: none;
+  }
+}
+
+/* =================================================================
+   Reduced Motion: Disable all CSS animations
+   ================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin,
+  .animate-pulse,
+  .animate-bounce,
+  [class*="animate-shimmer"],
+  [style*="animation"] {
+    animation: none !important;
+    transition: none !important;
   }
 }
 

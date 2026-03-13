@@ -121,7 +121,7 @@ export const ERROR_UI_CONFIG = {
     iconColor: 'text-red-500',
     iconBg: 'bg-red-100 dark:bg-red-900/30',
     title: 'Something Went Wrong',
-    description: 'An unexpected error occurred. Our team has been notified. Please try again or return to the home page.',
+    description: 'An unexpected error occurred. Please try again or contact support if the problem persists.',
     showRetry: true,
     retryLabel: 'Try Again',
   },
