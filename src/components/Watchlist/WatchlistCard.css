@@ -8,7 +8,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-3);
-  cursor: pointer;
   animation: watchlist-card-enter 300ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
   animation-delay: calc(var(--card-index, 0) * 80ms);
   position: relative;
@@ -26,10 +25,29 @@
   }
 }
 
-/* Focus visible outline for keyboard navigation */
-.watchlist-card:focus-visible {
+/* =================================================================
+   Select button — wraps all card content, resets button appearance
+   ================================================================= */
+
+.watchlist-card__select {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  text-align: inherit;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.watchlist-card__select:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
+  border-radius: var(--radius-md);
 }
 
 /* Hover state — only on devices that support hover */
@@ -45,7 +63,7 @@
 }
 
 /* =================================================================
-   Header: ticker badge, company name, remove button
+   Header: ticker badge and company name
    ================================================================= */
 
 .watchlist-card__header {
@@ -53,6 +71,7 @@
   align-items: center;
   gap: var(--spacing-2);
   min-width: 0;
+  padding-right: 44px; /* reserve space for the absolutely-positioned remove button */
 }
 
 /* Ticker badge — matches CompanyBanner pattern */
@@ -80,15 +99,16 @@
   min-width: 0;
 }
 
-/* Remove button — X icon, WCAG 44px min touch target */
+/* Remove button — X icon, WCAG 44px min touch target, positioned top-right */
 .watchlist-card__remove {
-  flex-shrink: 0;
+  position: absolute;
+  top: 0;
+  right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 44px;
   height: 44px;
-  margin: -10px -10px -10px 0;
   padding: 0;
   border: none;
   background: transparent;
