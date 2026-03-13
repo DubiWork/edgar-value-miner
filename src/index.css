@@ -167,6 +167,23 @@
 }
 
 /* =================================================================
+   Skip Navigation Link
+   ================================================================= */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  padding: 8px 16px;
+  z-index: 100;
+  transition: top 0.2s;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+/* =================================================================
    Theme Toggle Animation
    ================================================================= */
 .theme-toggle-icon {
@@ -176,6 +193,20 @@
 @media (prefers-reduced-motion: reduce) {
   .theme-toggle-icon {
     transition: none;
+  }
+}
+
+/* =================================================================
+   Reduced Motion: Disable all CSS animations
+   ================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin,
+  .animate-pulse,
+  .animate-bounce,
+  [class*="animate-shimmer"],
+  [style*="animation"] {
+    animation: none !important;
+    transition: none !important;
   }
 }
 
