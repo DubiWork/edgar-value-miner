@@ -291,7 +291,7 @@ describe('Watchlist Integration Tests', () => {
       />
     );
 
-    const card = screen.getByTestId('watchlist-card');
+    const card = screen.getByTestId('watchlist-card-select');
     fireEvent.click(card);
 
     expect(onSelect).toHaveBeenCalledTimes(1);
