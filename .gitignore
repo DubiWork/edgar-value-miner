@@ -33,3 +33,16 @@ dist-ssr
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Firebase Functions
+functions/node_modules/
+functions/lib/
+functions/.env
+
+# Firebase emulator data
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+ui-debug.log
+firestore-debug.log
+pubsub-debug.log
