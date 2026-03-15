@@ -1,4 +1,5 @@
-import { TrendingUp, DollarSign, BarChart3, Gem } from 'lucide-react'
+import { useState } from 'react'
+import { TrendingUp, DollarSign, BarChart3, Gem, LogIn } from 'lucide-react'
 import { TickerSearch } from './components/TickerSearch'
 import { ThemeToggle } from './components/ThemeToggle'
 import { ErrorFallback } from './components/ErrorBoundary'
@@ -14,11 +15,15 @@ import {
   DashboardSkeleton,
 } from './components/Dashboard'
 import { WatchlistPanel } from './components/Watchlist'
+import { LoginModal } from './components/LoginModal'
+import { UserMenu } from './components/UserMenu'
+import { DebatePanel } from './components/DebatePanel'
 import { useCompanySearch } from './hooks/useCompanySearch'
 import { useStockQuote } from './hooks/useStockQuote'
 import { useKeyMetrics } from './hooks/useKeyMetrics'
 import { useWatchlist } from './hooks/useWatchlist'
 import { useReducedMotion } from './hooks/useReducedMotion'
+import { useAuth } from './hooks/useAuth'
 import gaapNormalizer from './utils/gaapNormalizer'
 import { calculateMargins } from './utils/calculateMargins'
 
@@ -33,6 +38,10 @@ function App() {
 
   // Disable JS-driven chart animations when the user prefers reduced motion
   const prefersReducedMotion = useReducedMotion()
+
+  // Auth state
+  const { isAuthenticated } = useAuth()
+  const [loginModalOpen, setLoginModalOpen] = useState(false)
 
   const handleSearch = (ticker) => {
     searchCompany(ticker)
@@ -95,8 +104,26 @@ function App() {
               />
             )}
 
-            {/* Theme Toggle */}
-            <ThemeToggle />
+            {/* Theme Toggle + Auth */}
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              {isAuthenticated ? (
+                <UserMenu />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setLoginModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                  style={{
+                    backgroundColor: 'var(--color-accent)',
+                    color: '#ffffff',
+                  }}
+                >
+                  <LogIn size={14} aria-hidden="true" />
+                  Sign In
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -306,6 +333,11 @@ function App() {
           />
         )}
 
+        {/* Debate Panel (shown when data is loaded) */}
+        {data && !loading && (
+          <DebatePanel />
+        )}
+
         {/* Cache metadata indicator */}
         {metadata && data && !loading && (
           <div
@@ -337,6 +369,12 @@ function App() {
           Data powered by SEC EDGAR &bull; Built for value investors
         </div>
       </footer>
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+      />
     </div>
   )
 }

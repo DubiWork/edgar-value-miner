@@ -139,6 +139,43 @@ vi.mock('../utils/calculateMargins', () => ({
   calculateMargins: vi.fn(() => []),
 }));
 
+// Mock useAuth — App now requires this hook
+vi.mock('../hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: null,
+    loading: false,
+    error: null,
+    isAuthenticated: false,
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn(),
+  }),
+  default: () => ({
+    user: null,
+    loading: false,
+    error: null,
+    isAuthenticated: false,
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn(),
+  }),
+}));
+
+// Mock LoginModal
+vi.mock('../components/LoginModal', () => ({
+  LoginModal: ({ isOpen }) => isOpen ? <div data-testid="login-modal">Login Modal</div> : null,
+}));
+
+// Mock UserMenu
+vi.mock('../components/UserMenu', () => ({
+  UserMenu: () => <div data-testid="user-menu">User Menu</div>,
+}));
+
+// Mock DebatePanel
+vi.mock('../components/DebatePanel', () => ({
+  DebatePanel: () => <div data-testid="debate-panel">Debate Panel</div>,
+}));
+
 // =============================================================================
 // Fixtures
 // =============================================================================
