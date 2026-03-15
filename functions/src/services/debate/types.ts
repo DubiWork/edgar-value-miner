@@ -57,4 +57,6 @@ export interface DebateError {
 export interface CallerContext {
   uid: string | null;
   isAuthenticated: boolean;
+  /** Subscription tier. Defaults to 'anonymous' when not authenticated. */
+  tier?: import('../rateLimit/types.js').UserTier;
 }

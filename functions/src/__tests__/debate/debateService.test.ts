@@ -39,6 +39,25 @@ vi.mock('../../config/featureFlags.js', () => ({
   isAiDebateEnabled: mockIsAiDebateEnabled,
 }));
 
+// ── RateLimitService mock — always allow in debateService unit tests ───────────
+vi.mock('../../services/rateLimit/rateLimitService.js', () => ({
+  RateLimitService: vi.fn().mockImplementation(() => ({
+    checkRateLimit: vi.fn().mockResolvedValue({
+      allowed: true,
+      currentCount: 0,
+      maxCount: 3,
+      upgradeUrl: '/upgrade',
+    }),
+  })),
+}));
+
+// ── usageTracker mock — fire-and-forget calls won't hit real Firestore ─────────
+vi.mock('../../services/rateLimit/usageTracker.js', () => ({
+  getUsageRecord: vi.fn().mockResolvedValue(null),
+  incrementDebateCount: vi.fn().mockResolvedValue(undefined),
+  resetAllUsage: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
 const NOW_ISO = '2026-03-14T12:00:00.000Z';
@@ -103,6 +122,17 @@ function makeLlmMock(): { llm: LLMService; generateCompletion: ReturnType<typeof
   const generateCompletion = vi.fn();
   const llm = { generateCompletion } as unknown as LLMService;
   return { llm, generateCompletion };
+}
+
+function makePermissiveRateLimiter() {
+  return {
+    checkRateLimit: vi.fn().mockResolvedValue({
+      allowed: true,
+      currentCount: 0,
+      maxCount: 3,
+      upgradeUrl: '/upgrade',
+    }),
+  } as unknown as import('../../services/rateLimit/rateLimitService.js').RateLimitService;
 }
 
 function setupLlmSuccess(generateCompletion: ReturnType<typeof vi.fn>): void {
@@ -204,7 +234,7 @@ describe('DebateService — cache miss path (authenticated)', () => {
     const { llm, generateCompletion } = makeLlmMock();
     setupLlmSuccess(generateCompletion);
 
-    const service = new DebateService(llm);
+    const service = new DebateService(llm, makePermissiveRateLimiter());
     const result = await service.getOrGenerate('AAPL', 'Apple Inc.', { uid: 'user-1', isAuthenticated: true });
 
     expect(result.source).toBe('generated');
@@ -216,7 +246,7 @@ describe('DebateService — cache miss path (authenticated)', () => {
     const { llm, generateCompletion } = makeLlmMock();
     setupLlmSuccess(generateCompletion);
 
-    const service = new DebateService(llm);
+    const service = new DebateService(llm, makePermissiveRateLimiter());
     await service.getOrGenerate('AAPL', 'Apple Inc.', { uid: 'user-1', isAuthenticated: true });
 
     expect(generateCompletion).toHaveBeenCalledTimes(3);
@@ -227,7 +257,7 @@ describe('DebateService — cache miss path (authenticated)', () => {
     const { llm, generateCompletion } = makeLlmMock();
     setupLlmSuccess(generateCompletion);
 
-    const service = new DebateService(llm);
+    const service = new DebateService(llm, makePermissiveRateLimiter());
     await service.getOrGenerate('AAPL', 'Apple Inc.', { uid: 'user-1', isAuthenticated: true });
 
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -240,7 +270,7 @@ describe('DebateService — cache miss path (authenticated)', () => {
     const { llm, generateCompletion } = makeLlmMock();
     setupLlmSuccess(generateCompletion);
 
-    const service = new DebateService(llm);
+    const service = new DebateService(llm, makePermissiveRateLimiter());
     await service.getOrGenerate('aapl', 'Apple Inc.', { uid: 'user-1', isAuthenticated: true });
 
     expect(mockReadDebate).toHaveBeenCalledWith('AAPL');
@@ -264,7 +294,7 @@ describe('DebateService — TTL expiry', () => {
     const { llm, generateCompletion } = makeLlmMock();
     setupLlmSuccess(generateCompletion);
 
-    const service = new DebateService(llm);
+    const service = new DebateService(llm, makePermissiveRateLimiter());
     const result = await service.getOrGenerate('AAPL', 'Apple Inc.', { uid: 'user-1', isAuthenticated: true });
 
     expect(result.source).toBe('generated');
@@ -315,7 +345,7 @@ describe('DebateService — feature flag', () => {
 
     const { DebateService } = await import('../../services/debate/debateService.js');
     const { llm } = makeLlmMock();
-    const service = new DebateService(llm);
+    const service = new DebateService(llm, makePermissiveRateLimiter());
 
     await expect(
       service.getOrGenerate('AAPL', 'Apple Inc.', { uid: 'user-1', isAuthenticated: true })

@@ -1,6 +1,7 @@
 import * as functions from 'firebase-functions';
 import { helloWorldHandler } from './helloWorld';
 import { getOrGenerateDebateHandler } from './functions/getOrGenerateDebate';
+import { monthlyUsageResetHandler } from './functions/monthlyUsageReset';
 
 /**
  * helloWorld — smoke-test onCall function.
@@ -31,4 +32,15 @@ export const getOrGenerateDebate = functions.https.onCall(
     minInstances: parseInt(process.env.FUNCTIONS_MIN_INSTANCES ?? '0', 10) || 0,
   },
   getOrGenerateDebateHandler
+);
+
+/**
+ * monthlyUsageReset — resets all users' debateCount to 0 on the 1st of each month.
+ * Schedule: "0 0 1 * *" — midnight UTC on the 1st of every month.
+ */
+export const monthlyUsageReset = functions.scheduler.onSchedule(
+  '0 0 1 * *',
+  async (_event) => {
+    await monthlyUsageResetHandler();
+  }
 );

@@ -21,6 +21,9 @@ import {
   isCacheValid,
 } from './cacheManager.js';
 import type { CachedDebate, DebateResponse, CallerContext } from './types.js';
+import { RateLimitService } from '../rateLimit/rateLimitService.js';
+import { incrementDebateCount } from '../rateLimit/usageTracker.js';
+import type { UserTier } from '../rateLimit/types.js';
 
 const DEFAULT_MODEL = 'claude-3-5-haiku-20241022';
 const DEBATE_VERSION = 1;
@@ -45,17 +48,19 @@ function parseJsonSafe(raw: string): unknown {
 
 export class DebateService {
   private readonly llm: LLMService;
+  private readonly rateLimiter: RateLimitService;
 
-  constructor(llm?: LLMService) {
+  constructor(llm?: LLMService, rateLimiter?: RateLimitService) {
     this.llm = llm ?? new LLMService();
+    this.rateLimiter = rateLimiter ?? new RateLimitService();
   }
 
   /**
    * Primary debate flow: cache-first with optional fresh generation.
    *
    * 1. Check Firestore for a valid cached debate.
-   * 2a. Cache hit  → increment viewCount, return cached.
-   * 2b. Cache miss → gate on auth + feature flag → generate → cache → return.
+   * 2a. Cache hit  → increment viewCount, return cached (no rate limit check).
+   * 2b. Cache miss → gate on auth + feature flag + rate limit → generate → cache → return.
    */
   async getOrGenerate(
     ticker: string,
@@ -64,7 +69,7 @@ export class DebateService {
   ): Promise<DebateResponse> {
     const normalizedTicker = ticker.toUpperCase();
 
-    // Check cache first
+    // Check cache first — cached access is never rate-limited
     const cached = await readDebate(normalizedTicker);
     if (cached && isCacheValid(cached)) {
       // Fire-and-forget the viewCount increment (non-critical)
@@ -89,6 +94,19 @@ export class DebateService {
       });
     }
 
+    // Check rate limit before generating
+    const tier: UserTier = caller.tier ?? 'free';
+    const rateLimitResult = await this.rateLimiter.checkRateLimit(caller.uid, tier);
+    if (!rateLimitResult.allowed) {
+      throw Object.assign(new Error('Rate limit exceeded.'), {
+        code: 'rate-limited',
+        currentCount: rateLimitResult.currentCount,
+        maxCount: rateLimitResult.maxCount,
+        upgradeUrl: rateLimitResult.upgradeUrl,
+        retryable: false,
+      });
+    }
+
     // Generate fresh debate
     const freshDebate = await this.generate(normalizedTicker, companyName);
 
@@ -97,6 +115,11 @@ export class DebateService {
 
     // Count this initial view
     incrementViewCount(normalizedTicker).catch(() => { /* best effort */ });
+
+    // Increment debate count (fire-and-forget — non-critical)
+    if (caller.uid !== null) {
+      Promise.resolve(incrementDebateCount(caller.uid)).catch(() => { /* best effort */ });
+    }
 
     return this.toResponse(freshDebate, 'generated');
   }
