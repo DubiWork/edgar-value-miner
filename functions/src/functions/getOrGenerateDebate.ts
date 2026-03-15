@@ -16,6 +16,18 @@ function isStructuredError(err: unknown): err is { code: string; retryable: bool
   );
 }
 
+function isRateLimitError(
+  err: unknown
+): err is { code: string; currentCount: number; maxCount: number; upgradeUrl: string } {
+  return (
+    isStructuredError(err) &&
+    (err as Record<string, unknown>)['code'] === 'rate-limited' &&
+    typeof (err as Record<string, unknown>)['currentCount'] === 'number' &&
+    typeof (err as Record<string, unknown>)['maxCount'] === 'number' &&
+    typeof (err as Record<string, unknown>)['upgradeUrl'] === 'string'
+  );
+}
+
 /**
  * Validate and normalise the raw request data from the client.
  * Returns a validated { ticker, companyName } or throws an HttpsError.
@@ -75,6 +87,19 @@ export const getOrGenerateDebateHandler = async (
     return result;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
+
+    if (isRateLimitError(err)) {
+      return {
+        error: {
+          code: 'rate-limited',
+          message,
+          retryable: false,
+          currentCount: err.currentCount,
+          maxCount: err.maxCount,
+          upgradeUrl: err.upgradeUrl,
+        },
+      };
+    }
 
     if (isStructuredError(err)) {
       if (err.code === 'unauthenticated') {
