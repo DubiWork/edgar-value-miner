@@ -20,6 +20,14 @@ export { TickerSearch } from './TickerSearch';
 // Theme
 export { ThemeToggle } from './ThemeToggle';
 
+// Auth UI
+export { LoginModal } from './LoginModal';
+export { UserMenu } from './UserMenu';
+export { AuthGuard } from './AuthGuard';
+
+// Debate
+export { DebatePanel } from './DebatePanel';
+
 // Dashboard
 export { DashboardLayout } from './Dashboard';
 export { CompanyBanner } from './Dashboard/CompanyBanner';
