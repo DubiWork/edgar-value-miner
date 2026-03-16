@@ -11,7 +11,7 @@
  * - Cache metadata display
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import App from '../App';
 
@@ -228,9 +228,18 @@ vi.mock('../components/UserMenu', () => ({
   UserMenu: () => <div data-testid="user-menu">User Menu</div>,
 }));
 
-// Mock DebatePanel
+// Mock DebatePanel (legacy stub — still exists but no longer used by App)
 vi.mock('../components/DebatePanel', () => ({
   DebatePanel: () => <div data-testid="debate-panel">Debate Panel</div>,
+}));
+
+// Mock DebatePanelConnected — controls what renders without hitting useDebate
+vi.mock('../components/DebatePanelConnected', () => ({
+  DebatePanelConnected: ({ ticker }) => (
+    <div data-testid="debate-panel-connected" data-ticker={ticker}>
+      Debate Panel Connected
+    </div>
+  ),
 }));
 
 // =============================================================================
@@ -779,6 +788,73 @@ describe('App', () => {
 
       expect(screen.getByTestId('dashboard-layout')).toBeTruthy();
       expect(screen.queryByTestId('dashboard-skeleton')).toBeNull();
+    });
+  });
+
+  // ===========================================================================
+  // Feature Flag: AI_DEBATE
+  // ===========================================================================
+
+  describe('Feature Flag: AI_DEBATE', () => {
+    beforeEach(() => {
+      mockHookReturn.data = createMockCompanyData();
+      mockHookReturn.loading = false;
+      delete import.meta.env.VITE_FEATURE_AI_DEBATE;
+    });
+
+    afterEach(() => {
+      delete import.meta.env.VITE_FEATURE_AI_DEBATE;
+    });
+
+    it('does NOT render DebatePanelConnected when VITE_FEATURE_AI_DEBATE is not set (default off)', () => {
+      render(<App />);
+
+      expect(screen.queryByTestId('debate-panel-connected')).toBeNull();
+    });
+
+    it('does NOT render DebatePanelConnected when VITE_FEATURE_AI_DEBATE is "false"', () => {
+      import.meta.env.VITE_FEATURE_AI_DEBATE = 'false';
+      render(<App />);
+
+      expect(screen.queryByTestId('debate-panel-connected')).toBeNull();
+    });
+
+    it('renders DebatePanelConnected when VITE_FEATURE_AI_DEBATE is "true"', () => {
+      import.meta.env.VITE_FEATURE_AI_DEBATE = 'true';
+      render(<App />);
+
+      expect(screen.getByTestId('debate-panel-connected')).toBeTruthy();
+    });
+
+    it('passes the selected ticker to DebatePanelConnected', () => {
+      import.meta.env.VITE_FEATURE_AI_DEBATE = 'true';
+      render(<App />);
+
+      const panel = screen.getByTestId('debate-panel-connected');
+      expect(panel.getAttribute('data-ticker')).toBe('AAPL');
+    });
+
+    it('charts render regardless of VITE_FEATURE_AI_DEBATE flag state (flag off)', () => {
+      render(<App />);
+
+      expect(screen.getByTestId('dashboard-layout')).toBeTruthy();
+      expect(screen.getByTestId('chart-container-Revenue')).toBeTruthy();
+    });
+
+    it('charts render regardless of VITE_FEATURE_AI_DEBATE flag state (flag on)', () => {
+      import.meta.env.VITE_FEATURE_AI_DEBATE = 'true';
+      render(<App />);
+
+      expect(screen.getByTestId('dashboard-layout')).toBeTruthy();
+      expect(screen.getByTestId('chart-container-Revenue')).toBeTruthy();
+    });
+
+    it('does not render DebatePanelConnected when no data is loaded (flag on)', () => {
+      import.meta.env.VITE_FEATURE_AI_DEBATE = 'true';
+      mockHookReturn.data = null;
+      render(<App />);
+
+      expect(screen.queryByTestId('debate-panel-connected')).toBeNull();
     });
   });
 });
