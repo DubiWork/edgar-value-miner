@@ -27,6 +27,11 @@ export { AuthGuard } from './AuthGuard';
 
 // Debate
 export { DebatePanel } from './DebatePanel';
+export { DebatePanelConnected } from './DebatePanelConnected';
+export { BullCaseCard } from './BullCaseCard';
+export { BearCaseCard } from './BearCaseCard';
+export { SynthesisCard } from './SynthesisCard';
+export { ConfidenceMeter } from './ConfidenceMeter';
 
 // Dashboard
 export { DashboardLayout } from './Dashboard';

@@ -17,7 +17,7 @@ import {
 import { WatchlistPanel } from './components/Watchlist'
 import { LoginModal } from './components/LoginModal'
 import { UserMenu } from './components/UserMenu'
-import { DebatePanel } from './components/DebatePanel'
+import { DebatePanelConnected } from './components/DebatePanelConnected'
 import { useCompanySearch } from './hooks/useCompanySearch'
 import { useStockQuote } from './hooks/useStockQuote'
 import { useKeyMetrics } from './hooks/useKeyMetrics'
@@ -335,7 +335,7 @@ function App() {
 
         {/* Debate Panel (shown when data is loaded) */}
         {data && !loading && (
-          <DebatePanel />
+          <DebatePanelConnected ticker={data.ticker} />
         )}
 
         {/* Cache metadata indicator */}
