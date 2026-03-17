@@ -23,6 +23,7 @@ import { useDebate } from '../hooks/useDebate';
 import { BullCaseCard } from './BullCaseCard';
 import { BearCaseCard } from './BearCaseCard';
 import { SynthesisCard } from './SynthesisCard';
+import { DebateShareCard } from './DebateShareCard';
 
 // =============================================================================
 // Analytics helper
@@ -310,6 +311,13 @@ export function DebatePanelConnected({ ticker }) {
   // Debate document ID follows the pattern {TICKER}_v{version}
   const debateId = `${debate.ticker}_v${debate.metadata?.version ?? 1}`;
 
+  // Derive sentiment from bull vs bear confidence
+  const bullConf = debate.bullCase?.confidence ?? 0.5;
+  const bearConf = debate.bearCase?.confidence ?? 0.5;
+  let sentiment = 'neutral';
+  if (bullConf - bearConf > 0.05) sentiment = 'bullish';
+  else if (bearConf - bullConf > 0.05) sentiment = 'bearish';
+
   return (
     <section
       data-testid="debate-panel-container"
@@ -352,6 +360,18 @@ export function DebatePanelConnected({ ticker }) {
 
       {/* Synthesis — full width below */}
       <SynthesisCard synthesis={debate.synthesis} metadata={metadata} debateId={debateId} />
+
+      {/* Share card — social sharing buttons */}
+      <div
+        className="mt-4 pt-4"
+        style={{ borderTop: '1px solid var(--color-border)' }}
+      >
+        <DebateShareCard
+          ticker={debate.ticker}
+          companyName={debate.companyName}
+          sentiment={sentiment}
+        />
+      </div>
     </section>
   );
 }
