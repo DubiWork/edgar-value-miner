@@ -331,6 +331,35 @@ describe('DebatePanelConnected', () => {
       refresh: vi.fn(),
     });
     render(<DebatePanelConnected ticker="AAPL" />);
-    expect(screen.getByText(/Apple Inc\./)).toBeTruthy();
+    const matches = screen.getAllByText(/Apple Inc\./);
+    expect(matches.length).toBeGreaterThanOrEqual(1);
+  });
+
+  // UT-DEBATE-NEW-16: Share card rendered when debate is loaded
+  it('renders DebateShareCard when debate is loaded', () => {
+    useDebate.mockReturnValue({
+      debate: mockDebate,
+      loading: false,
+      error: null,
+      isRateLimited: false,
+      rateLimitInfo: null,
+      refresh: vi.fn(),
+    });
+    render(<DebatePanelConnected ticker="AAPL" />);
+    expect(screen.getByTestId('debate-share-card')).toBeTruthy();
+  });
+
+  // UT-DEBATE-NEW-17: Share card not shown during loading state
+  it('does not render DebateShareCard while loading', () => {
+    useDebate.mockReturnValue({
+      debate: null,
+      loading: true,
+      error: null,
+      isRateLimited: false,
+      rateLimitInfo: null,
+      refresh: vi.fn(),
+    });
+    render(<DebatePanelConnected ticker="AAPL" />);
+    expect(screen.queryByTestId('debate-share-card')).toBeFalsy();
   });
 });
