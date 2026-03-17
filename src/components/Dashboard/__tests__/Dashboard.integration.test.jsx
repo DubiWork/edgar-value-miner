@@ -205,7 +205,7 @@ describe('Dashboard Integration Tests', () => {
       // Phase 1: Welcome state
       const { rerender } = renderApp();
       expect(screen.getByTestId('welcome-state')).toBeTruthy();
-      expect(screen.getByText('Find gems in the market')).toBeTruthy();
+      expect(screen.getByText(/Your AI Research Analyst/i)).toBeTruthy();
 
       // Phase 2: Simulate loading state
       setHookState({ loading: true });

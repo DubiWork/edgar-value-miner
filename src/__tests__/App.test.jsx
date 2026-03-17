@@ -67,6 +67,26 @@ vi.mock('../hooks/useStockQuote', () => ({
   default: () => mockStockQuoteReturn,
 }));
 
+// Mock WelcomeScreen to keep App tests focused on App-level wiring
+vi.mock('../components/WelcomeScreen', () => ({
+  WelcomeScreen: ({ onSearch, isSearching }) => (
+    <div data-testid="welcome-screen-component">
+      <div data-testid="ticker-search-hero">
+        <input
+          data-testid="ticker-input-hero"
+          onChange={() => {}}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && onSearch) {
+              onSearch(e.target.value);
+            }
+          }}
+        />
+      </div>
+      <span data-testid="welcome-is-searching">{String(isSearching)}</span>
+    </div>
+  ),
+}));
+
 // Mock TickerSearch to simplify — avoid autocomplete complexity
 vi.mock('../components/TickerSearch', () => ({
   TickerSearch: ({ variant, onSearch, isSearching, autoFocus, className }) => (
@@ -338,16 +358,14 @@ describe('App', () => {
       render(<App />);
 
       expect(screen.getByTestId('welcome-state')).toBeTruthy();
-      expect(screen.getByText('Find gems in the market')).toBeTruthy();
+      expect(screen.getByTestId('welcome-screen-component')).toBeTruthy();
       expect(screen.getByTestId('ticker-search-hero')).toBeTruthy();
     });
 
-    it('renders feature cards in welcome state', () => {
+    it('renders the WelcomeScreen component in welcome state', () => {
       render(<App />);
 
-      expect(screen.getByText('Visual Analysis')).toBeTruthy();
-      expect(screen.getByText('Smart Valuations')).toBeTruthy();
-      expect(screen.getByText('Quality Scoring')).toBeTruthy();
+      expect(screen.getByTestId('welcome-screen-component')).toBeTruthy();
     });
 
     it('does not show compact search bar in welcome state', () => {
