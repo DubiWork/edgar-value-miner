@@ -167,4 +167,39 @@ describe('BearCaseCard', () => {
     expect(screen.getByTestId('bear-methodology-badge')).toBeTruthy();
     expect(screen.getByTestId('bear-methodology-badge').textContent).toMatch(/feroldi|buffett|methodology/i);
   });
+
+  // UT-BEAR-16: Expandable risk factor button has aria-expanded=false by default
+  it('risk factor button has aria-expanded="false" by default', () => {
+    renderCard();
+    const buttons = screen.getAllByRole('button');
+    const riskButton = buttons.find((btn) => btn.textContent.includes('China Revenue Risk'));
+    expect(riskButton).toBeTruthy();
+    expect(riskButton.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  // UT-BEAR-17: Risk factor button aria-expanded becomes "true" on click
+  it('risk factor button aria-expanded becomes "true" when expanded', () => {
+    renderCard();
+    const buttons = screen.getAllByRole('button');
+    const riskButton = buttons.find((btn) => btn.textContent.includes('China Revenue Risk'));
+    fireEvent.click(riskButton);
+    expect(riskButton.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  // UT-BEAR-18: Confidence meter has role="progressbar"
+  it('confidence meter has role="progressbar" for accessibility', () => {
+    renderCard();
+    const progressbar = screen.getByRole('progressbar');
+    expect(progressbar).toBeTruthy();
+    expect(progressbar.getAttribute('aria-valuemin')).toBe('0');
+    expect(progressbar.getAttribute('aria-valuemax')).toBe('100');
+  });
+
+  // UT-BEAR-19: Severity labels High, Medium, Low assigned by index order
+  it('assigns severity labels by index — first is High, second is Medium, third is Low', () => {
+    renderCard();
+    expect(screen.getByTestId('bear-severity-0').textContent).toBe('High');
+    expect(screen.getByTestId('bear-severity-1').textContent).toBe('Medium');
+    expect(screen.getByTestId('bear-severity-2').textContent).toBe('Low');
+  });
 });

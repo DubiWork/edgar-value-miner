@@ -170,4 +170,32 @@ describe('BullCaseCard', () => {
     renderCard({ bullCase: { ...mockBullCase, confidence: 0.9 } });
     expect(screen.getByText(/90%/)).toBeTruthy();
   });
+
+  // UT-BULL-16: Expandable argument button has aria-expanded=false by default
+  it('argument button has aria-expanded="false" by default', () => {
+    renderCard();
+    const buttons = screen.getAllByRole('button');
+    // All argument buttons start collapsed
+    const argButton = buttons.find((btn) => btn.textContent.includes('Strong Ecosystem'));
+    expect(argButton).toBeTruthy();
+    expect(argButton.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  // UT-BULL-17: Argument button aria-expanded toggles to true on click
+  it('argument button aria-expanded becomes "true" when expanded', () => {
+    renderCard();
+    const buttons = screen.getAllByRole('button');
+    const argButton = buttons.find((btn) => btn.textContent.includes('Strong Ecosystem'));
+    fireEvent.click(argButton);
+    expect(argButton.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  // UT-BULL-18: Confidence meter has role="progressbar"
+  it('confidence meter has role="progressbar" for accessibility', () => {
+    renderCard();
+    const progressbar = screen.getByRole('progressbar');
+    expect(progressbar).toBeTruthy();
+    expect(progressbar.getAttribute('aria-valuemin')).toBe('0');
+    expect(progressbar.getAttribute('aria-valuemax')).toBe('100');
+  });
 });
