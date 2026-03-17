@@ -39,12 +39,17 @@ const NOTES_SUBCOLLECTION = 'notes';
 // =============================================================================
 
 /**
- * Normalizes a ticker symbol to uppercase.
+ * Normalizes a ticker symbol to uppercase and validates format.
  * @param {string} ticker
  * @returns {string}
+ * @throws {Error} if ticker format is invalid
  */
 function normalizeTicker(ticker) {
-  return String(ticker).trim().toUpperCase();
+  const normalized = String(ticker).trim().toUpperCase();
+  if (!/^[A-Z0-9.-]{1,10}$/.test(normalized)) {
+    throw new Error(`Invalid ticker format: "${normalized}"`);
+  }
+  return normalized;
 }
 
 /**
@@ -95,9 +100,8 @@ export async function getNote(ticker) {
   const { uid, valid } = getAuth();
   if (!valid) return null;
 
-  const normalizedTicker = normalizeTicker(ticker);
-
   try {
+    const normalizedTicker = normalizeTicker(ticker);
     const ref = noteDocRef(uid, normalizedTicker);
     const snap = await getDoc(ref);
 
@@ -126,18 +130,21 @@ export async function saveNote(ticker, content) {
   const { uid, valid } = getAuth();
   if (!valid) return false;
 
-  const normalizedTicker = normalizeTicker(ticker);
-  const truncatedContent = String(content).slice(0, MAX_NOTE_LENGTH);
-
   try {
+    const normalizedTicker = normalizeTicker(ticker);
+    const truncatedContent = String(content).slice(0, MAX_NOTE_LENGTH);
     const ref = noteDocRef(uid, normalizedTicker);
-    await setDoc(ref, {
+    const existing = await getDoc(ref);
+    const data = {
       content: truncatedContent,
       ticker: normalizedTicker,
       uid,
       updatedAt: serverTimestamp(),
-      createdAt: serverTimestamp(),
-    }, { merge: true });
+    };
+    if (!existing.exists()) {
+      data.createdAt = serverTimestamp();
+    }
+    await setDoc(ref, data, { merge: true });
 
     return true;
   } catch {
@@ -158,9 +165,8 @@ export async function deleteNote(ticker) {
   const { uid, valid } = getAuth();
   if (!valid) return false;
 
-  const normalizedTicker = normalizeTicker(ticker);
-
   try {
+    const normalizedTicker = normalizeTicker(ticker);
     const ref = noteDocRef(uid, normalizedTicker);
     await deleteDoc(ref);
     return true;

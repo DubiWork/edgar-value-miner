@@ -24,9 +24,20 @@ vi.mock('firebase/firestore', () => ({
   orderBy: vi.fn(),
 }));
 
-vi.mock('../../lib/firebase', () => ({
+// Mutable state object — tests set mockFirebaseState.db to control the `db` value
+// without touching the import binding (avoids no-import-assign lint errors).
+const mockFirebaseState = {
   db: {},
   getCurrentUserId: vi.fn(() => null),
+};
+
+vi.mock('../../lib/firebase', () => ({
+  get db() {
+    return mockFirebaseState.db;
+  },
+  get getCurrentUserId() {
+    return mockFirebaseState.getCurrentUserId;
+  },
 }));
 
 import {
@@ -37,7 +48,6 @@ import {
 } from '../notesService.js';
 
 import * as firestore from 'firebase/firestore';
-import * as firebaseLib from '../../lib/firebase';
 
 // =============================================================================
 // Helpers
@@ -62,6 +72,8 @@ function mockDocSnap(exists, data = {}) {
 describe('notesService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFirebaseState.db = {};
+    mockFirebaseState.getCurrentUserId = vi.fn(() => null);
     firestore.doc.mockReturnValue(mockDocRef());
     firestore.collection.mockReturnValue({ id: 'notes-collection' });
     firestore.query.mockReturnValue({ id: 'mock-query' });
@@ -74,7 +86,7 @@ describe('notesService', () => {
 
   describe('getNote', () => {
     it('returns null when user is not authenticated', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue(null);
+      mockFirebaseState.getCurrentUserId.mockReturnValue(null);
 
       const result = await getNote('AAPL');
 
@@ -83,7 +95,7 @@ describe('notesService', () => {
     });
 
     it('returns null when document does not exist', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
       firestore.getDoc.mockResolvedValue(mockDocSnap(false));
 
       const result = await getNote('AAPL');
@@ -92,7 +104,7 @@ describe('notesService', () => {
     });
 
     it('returns note data when document exists', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
       const noteData = {
         content: 'My research notes',
         ticker: 'AAPL',
@@ -107,7 +119,7 @@ describe('notesService', () => {
     });
 
     it('normalizes ticker to uppercase', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
       firestore.getDoc.mockResolvedValue(mockDocSnap(false));
 
       await getNote('aapl');
@@ -123,7 +135,7 @@ describe('notesService', () => {
     });
 
     it('returns null on Firestore error', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
       firestore.getDoc.mockRejectedValue(new Error('Network error'));
 
       const result = await getNote('AAPL');
@@ -132,16 +144,12 @@ describe('notesService', () => {
     });
 
     it('returns null when db is not available', async () => {
-      // Override db mock to null for this test
-      const originalDb = firebaseLib.db;
-      Object.defineProperty(firebaseLib, 'db', { value: null, configurable: true });
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.db = null;
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
 
       const result = await getNote('AAPL');
 
       expect(result).toBeNull();
-
-      Object.defineProperty(firebaseLib, 'db', { value: originalDb, configurable: true });
     });
   });
 
@@ -151,7 +159,7 @@ describe('notesService', () => {
 
   describe('saveNote', () => {
     it('returns false when user is not authenticated', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue(null);
+      mockFirebaseState.getCurrentUserId.mockReturnValue(null);
 
       const result = await saveNote('AAPL', 'My analysis');
 
@@ -160,7 +168,8 @@ describe('notesService', () => {
     });
 
     it('saves note to Firestore and returns true on success', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
+      firestore.getDoc.mockResolvedValue(mockDocSnap(false));
       firestore.setDoc.mockResolvedValue(undefined);
 
       const result = await saveNote('AAPL', 'My research notes');
@@ -170,7 +179,8 @@ describe('notesService', () => {
     });
 
     it('saves with correct document structure', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
+      firestore.getDoc.mockResolvedValue(mockDocSnap(false));
       firestore.setDoc.mockResolvedValue(undefined);
 
       await saveNote('AAPL', 'My analysis');
@@ -184,7 +194,8 @@ describe('notesService', () => {
     });
 
     it('saves to correct path: users/{uid}/notes/{ticker}', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
+      firestore.getDoc.mockResolvedValue(mockDocSnap(false));
       firestore.setDoc.mockResolvedValue(undefined);
 
       await saveNote('AAPL', 'My analysis');
@@ -199,7 +210,8 @@ describe('notesService', () => {
     });
 
     it('normalizes ticker to uppercase', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
+      firestore.getDoc.mockResolvedValue(mockDocSnap(false));
       firestore.setDoc.mockResolvedValue(undefined);
 
       await saveNote('aapl', 'My analysis');
@@ -209,7 +221,8 @@ describe('notesService', () => {
     });
 
     it('truncates content at 10000 characters', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
+      firestore.getDoc.mockResolvedValue(mockDocSnap(false));
       firestore.setDoc.mockResolvedValue(undefined);
 
       const longContent = 'x'.repeat(15000);
@@ -220,7 +233,8 @@ describe('notesService', () => {
     });
 
     it('returns false on Firestore error', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
+      firestore.getDoc.mockResolvedValue(mockDocSnap(false));
       firestore.setDoc.mockRejectedValue(new Error('Permission denied'));
 
       const result = await saveNote('AAPL', 'My analysis');
@@ -229,15 +243,34 @@ describe('notesService', () => {
     });
 
     it('returns false when db is not available', async () => {
-      const originalDb = firebaseLib.db;
-      Object.defineProperty(firebaseLib, 'db', { value: null, configurable: true });
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.db = null;
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
 
       const result = await saveNote('AAPL', 'My analysis');
 
       expect(result).toBe(false);
+    });
 
-      Object.defineProperty(firebaseLib, 'db', { value: originalDb, configurable: true });
+    it('does not overwrite createdAt on update', async () => {
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
+      firestore.getDoc.mockResolvedValue(mockDocSnap(true, { createdAt: 'original-ts' }));
+      firestore.setDoc.mockResolvedValue(undefined);
+
+      await saveNote('AAPL', 'Updated notes');
+
+      const savedData = firestore.setDoc.mock.calls[0][1];
+      expect(savedData).not.toHaveProperty('createdAt');
+    });
+
+    it('sets createdAt on initial creation', async () => {
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
+      firestore.getDoc.mockResolvedValue(mockDocSnap(false));
+      firestore.setDoc.mockResolvedValue(undefined);
+
+      await saveNote('AAPL', 'New note');
+
+      const savedData = firestore.setDoc.mock.calls[0][1];
+      expect(savedData).toHaveProperty('createdAt');
     });
   });
 
@@ -247,7 +280,7 @@ describe('notesService', () => {
 
   describe('deleteNote', () => {
     it('returns false when user is not authenticated', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue(null);
+      mockFirebaseState.getCurrentUserId.mockReturnValue(null);
 
       const result = await deleteNote('AAPL');
 
@@ -256,7 +289,7 @@ describe('notesService', () => {
     });
 
     it('deletes note from Firestore and returns true', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
       firestore.deleteDoc.mockResolvedValue(undefined);
 
       const result = await deleteNote('AAPL');
@@ -266,7 +299,7 @@ describe('notesService', () => {
     });
 
     it('deletes from correct path: users/{uid}/notes/{ticker}', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
       firestore.deleteDoc.mockResolvedValue(undefined);
 
       await deleteNote('AAPL');
@@ -281,7 +314,7 @@ describe('notesService', () => {
     });
 
     it('normalizes ticker to uppercase', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
       firestore.deleteDoc.mockResolvedValue(undefined);
 
       await deleteNote('aapl');
@@ -296,7 +329,7 @@ describe('notesService', () => {
     });
 
     it('returns false on Firestore error', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
       firestore.deleteDoc.mockRejectedValue(new Error('Network error'));
 
       const result = await deleteNote('AAPL');
@@ -311,7 +344,7 @@ describe('notesService', () => {
 
   describe('listNotes', () => {
     it('returns empty array when user is not authenticated', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue(null);
+      mockFirebaseState.getCurrentUserId.mockReturnValue(null);
 
       const result = await listNotes();
 
@@ -320,7 +353,7 @@ describe('notesService', () => {
     });
 
     it('returns array of notes on success', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
       const mockNotes = [
         { id: 'AAPL', data: () => ({ content: 'Apple notes', ticker: 'AAPL' }) },
         { id: 'MSFT', data: () => ({ content: 'Microsoft notes', ticker: 'MSFT' }) },
@@ -335,7 +368,7 @@ describe('notesService', () => {
     });
 
     it('returns empty array on Firestore error', async () => {
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
       firestore.getDocs.mockRejectedValue(new Error('Network error'));
 
       const result = await listNotes();
@@ -344,15 +377,12 @@ describe('notesService', () => {
     });
 
     it('returns empty array when db is not available', async () => {
-      const originalDb = firebaseLib.db;
-      Object.defineProperty(firebaseLib, 'db', { value: null, configurable: true });
-      firebaseLib.getCurrentUserId.mockReturnValue('user-123');
+      mockFirebaseState.db = null;
+      mockFirebaseState.getCurrentUserId.mockReturnValue('user-123');
 
       const result = await listNotes();
 
       expect(result).toEqual([]);
-
-      Object.defineProperty(firebaseLib, 'db', { value: originalDb, configurable: true });
     });
   });
 });
