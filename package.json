@@ -11,7 +11,11 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "npx playwright test"
+    "test:e2e": "npx playwright test",
+    "functions:dev": "firebase emulators:start --only auth,firestore,functions",
+    "functions:build": "npm run build --prefix functions",
+    "functions:test": "npm test --prefix functions",
+    "functions:deploy": "firebase deploy --only functions"
   },
   "dependencies": {
     "firebase": "^12.10.0",

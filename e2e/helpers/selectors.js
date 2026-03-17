@@ -123,4 +123,66 @@ export const SELECTORS = {
   theme: {
     toggle: 'theme-toggle',
   },
+
+  // -----------------------------------------------------------------------
+  // Debate panel (src/components/DebatePanelConnected.jsx)
+  // -----------------------------------------------------------------------
+  debate: {
+    container: 'debate-panel-container',
+    grid: 'debate-grid',
+    loading: 'debate-loading',
+    loadingMessage: 'debate-loading-message',
+    loadingTimeEstimate: 'debate-loading-time-estimate',
+    error: 'debate-error',
+    errorRetry: 'debate-error-retry',
+    rateLimit: 'debate-rate-limit',
+    rateLimitUsage: 'rate-limit-usage',
+    rateLimitUpgradeMessage: 'rate-limit-upgrade-message',
+    rateLimitCta: 'rate-limit-cta',
+    methodologyCitation: 'methodology-citation',
+  },
+
+  // -----------------------------------------------------------------------
+  // Debate cards (BullCaseCard, BearCaseCard, SynthesisCard)
+  // -----------------------------------------------------------------------
+  debateCards: {
+    bull: 'bull-case-card',
+    bear: 'bear-case-card',
+    synthesis: 'synthesis-card',
+    disclaimer: 'investment-disclaimer',
+  },
+
+  // -----------------------------------------------------------------------
+  // Feedback buttons (src/components/FeedbackButtons.jsx)
+  // -----------------------------------------------------------------------
+  feedback: {
+    container: 'feedback-buttons-container',
+    thumbUp: 'feedback-thumb-up',
+    thumbDown: 'feedback-thumb-down',
+    error: 'feedback-error',
+  },
+
+  // -----------------------------------------------------------------------
+  // Debate share card (src/components/DebateShareCard.jsx)
+  // -----------------------------------------------------------------------
+  share: {
+    card: 'debate-share-card',
+    sentiment: 'share-sentiment',
+    twitter: 'share-twitter',
+    linkedin: 'share-linkedin',
+    reddit: 'share-reddit',
+    copy: 'share-copy',
+    copyConfirmation: 'copy-confirmation',
+  },
+
+  // -----------------------------------------------------------------------
+  // Personal notes panel (src/components/PersonalNotesPanel.jsx)
+  // -----------------------------------------------------------------------
+  notes: {
+    panel: 'personal-notes-panel',
+    header: 'notes-header',
+    textarea: 'notes-textarea',
+    saveIndicator: 'notes-save-indicator',
+    signinCta: 'notes-signin-cta',
+  },
 };

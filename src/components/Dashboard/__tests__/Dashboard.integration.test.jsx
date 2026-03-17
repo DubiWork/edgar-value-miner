@@ -100,6 +100,43 @@ vi.mock('../../../components/ErrorBoundary', () => ({
   ),
 }));
 
+// Mock useAuth — App now requires this hook
+vi.mock('../../../hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: null,
+    loading: false,
+    error: null,
+    isAuthenticated: false,
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn(),
+  }),
+  default: () => ({
+    user: null,
+    loading: false,
+    error: null,
+    isAuthenticated: false,
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn(),
+  }),
+}));
+
+// Mock LoginModal
+vi.mock('../../../components/LoginModal', () => ({
+  LoginModal: ({ isOpen }) => isOpen ? <div data-testid="login-modal">Login Modal</div> : null,
+}));
+
+// Mock UserMenu
+vi.mock('../../../components/UserMenu', () => ({
+  UserMenu: () => <div data-testid="user-menu">User Menu</div>,
+}));
+
+// Mock DebatePanel — keep integration tests focused on dashboard components
+vi.mock('../../../components/DebatePanel', () => ({
+  DebatePanel: () => <div data-testid="debate-panel">Debate Panel</div>,
+}));
+
 // Use REAL Dashboard components for integration testing
 // (no mock for '../components/Dashboard')
 
@@ -168,7 +205,7 @@ describe('Dashboard Integration Tests', () => {
       // Phase 1: Welcome state
       const { rerender } = renderApp();
       expect(screen.getByTestId('welcome-state')).toBeTruthy();
-      expect(screen.getByText('Find gems in the market')).toBeTruthy();
+      expect(screen.getByText(/Your AI Research Analyst/i)).toBeTruthy();
 
       // Phase 2: Simulate loading state
       setHookState({ loading: true });

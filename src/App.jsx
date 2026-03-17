@@ -1,4 +1,5 @@
-import { TrendingUp, DollarSign, BarChart3, Gem } from 'lucide-react'
+import { useState } from 'react'
+import { Gem, LogIn } from 'lucide-react'
 import { TickerSearch } from './components/TickerSearch'
 import { ThemeToggle } from './components/ThemeToggle'
 import { ErrorFallback } from './components/ErrorBoundary'
@@ -14,11 +15,18 @@ import {
   DashboardSkeleton,
 } from './components/Dashboard'
 import { WatchlistPanel } from './components/Watchlist'
+import { LoginModal } from './components/LoginModal'
+import { UserMenu } from './components/UserMenu'
+import { FeatureGate } from './components/FeatureGate'
+import { DebatePanelConnected } from './components/DebatePanelConnected'
+import { PersonalNotesPanel } from './components/PersonalNotesPanel'
+import { WelcomeScreen } from './components/WelcomeScreen'
 import { useCompanySearch } from './hooks/useCompanySearch'
 import { useStockQuote } from './hooks/useStockQuote'
 import { useKeyMetrics } from './hooks/useKeyMetrics'
 import { useWatchlist } from './hooks/useWatchlist'
 import { useReducedMotion } from './hooks/useReducedMotion'
+import { useAuth } from './hooks/useAuth'
 import gaapNormalizer from './utils/gaapNormalizer'
 import { calculateMargins } from './utils/calculateMargins'
 
@@ -33,6 +41,10 @@ function App() {
 
   // Disable JS-driven chart animations when the user prefers reduced motion
   const prefersReducedMotion = useReducedMotion()
+
+  // Auth state
+  const { isAuthenticated } = useAuth()
+  const [loginModalOpen, setLoginModalOpen] = useState(false)
 
   const handleSearch = (ticker) => {
     searchCompany(ticker)
@@ -95,8 +107,26 @@ function App() {
               />
             )}
 
-            {/* Theme Toggle */}
-            <ThemeToggle />
+            {/* Theme Toggle + Auth */}
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              {isAuthenticated ? (
+                <UserMenu />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setLoginModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
+                  style={{
+                    backgroundColor: 'var(--color-accent)',
+                    color: '#ffffff',
+                  }}
+                >
+                  <LogIn size={14} aria-hidden="true" />
+                  Sign In
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -105,29 +135,10 @@ function App() {
       <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome State (no data loaded, not loading, no error) */}
         {!data && !loading && !error && (
-          <div className="text-center py-16" data-testid="welcome-state">
-            <Gem className="h-20 w-20 text-brand-500 mx-auto mb-6" aria-hidden="true" />
-            <h1
-              className="text-4xl font-bold mb-4"
-              style={{ color: 'var(--color-text-primary)' }}
-            >
-              Find gems in the market
-            </h1>
-            <p
-              className="text-xl mb-8 max-w-2xl mx-auto"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
-              Research companies with beautiful visualizations, professional scoring systems,
-              and smart valuations — all powered by official SEC EDGAR data.
-            </p>
-
-            {/* Hero Search */}
-            <TickerSearch
-              variant="hero"
+          <div data-testid="welcome-state">
+            <WelcomeScreen
               onSearch={handleSearch}
               isSearching={loading}
-              autoFocus
-              className="mb-12"
             />
 
             {/* Watchlist Panel (shown when user has watchlist items) */}
@@ -141,90 +152,6 @@ function App() {
                 />
               </div>
             )}
-
-            {/* Feature Cards */}
-            <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-              <div className="card text-left">
-                <div className="flex items-center space-x-3 mb-3">
-                  <div
-                    className="p-2 rounded-lg"
-                    style={{ backgroundColor: 'color-mix(in srgb, var(--color-success) 15%, transparent)' }}
-                  >
-                    <TrendingUp
-                      className="h-6 w-6"
-                      style={{ color: 'var(--color-success)' }}
-                      aria-hidden="true"
-                    />
-                  </div>
-                  <h3
-                    className="font-semibold"
-                    style={{ color: 'var(--color-text-primary)' }}
-                  >
-                    Visual Analysis
-                  </h3>
-                </div>
-                <p
-                  className="text-sm"
-                  style={{ color: 'var(--color-text-secondary)' }}
-                >
-                  Beautiful charts showing revenue, FCF, and margin trends over 5+ years.
-                </p>
-              </div>
-
-              <div className="card text-left">
-                <div className="flex items-center space-x-3 mb-3">
-                  <div
-                    className="p-2 rounded-lg"
-                    style={{ backgroundColor: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' }}
-                  >
-                    <DollarSign
-                      className="h-6 w-6"
-                      style={{ color: 'var(--color-accent)' }}
-                      aria-hidden="true"
-                    />
-                  </div>
-                  <h3
-                    className="font-semibold"
-                    style={{ color: 'var(--color-text-primary)' }}
-                  >
-                    Smart Valuations
-                  </h3>
-                </div>
-                <p
-                  className="text-sm"
-                  style={{ color: 'var(--color-text-secondary)' }}
-                >
-                  P/E fair value, DCF analysis, and margin of safety calculations.
-                </p>
-              </div>
-
-              <div className="card text-left">
-                <div className="flex items-center space-x-3 mb-3">
-                  <div
-                    className="p-2 rounded-lg"
-                    style={{ backgroundColor: 'color-mix(in srgb, var(--color-info) 15%, transparent)' }}
-                  >
-                    <BarChart3
-                      className="h-6 w-6"
-                      style={{ color: 'var(--color-info)' }}
-                      aria-hidden="true"
-                    />
-                  </div>
-                  <h3
-                    className="font-semibold"
-                    style={{ color: 'var(--color-text-primary)' }}
-                  >
-                    Quality Scoring
-                  </h3>
-                </div>
-                <p
-                  className="text-sm"
-                  style={{ color: 'var(--color-text-secondary)' }}
-                >
-                  Feroldi Quality Score and Anti-Fragile analysis for each company.
-                </p>
-              </div>
-            </div>
           </div>
         )}
 
@@ -306,6 +233,18 @@ function App() {
           />
         )}
 
+        {/* Debate Panel — gated by VITE_FEATURE_AI_DEBATE, loads independently below charts */}
+        {data && !loading && (
+          <FeatureGate flag="AI_DEBATE">
+            <DebatePanelConnected ticker={data.ticker} />
+          </FeatureGate>
+        )}
+
+        {/* Personal Notes Panel — below debate, always shown when company is loaded */}
+        {data && !loading && (
+          <PersonalNotesPanel ticker={data.ticker} companyName={data.companyName} />
+        )}
+
         {/* Cache metadata indicator */}
         {metadata && data && !loading && (
           <div
@@ -337,6 +276,12 @@ function App() {
           Data powered by SEC EDGAR &bull; Built for value investors
         </div>
       </footer>
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+      />
     </div>
   )
 }

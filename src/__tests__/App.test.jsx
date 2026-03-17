@@ -11,7 +11,7 @@
  * - Cache metadata display
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import App from '../App';
 
@@ -65,6 +65,26 @@ let mockStockQuoteReturn = { data: null, loading: false, error: null, refetch: v
 vi.mock('../hooks/useStockQuote', () => ({
   useStockQuote: () => mockStockQuoteReturn,
   default: () => mockStockQuoteReturn,
+}));
+
+// Mock WelcomeScreen to keep App tests focused on App-level wiring
+vi.mock('../components/WelcomeScreen', () => ({
+  WelcomeScreen: ({ onSearch, isSearching }) => (
+    <div data-testid="welcome-screen-component">
+      <div data-testid="ticker-search-hero">
+        <input
+          data-testid="ticker-input-hero"
+          onChange={() => {}}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && onSearch) {
+              onSearch(e.target.value);
+            }
+          }}
+        />
+      </div>
+      <span data-testid="welcome-is-searching">{String(isSearching)}</span>
+    </div>
+  ),
 }));
 
 // Mock TickerSearch to simplify — avoid autocomplete complexity
@@ -196,6 +216,52 @@ vi.mock('../utils/calculateMargins', () => ({
   default: vi.fn(),
 }));
 
+// Mock useAuth
+vi.mock('../hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: null,
+    loading: false,
+    error: null,
+    isAuthenticated: false,
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn(),
+  }),
+  default: () => ({
+    user: null,
+    loading: false,
+    error: null,
+    isAuthenticated: false,
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn(),
+  }),
+}));
+
+// Mock LoginModal
+vi.mock('../components/LoginModal', () => ({
+  LoginModal: ({ isOpen }) => isOpen ? <div data-testid="login-modal">Login Modal</div> : null,
+}));
+
+// Mock UserMenu
+vi.mock('../components/UserMenu', () => ({
+  UserMenu: () => <div data-testid="user-menu">User Menu</div>,
+}));
+
+// Mock DebatePanel (legacy stub — still exists but no longer used by App)
+vi.mock('../components/DebatePanel', () => ({
+  DebatePanel: () => <div data-testid="debate-panel">Debate Panel</div>,
+}));
+
+// Mock DebatePanelConnected — controls what renders without hitting useDebate
+vi.mock('../components/DebatePanelConnected', () => ({
+  DebatePanelConnected: ({ ticker }) => (
+    <div data-testid="debate-panel-connected" data-ticker={ticker}>
+      Debate Panel Connected
+    </div>
+  ),
+}));
+
 // =============================================================================
 // Mock Data Fixtures
 // =============================================================================
@@ -292,16 +358,14 @@ describe('App', () => {
       render(<App />);
 
       expect(screen.getByTestId('welcome-state')).toBeTruthy();
-      expect(screen.getByText('Find gems in the market')).toBeTruthy();
+      expect(screen.getByTestId('welcome-screen-component')).toBeTruthy();
       expect(screen.getByTestId('ticker-search-hero')).toBeTruthy();
     });
 
-    it('renders feature cards in welcome state', () => {
+    it('renders the WelcomeScreen component in welcome state', () => {
       render(<App />);
 
-      expect(screen.getByText('Visual Analysis')).toBeTruthy();
-      expect(screen.getByText('Smart Valuations')).toBeTruthy();
-      expect(screen.getByText('Quality Scoring')).toBeTruthy();
+      expect(screen.getByTestId('welcome-screen-component')).toBeTruthy();
     });
 
     it('does not show compact search bar in welcome state', () => {
@@ -742,6 +806,73 @@ describe('App', () => {
 
       expect(screen.getByTestId('dashboard-layout')).toBeTruthy();
       expect(screen.queryByTestId('dashboard-skeleton')).toBeNull();
+    });
+  });
+
+  // ===========================================================================
+  // Feature Flag: AI_DEBATE
+  // ===========================================================================
+
+  describe('Feature Flag: AI_DEBATE', () => {
+    beforeEach(() => {
+      mockHookReturn.data = createMockCompanyData();
+      mockHookReturn.loading = false;
+      delete import.meta.env.VITE_FEATURE_AI_DEBATE;
+    });
+
+    afterEach(() => {
+      delete import.meta.env.VITE_FEATURE_AI_DEBATE;
+    });
+
+    it('does NOT render DebatePanelConnected when VITE_FEATURE_AI_DEBATE is not set (default off)', () => {
+      render(<App />);
+
+      expect(screen.queryByTestId('debate-panel-connected')).toBeNull();
+    });
+
+    it('does NOT render DebatePanelConnected when VITE_FEATURE_AI_DEBATE is "false"', () => {
+      import.meta.env.VITE_FEATURE_AI_DEBATE = 'false';
+      render(<App />);
+
+      expect(screen.queryByTestId('debate-panel-connected')).toBeNull();
+    });
+
+    it('renders DebatePanelConnected when VITE_FEATURE_AI_DEBATE is "true"', () => {
+      import.meta.env.VITE_FEATURE_AI_DEBATE = 'true';
+      render(<App />);
+
+      expect(screen.getByTestId('debate-panel-connected')).toBeTruthy();
+    });
+
+    it('passes the selected ticker to DebatePanelConnected', () => {
+      import.meta.env.VITE_FEATURE_AI_DEBATE = 'true';
+      render(<App />);
+
+      const panel = screen.getByTestId('debate-panel-connected');
+      expect(panel.getAttribute('data-ticker')).toBe('AAPL');
+    });
+
+    it('charts render regardless of VITE_FEATURE_AI_DEBATE flag state (flag off)', () => {
+      render(<App />);
+
+      expect(screen.getByTestId('dashboard-layout')).toBeTruthy();
+      expect(screen.getByTestId('chart-container-Revenue')).toBeTruthy();
+    });
+
+    it('charts render regardless of VITE_FEATURE_AI_DEBATE flag state (flag on)', () => {
+      import.meta.env.VITE_FEATURE_AI_DEBATE = 'true';
+      render(<App />);
+
+      expect(screen.getByTestId('dashboard-layout')).toBeTruthy();
+      expect(screen.getByTestId('chart-container-Revenue')).toBeTruthy();
+    });
+
+    it('does not render DebatePanelConnected when no data is loaded (flag on)', () => {
+      import.meta.env.VITE_FEATURE_AI_DEBATE = 'true';
+      mockHookReturn.data = null;
+      render(<App />);
+
+      expect(screen.queryByTestId('debate-panel-connected')).toBeNull();
     });
   });
 });
