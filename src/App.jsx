@@ -17,6 +17,7 @@ import {
 import { WatchlistPanel } from './components/Watchlist'
 import { LoginModal } from './components/LoginModal'
 import { UserMenu } from './components/UserMenu'
+import { FeatureGate } from './components/FeatureGate'
 import { DebatePanelConnected } from './components/DebatePanelConnected'
 import { useCompanySearch } from './hooks/useCompanySearch'
 import { useStockQuote } from './hooks/useStockQuote'
@@ -333,9 +334,11 @@ function App() {
           />
         )}
 
-        {/* Debate Panel (shown when data is loaded) */}
+        {/* Debate Panel — gated by VITE_FEATURE_AI_DEBATE, loads independently below charts */}
         {data && !loading && (
-          <DebatePanelConnected ticker={data.ticker} />
+          <FeatureGate flag="AI_DEBATE">
+            <DebatePanelConnected ticker={data.ticker} />
+          </FeatureGate>
         )}
 
         {/* Cache metadata indicator */}
