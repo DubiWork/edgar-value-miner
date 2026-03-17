@@ -40,6 +40,13 @@ function parseRequest(data: unknown): SubmitFeedbackRequest {
     );
   }
 
+  if (!/^[A-Za-z0-9_-]+$/.test((req['debateId'] as string).trim())) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Invalid debateId format. Only alphanumeric characters, underscores, and hyphens are allowed.'
+    );
+  }
+
   const section = req['section'];
   if (!VALID_SECTIONS.includes(section as Section)) {
     throw new functions.https.HttpsError(

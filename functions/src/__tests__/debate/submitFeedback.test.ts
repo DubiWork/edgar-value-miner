@@ -95,6 +95,27 @@ describe('submitFeedback handler — input validation', () => {
       submitFeedbackHandler(makeRequest({ debateId: 'AAPL_v1', section: 'bullCase', rating: 'meh' }, 'user-1'))
     ).rejects.toMatchObject({ code: 'invalid-argument' });
   });
+
+  it('throws invalid-argument when debateId contains a forward slash (path injection)', async () => {
+    const { submitFeedbackHandler } = await import('../../functions/submitFeedback.js');
+    await expect(
+      submitFeedbackHandler(makeRequest({ debateId: 'debates/evil', section: 'bullCase', rating: 'up' }, 'user-1'))
+    ).rejects.toMatchObject({ code: 'invalid-argument' });
+  });
+
+  it('throws invalid-argument when debateId contains a dot (path injection)', async () => {
+    const { submitFeedbackHandler } = await import('../../functions/submitFeedback.js');
+    await expect(
+      submitFeedbackHandler(makeRequest({ debateId: 'AAPL.v1', section: 'bullCase', rating: 'up' }, 'user-1'))
+    ).rejects.toMatchObject({ code: 'invalid-argument' });
+  });
+
+  it('throws invalid-argument when debateId contains whitespace (path injection)', async () => {
+    const { submitFeedbackHandler } = await import('../../functions/submitFeedback.js');
+    await expect(
+      submitFeedbackHandler(makeRequest({ debateId: 'AAPL v1', section: 'bullCase', rating: 'up' }, 'user-1'))
+    ).rejects.toMatchObject({ code: 'invalid-argument' });
+  });
 });
 
 describe('submitFeedback handler — write behavior', () => {

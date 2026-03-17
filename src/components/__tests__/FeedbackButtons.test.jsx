@@ -172,4 +172,27 @@ describe('FeedbackButtons', () => {
       expect(submitFeedback).toHaveBeenCalledWith('TSLA_v1', 'bearCase', 'down');
     });
   });
+
+  // UT-FB-11: On API error, an error message is displayed to the user
+  it('shows error message when submitFeedback throws', async () => {
+    makeAuthenticatedUser();
+    submitFeedback.mockRejectedValueOnce(new Error('Network error'));
+    renderFeedback();
+    fireEvent.click(screen.getByTestId('feedback-thumb-up'));
+    await waitFor(() => {
+      expect(screen.getByTestId('feedback-error')).toBeTruthy();
+    });
+  });
+
+  // UT-FB-12: Error message is not shown on successful submission
+  it('does not show error message on successful submission', async () => {
+    makeAuthenticatedUser();
+    submitFeedback.mockResolvedValueOnce({ success: true });
+    renderFeedback();
+    fireEvent.click(screen.getByTestId('feedback-thumb-up'));
+    await waitFor(() => {
+      expect(submitFeedback).toHaveBeenCalled();
+    });
+    expect(screen.queryByTestId('feedback-error')).toBeNull();
+  });
 });
