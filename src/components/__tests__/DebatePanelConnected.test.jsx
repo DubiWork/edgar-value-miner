@@ -17,6 +17,24 @@ vi.mock('../../hooks/useDebate', () => ({
   useDebate: vi.fn(),
 }));
 
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: vi.fn(() => ({
+    user: null,
+    isAuthenticated: false,
+    loading: false,
+    error: null,
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn(),
+  })),
+}));
+
+// Mock debateApi so FeedbackButtons doesn't call real Firebase
+vi.mock('../../services/debateApi', () => ({
+  getDebate: vi.fn(),
+  submitFeedback: vi.fn(),
+}));
+
 import { useDebate } from '../../hooks/useDebate';
 
 // =============================================================================

@@ -15,6 +15,7 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { ConfidenceMeter } from './ConfidenceMeter';
+import { FeedbackButtons } from './FeedbackButtons';
 
 const BULL_COLOR = '#10B981';
 const BULL_BG = 'color-mix(in srgb, #10B981 8%, transparent)';
@@ -81,7 +82,7 @@ ExpandableArgument.propTypes = {
 // BullCaseCard
 // =============================================================================
 
-export function BullCaseCard({ bullCase }) {
+export function BullCaseCard({ bullCase, debateId }) {
   const { arguments: args = [], confidence } = bullCase;
 
   return (
@@ -126,6 +127,13 @@ export function BullCaseCard({ bullCase }) {
           <ExpandableArgument key={i} argument={arg} index={i} />
         ))}
       </div>
+
+      {/* Feedback */}
+      {debateId && (
+        <div className="flex items-center justify-end pt-1">
+          <FeedbackButtons debateId={debateId} section="bullCase" />
+        </div>
+      )}
     </div>
   );
 }
@@ -142,6 +150,7 @@ BullCaseCard.propTypes = {
     confidence: PropTypes.number.isRequired,
     generatedAt: PropTypes.string,
   }).isRequired,
+  debateId: PropTypes.string,
   metadata: PropTypes.shape({
     viewCount: PropTypes.number,
     generatedAt: PropTypes.string,

@@ -16,6 +16,7 @@
  */
 
 import PropTypes from 'prop-types';
+import { FeedbackButtons } from './FeedbackButtons';
 
 const BLUE_COLOR = '#3B82F6';
 const BLUE_BG = 'color-mix(in srgb, #3B82F6 8%, transparent)';
@@ -59,7 +60,7 @@ function formatViewCount(count) {
 // SynthesisCard
 // =============================================================================
 
-export function SynthesisCard({ synthesis, metadata }) {
+export function SynthesisCard({ synthesis, metadata, debateId }) {
   const { keyFactors = [], recommendation, confidence, disclaimer } = synthesis;
   const sentiment = getSentiment(confidence);
   const { viewCount, generatedAt } = metadata || {};
@@ -154,6 +155,13 @@ export function SynthesisCard({ synthesis, metadata }) {
       >
         {disclaimer || 'AI-generated analysis for educational purposes only. Not financial advice.'}
       </div>
+
+      {/* Feedback */}
+      {debateId && (
+        <div className="flex items-center justify-end pt-1">
+          <FeedbackButtons debateId={debateId} section="synthesis" />
+        </div>
+      )}
     </div>
   );
 }
@@ -171,6 +179,7 @@ SynthesisCard.propTypes = {
     disclaimer: PropTypes.string.isRequired,
     generatedAt: PropTypes.string,
   }).isRequired,
+  debateId: PropTypes.string,
   metadata: PropTypes.shape({
     viewCount: PropTypes.number,
     generatedAt: PropTypes.string,

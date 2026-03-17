@@ -16,6 +16,7 @@
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { ConfidenceMeter } from './ConfidenceMeter';
+import { FeedbackButtons } from './FeedbackButtons';
 
 const BEAR_COLOR = '#EF4444';
 const BEAR_BG = 'color-mix(in srgb, #EF4444 8%, transparent)';
@@ -110,7 +111,7 @@ ExpandableRiskFactor.propTypes = {
 // BearCaseCard
 // =============================================================================
 
-export function BearCaseCard({ bearCase }) {
+export function BearCaseCard({ bearCase, debateId }) {
   const { riskFactors = [], confidence } = bearCase;
 
   return (
@@ -155,6 +156,13 @@ export function BearCaseCard({ bearCase }) {
           <ExpandableRiskFactor key={i} factor={factor} index={i} />
         ))}
       </div>
+
+      {/* Feedback */}
+      {debateId && (
+        <div className="flex items-center justify-end pt-1">
+          <FeedbackButtons debateId={debateId} section="bearCase" />
+        </div>
+      )}
     </div>
   );
 }
@@ -171,6 +179,7 @@ BearCaseCard.propTypes = {
     confidence: PropTypes.number.isRequired,
     generatedAt: PropTypes.string,
   }).isRequired,
+  debateId: PropTypes.string,
   metadata: PropTypes.shape({
     viewCount: PropTypes.number,
     generatedAt: PropTypes.string,

@@ -2,6 +2,7 @@ import * as functions from 'firebase-functions';
 import { helloWorldHandler } from './helloWorld';
 import { getOrGenerateDebateHandler } from './functions/getOrGenerateDebate';
 import { monthlyUsageResetHandler } from './functions/monthlyUsageReset';
+import { submitFeedbackHandler } from './functions/submitFeedback';
 
 /**
  * helloWorld — smoke-test onCall function.
@@ -44,3 +45,15 @@ export const monthlyUsageReset = functions.scheduler.onSchedule(
     await monthlyUsageResetHandler();
   }
 );
+
+/**
+ * submitFeedback — records user thumbs up/down feedback on a debate section.
+ * Writes to debates/{debateId}/feedback/{uid} and aggregates into feedbackSummary.
+ *
+ * Usage (emulator):
+ *   POST http://localhost:5001/<project-id>/<region>/submitFeedback
+ *   Body: { "data": { "debateId": "AAPL_v1", "section": "bullCase", "rating": "up" } }
+ *
+ * Requires authentication.
+ */
+export const submitFeedback = functions.https.onCall(submitFeedbackHandler);

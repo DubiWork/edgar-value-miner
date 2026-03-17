@@ -307,6 +307,9 @@ export function DebatePanelConnected({ ticker }) {
     generatedAt: debate.generatedAt,
   };
 
+  // Debate document ID follows the pattern {TICKER}_v{version}
+  const debateId = `${debate.ticker}_v${debate.metadata?.version ?? 1}`;
+
   return (
     <section
       data-testid="debate-panel-container"
@@ -343,12 +346,12 @@ export function DebatePanelConnected({ ticker }) {
         data-testid="debate-grid"
         className="grid md:grid-cols-2 gap-4 mb-4"
       >
-        <BullCaseCard bullCase={debate.bullCase} metadata={metadata} />
-        <BearCaseCard bearCase={debate.bearCase} metadata={metadata} />
+        <BullCaseCard bullCase={debate.bullCase} metadata={metadata} debateId={debateId} />
+        <BearCaseCard bearCase={debate.bearCase} metadata={metadata} debateId={debateId} />
       </div>
 
       {/* Synthesis — full width below */}
-      <SynthesisCard synthesis={debate.synthesis} metadata={metadata} />
+      <SynthesisCard synthesis={debate.synthesis} metadata={metadata} debateId={debateId} />
     </section>
   );
 }
