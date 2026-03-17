@@ -33,6 +33,9 @@ export { BearCaseCard } from './BearCaseCard';
 export { SynthesisCard } from './SynthesisCard';
 export { ConfidenceMeter } from './ConfidenceMeter';
 
+// Personal Notes
+export { PersonalNotesPanel } from './PersonalNotesPanel';
+
 // Dashboard
 export { DashboardLayout } from './Dashboard';
 export { CompanyBanner } from './Dashboard/CompanyBanner';

@@ -19,6 +19,7 @@ import { LoginModal } from './components/LoginModal'
 import { UserMenu } from './components/UserMenu'
 import { FeatureGate } from './components/FeatureGate'
 import { DebatePanelConnected } from './components/DebatePanelConnected'
+import { PersonalNotesPanel } from './components/PersonalNotesPanel'
 import { useCompanySearch } from './hooks/useCompanySearch'
 import { useStockQuote } from './hooks/useStockQuote'
 import { useKeyMetrics } from './hooks/useKeyMetrics'
@@ -339,6 +340,11 @@ function App() {
           <FeatureGate flag="AI_DEBATE">
             <DebatePanelConnected ticker={data.ticker} />
           </FeatureGate>
+        )}
+
+        {/* Personal Notes Panel — below debate, always shown when company is loaded */}
+        {data && !loading && (
+          <PersonalNotesPanel ticker={data.ticker} companyName={data.companyName} />
         )}
 
         {/* Cache metadata indicator */}
