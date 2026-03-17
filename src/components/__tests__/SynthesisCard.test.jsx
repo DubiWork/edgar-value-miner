@@ -131,4 +131,43 @@ describe('SynthesisCard', () => {
     const dateEl = screen.getByTestId('generated-at');
     expect(dateEl.textContent).toMatch(/Mar|march|2026|updated/i);
   });
+
+  // UT-SYN-13: Sentiment shows "Bullish" for confidence > 0.70
+  it('shows Bullish sentiment for confidence > 0.70', () => {
+    renderCard({ synthesis: { ...mockSynthesis, confidence: 0.8 } });
+    const indicator = screen.getByTestId('sentiment-indicator');
+    expect(indicator.textContent).toMatch(/bullish/i);
+  });
+
+  // UT-SYN-14: Sentiment shows "Bearish" for confidence < 0.40
+  it('shows Bearish sentiment for confidence < 0.40', () => {
+    renderCard({ synthesis: { ...mockSynthesis, confidence: 0.2 } });
+    const indicator = screen.getByTestId('sentiment-indicator');
+    expect(indicator.textContent).toMatch(/bearish/i);
+  });
+
+  // UT-SYN-15: Sentiment indicator has aria-label for accessibility
+  it('sentiment indicator has aria-label for screen readers', () => {
+    renderCard();
+    const indicator = screen.getByTestId('sentiment-indicator');
+    // aria-label should describe the sentiment clearly
+    expect(indicator.getAttribute('aria-label')).toMatch(/sentiment/i);
+  });
+
+  // UT-SYN-16: Investment disclaimer has role="note"
+  it('investment disclaimer has role="note" for accessibility', () => {
+    renderCard();
+    const disclaimer = screen.getByTestId('investment-disclaimer');
+    expect(disclaimer.getAttribute('role')).toBe('note');
+  });
+
+  // UT-SYN-17: Renders with empty keyFactors gracefully
+  it('renders gracefully with empty keyFactors array', () => {
+    const { container } = renderCard({
+      synthesis: { ...mockSynthesis, keyFactors: [] },
+    });
+    expect(container.firstChild).toBeTruthy();
+    // No factors rendered
+    expect(screen.queryAllByTestId(/^synthesis-factor-/).length).toBe(0);
+  });
 });
