@@ -9,9 +9,9 @@
  * - Mobile (375px): All stacked vertically
  *
  * States:
- * - Loading spinner
- * - Error with retry
- * - Rate limited with upgrade CTA
+ * - Loading: shimmer skeleton matching DebatePanel layout (3 cards)
+ * - Error: distinct messages per error type (network, server, timeout, not-found)
+ * - Rate limited with upgrade CTA and analytics event
  * - Success (Bull + Bear + Synthesis)
  *
  * @param {Object} props
@@ -25,33 +25,150 @@ import { BearCaseCard } from './BearCaseCard';
 import { SynthesisCard } from './SynthesisCard';
 
 // =============================================================================
-// Loading state
+// Analytics helper
 // =============================================================================
 
-function DebateLoading() {
+/**
+ * Fires a gtag event if the gtag function is available.
+ * Falls back silently when analytics is not configured.
+ *
+ * @param {string} eventName - Event name (e.g. 'upgrade_cta_clicked')
+ * @param {Object} [params]  - Additional event parameters
+ */
+function fireAnalyticsEvent(eventName, params = {}) {
+  if (typeof globalThis.gtag === 'function') {
+    globalThis.gtag('event', eventName, params);
+  }
+}
+
+// =============================================================================
+// Error codes that are NOT retryable (no retry button shown)
+// =============================================================================
+
+const NON_RETRYABLE_CODES = new Set(['not-found', 'auth']);
+
+// =============================================================================
+// Loading state — 3-card shimmer skeleton
+// =============================================================================
+
+/**
+ * SkeletonBone — single animated gray rectangle used inside the skeleton.
+ */
+function SkeletonBone({ className = '' }) {
+  return (
+    <div
+      className={`rounded-lg animate-pulse ${className}`.trim()}
+      style={{ backgroundColor: 'var(--color-bg-secondary)' }}
+    />
+  );
+}
+
+SkeletonBone.propTypes = {
+  className: PropTypes.string,
+};
+
+/**
+ * DebateCardSkeleton — skeleton placeholder for one debate card
+ * (Bull, Bear, or Synthesis). Matches the rough dimensions of the real cards.
+ */
+function DebateCardSkeleton({ testId }) {
+  return (
+    <div
+      data-testid={testId}
+      className="rounded-xl p-4 flex flex-col gap-3"
+      style={{
+        backgroundColor: 'var(--color-bg-secondary)',
+        border: '1px solid var(--color-border)',
+      }}
+    >
+      {/* Header row: icon + title */}
+      <div className="flex items-center justify-between gap-2">
+        <SkeletonBone className="h-4 w-24" />
+        <SkeletonBone className="h-4 w-20" />
+      </div>
+      {/* Confidence bar */}
+      <SkeletonBone className="h-2 w-full" />
+      {/* 3 argument/factor rows */}
+      <SkeletonBone className="h-8 w-full" />
+      <SkeletonBone className="h-8 w-full" />
+      <SkeletonBone className="h-8 w-full" />
+    </div>
+  );
+}
+
+DebateCardSkeleton.propTypes = {
+  testId: PropTypes.string.isRequired,
+};
+
+/**
+ * DebateLoading — full loading skeleton for the debate panel.
+ *
+ * Renders 3 skeleton cards (Bull, Bear, Synthesis) with:
+ * - Company name in the loading message
+ * - Time estimate ("This usually takes 10–15 seconds")
+ */
+function DebateLoading({ ticker }) {
   return (
     <div
       data-testid="debate-loading"
-      className="card mt-6 animate-pulse"
+      className="card mt-6"
       aria-label="Loading AI debate analysis"
       role="status"
     >
-      <div className="h-5 w-48 rounded mb-4" style={{ backgroundColor: 'var(--color-bg-secondary)' }} />
-      <div className="grid md:grid-cols-2 gap-4 mb-4">
-        <div className="h-40 rounded-xl" style={{ backgroundColor: 'var(--color-bg-secondary)' }} />
-        <div className="h-40 rounded-xl" style={{ backgroundColor: 'var(--color-bg-secondary)' }} />
+      {/* Loading message */}
+      <div className="mb-4">
+        <p
+          data-testid="debate-loading-message"
+          className="text-sm font-medium"
+          style={{ color: 'var(--color-text-primary)' }}
+        >
+          Generating AI debate for {ticker}...
+        </p>
+        <p
+          data-testid="debate-loading-time-estimate"
+          className="text-xs mt-1"
+          style={{ color: 'var(--color-text-muted)' }}
+        >
+          This usually takes 10–15 seconds
+        </p>
       </div>
-      <div className="h-32 rounded-xl" style={{ backgroundColor: 'var(--color-bg-secondary)' }} />
+
+      {/* Bull + Bear side-by-side (stacked on mobile) */}
+      <div className="grid md:grid-cols-2 gap-4 mb-4">
+        <DebateCardSkeleton testId="debate-skeleton-card-bull" />
+        <DebateCardSkeleton testId="debate-skeleton-card-bear" />
+      </div>
+
+      {/* Synthesis below */}
+      <DebateCardSkeleton testId="debate-skeleton-card-synthesis" />
+
       <span className="sr-only">Loading AI debate analysis...</span>
     </div>
   );
 }
 
+DebateLoading.propTypes = {
+  ticker: PropTypes.string,
+};
+
 // =============================================================================
 // Error state
 // =============================================================================
 
-function DebateError({ message, onRetry }) {
+/**
+ * DebateError — contained error display within the debate section.
+ *
+ * Does NOT break the Dashboard. Shows a contextual message per error type
+ * and a retry button for retryable errors.
+ *
+ * @param {Object} props
+ * @param {string} props.message   - User-friendly error message
+ * @param {string|null} props.errorCode - Machine-readable code ('network' | 'internal' | 'timeout' | 'not-found' | 'auth' | ...)
+ * @param {Function|null} props.onRetry - Retry callback; omitted for non-retryable errors
+ */
+function DebateError({ message, errorCode, onRetry }) {
+  const isRetryable = !NON_RETRYABLE_CODES.has(errorCode);
+
   return (
     <div
       data-testid="debate-error"
@@ -61,8 +178,9 @@ function DebateError({ message, onRetry }) {
       <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
         {message}
       </p>
-      {onRetry && (
+      {isRetryable && onRetry && (
         <button
+          data-testid="debate-error-retry"
           type="button"
           className="px-4 py-2 text-sm font-medium rounded-lg"
           style={{
@@ -80,41 +198,86 @@ function DebateError({ message, onRetry }) {
 
 DebateError.propTypes = {
   message: PropTypes.string.isRequired,
+  errorCode: PropTypes.string,
   onRetry: PropTypes.func,
 };
 
 // =============================================================================
-// Rate limit state
+// Rate limit state — visually distinct from error (upgrade opportunity)
 // =============================================================================
 
+/**
+ * DebateRateLimit — upgrade CTA shown when the free tier limit is reached.
+ *
+ * Visually distinct from the error state: uses a lock icon and upgrade-focused
+ * language rather than a warning icon and retry.
+ *
+ * Fires `upgrade_cta_clicked` analytics event when the CTA is clicked.
+ *
+ * @param {Object} props
+ * @param {{ currentCount: number, maxCount: number, upgradeUrl: string }|null} props.info
+ */
 function DebateRateLimit({ info }) {
+  const upgradeUrl =
+    info?.upgradeUrl ||
+    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_STRIPE_UPGRADE_URL) ||
+    '#';
+
+  function handleCtaClick() {
+    fireAnalyticsEvent('upgrade_cta_clicked', {
+      source: 'debate_rate_limit',
+      current_count: info?.currentCount,
+      max_count: info?.maxCount,
+    });
+  }
+
   return (
     <div
       data-testid="debate-rate-limit"
-      className="card mt-6 flex flex-col items-center gap-3 py-8 text-center"
+      className="card mt-6 flex flex-col items-center gap-4 py-10 text-center"
+      style={{
+        border: '1px solid color-mix(in srgb, #3B82F6 30%, transparent)',
+        backgroundColor: 'color-mix(in srgb, #3B82F6 5%, transparent)',
+      }}
     >
-      <span className="text-2xl" aria-hidden="true">🔒</span>
-      <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-        Debate generation limit reached
-      </p>
-      {info && (
-        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          {info.currentCount} / {info.maxCount} debates used this period
+      <span className="text-3xl" aria-hidden="true">🔒</span>
+
+      <div className="flex flex-col gap-1">
+        <p className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+          You&rsquo;ve reached your debate limit
         </p>
-      )}
-      {info?.upgradeUrl && (
-        <a
-          href={info.upgradeUrl}
-          className="px-4 py-2 text-sm font-medium rounded-lg"
-          style={{
-            backgroundColor: '#3B82F6',
-            color: '#fff',
-          }}
-          rel="noreferrer"
-        >
-          Upgrade to generate more
-        </a>
-      )}
+        {info && (
+          <p
+            data-testid="rate-limit-usage"
+            className="text-sm"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
+            {info.currentCount} of {info.maxCount} free debates used this month
+          </p>
+        )}
+      </div>
+
+      <p
+        data-testid="rate-limit-upgrade-message"
+        className="text-sm max-w-xs"
+        style={{ color: 'var(--color-text-secondary)' }}
+      >
+        Unlock unlimited debates for $9.99/month and get AI analysis for any stock.
+      </p>
+
+      <a
+        data-testid="rate-limit-cta"
+        href={upgradeUrl}
+        className="px-6 py-2.5 text-sm font-semibold rounded-lg"
+        style={{
+          backgroundColor: '#3B82F6',
+          color: '#fff',
+        }}
+        rel="noreferrer"
+        onClick={handleCtaClick}
+      >
+        Upgrade — Unlimited Debates
+      </a>
     </div>
   );
 }
@@ -132,11 +295,11 @@ DebateRateLimit.propTypes = {
 // =============================================================================
 
 export function DebatePanelConnected({ ticker }) {
-  const { debate, loading, error, isRateLimited, rateLimitInfo, refresh } = useDebate(ticker);
+  const { debate, loading, error, errorCode, isRateLimited, rateLimitInfo, refresh } = useDebate(ticker);
 
-  if (loading) return <DebateLoading />;
+  if (loading) return <DebateLoading ticker={ticker} />;
   if (isRateLimited) return <DebateRateLimit info={rateLimitInfo} />;
-  if (error) return <DebateError message={error} onRetry={refresh} />;
+  if (error) return <DebateError message={error} errorCode={errorCode} onRetry={refresh} />;
   if (!debate) return null;
 
   const metadata = {
