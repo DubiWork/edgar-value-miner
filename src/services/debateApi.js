@@ -202,12 +202,12 @@ export async function getDebate(ticker) {
  *
  * @param {string} debateId - The debate document ID
  * @param {'bullCase'|'bearCase'|'synthesis'} section - Which section was rated
- * @param {number} rating - Rating (1-5)
+ * @param {'up'|'down'} rating - Thumbs up or down
  * @returns {Promise<{ success: boolean }>}
  * @throws {DebateApiError} On network errors or auth errors
  *
  * @example
- * await submitFeedback('debates/AAPL_v1', 'bullCase', 4);
+ * await submitFeedback('AAPL_v1', 'bullCase', 'up');
  */
 export async function submitFeedback(debateId, section, rating) {
   let result;
