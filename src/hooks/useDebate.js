@@ -31,6 +31,7 @@ import { useAuth } from './useAuth';
  *   debate: import('../services/debateApi').DebateResponse | null,
  *   loading: boolean,
  *   error: string | null,
+ *   errorCode: string | null,
  *   isRateLimited: boolean,
  *   rateLimitInfo: { currentCount: number, maxCount: number, upgradeUrl: string } | null,
  *   refresh: () => void
@@ -61,6 +62,7 @@ export function useDebate(ticker) {
   const [debate, setDebate] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [errorCode, setErrorCode] = useState(null);
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [rateLimitInfo, setRateLimitInfo] = useState(null);
 
@@ -97,6 +99,7 @@ export function useDebate(ticker) {
 
     setLoading(true);
     setError(null);
+    setErrorCode(null);
     setIsRateLimited(false);
     setRateLimitInfo(null);
 
@@ -107,6 +110,7 @@ export function useDebate(ticker) {
 
       setDebate(result);
       setError(null);
+      setErrorCode(null);
       setIsRateLimited(false);
       setRateLimitInfo(null);
     } catch (err) {
@@ -118,12 +122,14 @@ export function useDebate(ticker) {
         setIsRateLimited(true);
         setRateLimitInfo(err.rateLimitInfo ?? null);
         setError(err.message ?? 'You have reached your debate generation limit.');
+        setErrorCode('rate-limited');
       } else {
         setIsRateLimited(false);
         setRateLimitInfo(null);
         setError(
           err?.message ?? 'An unexpected error occurred. Please try again.'
         );
+        setErrorCode(err?.code ?? 'unknown');
       }
     } finally {
       if (isMountedRef.current && currentFetchId === fetchIdRef.current) {
@@ -141,6 +147,7 @@ export function useDebate(ticker) {
       setDebate(null);
       setLoading(false);
       setError(null);
+      setErrorCode(null);
       setIsRateLimited(false);
       setRateLimitInfo(null);
       return;
@@ -164,6 +171,7 @@ export function useDebate(ticker) {
     debate,
     loading,
     error,
+    errorCode,
     isRateLimited,
     rateLimitInfo,
     refresh,
