@@ -13,6 +13,13 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: () => '/files/company_tickers.json',
       },
+      // Proxy SEC company facts API to avoid CORS issues in development
+      // Forwards /api/sec-company-facts/CIK{paddedCIK}.json -> data.sec.gov
+      '/api/sec-company-facts': {
+        target: 'https://data.sec.gov',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/sec-company-facts', '/api/xbrl/companyfacts'),
+      },
     },
   },
 })
