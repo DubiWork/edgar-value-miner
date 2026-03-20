@@ -361,10 +361,10 @@ describe('edgarApi', () => {
     it('should pad CIK before fetching', async () => {
       await fetchCompanyFacts(320193);
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('CIK0000320193'),
-        expect.any(Object)
-      );
+      // URL contains the padded CIK — either as path segment (DEV: CIK0000320193)
+      // or as query param (PROD: ?cik=0000320193)
+      const calledUrl = global.fetch.mock.calls[0][0];
+      expect(calledUrl).toMatch(/CIK0000320193|cik=0000320193/);
     });
 
     it('should throw error for 404 not found', async () => {
@@ -406,7 +406,7 @@ describe('edgarApi', () => {
             json: () => Promise.resolve(mockCompanyTickersResponse),
           });
         }
-        if (url.includes('companyfacts')) {
+        if (url.includes('companyfacts') || url.includes('secCompanyFacts') || url.includes('sec-company-facts')) {
           return Promise.resolve({
             ok: true,
             status: 200,
