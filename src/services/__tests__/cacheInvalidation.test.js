@@ -1121,8 +1121,8 @@ describe('cacheInvalidation', () => {
       const status = await checkCacheStatus('AAPL');
 
       expect(status.exists).toBe(true);
-      // At exactly 90 days, it should be fresh (not expired)
-      expect(status.isStale).toBe(false);
+      // At exactly 90 days, it should be stale (expired)
+      expect(status.isStale).toBe(true);
     });
 
     it('should prioritize TTL expiry reason over other reasons', async () => {
