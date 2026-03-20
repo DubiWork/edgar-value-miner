@@ -47,8 +47,10 @@ jobs:
           target: staging
           projectId: edgar-value-miner
           channelId: live
+      - name: Build Cloud Functions
+        run: cd functions && npm run build
       - name: Deploy Cloud Functions to Staging
-        run: npx firebase-tools deploy --only functions --project edgar-value-miner
+        run: npx firebase deploy --only functions --project edgar-value-miner
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
