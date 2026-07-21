@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "lastUpdated": "2026-03-13T16:00:00Z",
+  "lastUpdated": "2026-03-20T12:00:00Z",
   "projectConfig": {
     "owner": "DubiWork",
     "repo": "edgar-value-miner",
@@ -9,27 +9,92 @@
     "ghPagesUrl": "https://dubiwork.github.io/edgar-value-miner"
   },
   "activeParentIssue": {
-    "number": 129,
-    "title": "Epic: Sprint 0 — Quick Wins + Accessibility Baseline (v1.1)",
-    "epicBranch": "epic/129-sprint-0-accessibility",
-    "subIssues": [130, 131, 132, 133, 134, 135],
-    "allSubIssuesMerged": true,
-    "epicPR": 142
+    "number": 143,
+    "title": "Epic: AI Bull vs Bear Debate — Full Stack (v2.0)",
+    "epicBranch": "epic/143-ai-debate",
+    "epicPR": 166,
+    "epicPRUrl": "https://github.com/DubiWork/edgar-value-miner/pull/166",
+    "subIssues": {
+      "phaseA": [144, 145, 146, 147, 148],
+      "phaseB": [149, 150, 151, 152, 153],
+      "phaseC": [154, 155, 156, 157, 158, 159],
+      "phaseD": [160, 161, 162, 163, 164, 165]
+    },
+    "status": "epic-complete-queued",
+    "ghPagesPreviewUrl": "https://dubiwork.github.io/edgar-value-miner/epic-143/"
   },
-  "currentStep": "3.5.1",
+  "currentStep": "hotfix-executing",
+  "hotfix": {
+    "issues": [
+      {
+        "number": 190,
+        "title": "HOTFIX: SEC Tickers CORS proxy",
+        "priority": "P0",
+        "status": "merged",
+        "branch": "hotfix/190-sec-cors-proxy",
+        "pr": 196
+      },
+      {
+        "number": 193,
+        "title": "HOTFIX: Deploy workflows missing env vars",
+        "priority": "P0",
+        "status": "merged",
+        "branch": "hotfix/193-deploy-env-vars",
+        "pr": 195
+      },
+      {
+        "number": 191,
+        "title": "HOTFIX: Missing meta/OG tags",
+        "priority": "P1",
+        "status": "pending",
+        "branch": null,
+        "pr": null
+      },
+      {
+        "number": 192,
+        "title": "HOTFIX: Footer contrast dark mode",
+        "priority": "P1",
+        "status": "pending",
+        "branch": null,
+        "pr": null
+      },
+      {
+        "number": 194,
+        "title": "HOTFIX: Search input missing id/name",
+        "priority": "P2",
+        "status": "pending",
+        "branch": null,
+        "pr": null
+      }
+    ],
+    "blocksPromotion": true,
+    "userMustSeeE2E": true
+  },
   "bakingEpics": [
     {
       "number": 129,
+      "title": "Epic: Sprint 0 — Quick Wins + Accessibility Baseline (v1.1)",
       "mergedToDevelop": "2026-03-13",
       "bakeStarted": "2026-03-13",
-      "consecutiveGreenDays": 0,
-      "status": "baking"
+      "consecutiveGreenDays": 7,
+      "status": "ready-for-promotion",
+      "promotionPR": 189
     }
   ],
   "stagingQueue": {
     "current": 129,
-    "queue": [],
+    "queue": [143],
     "history": []
+  },
+  "groomingPipeline": {
+    "current": null,
+    "queue": [],
+    "completed": {
+      "number": 143,
+      "title": "Epic: AI Bull vs Bear Debate — Full Stack (v2.0)",
+      "groomingCompletedAt": "2026-03-14",
+      "status": "planned"
+    }
   },
   "completedEpics": [
     {
@@ -38,9 +103,5 @@
       "closedAt": "2026-03-11T12:00:00Z",
       "version": "v1.0.0"
     }
-  ],
-  "groomingPipeline": {
-    "queue": [],
-    "current": null
-  }
+  ]
 }
