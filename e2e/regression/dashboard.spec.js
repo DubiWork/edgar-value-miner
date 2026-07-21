@@ -1,14 +1,17 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
-import { mockAPIs } from '../helpers/mock-apis.js';
 import { SELECTORS } from '../helpers/selectors.js';
 import { VIEWPORTS } from '../helpers/viewports.js';
 
 // ---------------------------------------------------------------------------
-// Dashboard Flow E2E Tests (RT-20 to RT-24)
+// Dashboard Flow E2E Tests (RT-20 to RT-22) — REAL (no API mocks)
 //
-// Covers dashboard layout rendering, responsive behaviour, loading skeletons,
-// and error boundary display.
+// Runs against live staging: BASE_URL=https://edgar-value-miner-staging.web.app
+// All tests hit real Cloud Functions (secTickers, secCompanyFacts).
+// RT-23 (loading skeleton) and RT-24 (error boundary) require induced
+// conditions that cannot be created against live infra — those tests live in
+// the local vitest layer: src/__tests__/loadingSkeleton.integration.test.jsx
+// and src/__tests__/errorBoundary.integration.test.jsx
 // ---------------------------------------------------------------------------
 
 test.describe('Dashboard Flow', () => {
@@ -16,7 +19,6 @@ test.describe('Dashboard Flow', () => {
   // RT-20: Dashboard layout renders all expected panels after search
   // -----------------------------------------------------------------------
   test('RT-20: Dashboard layout renders all sections after search', async ({ page }) => {
-    await mockAPIs(page);
     await page.goto('/');
 
     // Perform search
@@ -31,13 +33,13 @@ test.describe('Dashboard Flow', () => {
     const dashboard = page.locator(
       `[data-testid="${SELECTORS.dashboard.layout}"]`,
     );
-    await expect(dashboard).toBeVisible({ timeout: 10_000 });
+    await expect(dashboard).toBeVisible({ timeout: 35_000 });
 
-    // Banner section (only renders after real data loads, not from skeleton)
+    // Banner section (only renders after real Cloud Function data loads)
     const banner = page.locator(
       `[data-testid="${SELECTORS.companyBanner.root}"]`,
     );
-    await expect(banner).toBeVisible({ timeout: 15_000 });
+    await expect(banner).toBeVisible({ timeout: 35_000 });
     await expect(
       page.getByRole('heading', { name: 'Apple Inc.' }),
     ).toBeVisible();
@@ -75,7 +77,6 @@ test.describe('Dashboard Flow', () => {
   // -----------------------------------------------------------------------
   test('RT-21: Mobile layout is single column with no horizontal overflow', async ({ page }) => {
     await page.setViewportSize(VIEWPORTS.mobile);
-    await mockAPIs(page);
     await page.goto('/');
 
     // Perform search
@@ -90,13 +91,12 @@ test.describe('Dashboard Flow', () => {
     const dashboard = page.locator(
       `[data-testid="${SELECTORS.dashboard.layout}"]`,
     );
-    await expect(dashboard).toBeVisible({ timeout: 10_000 });
+    await expect(dashboard).toBeVisible({ timeout: 35_000 });
 
-    // All major sections should be visible (company-banner needs extra time
-    // because the cache coordinator falls through L1/L2 before hitting L3 mock)
+    // All major sections should be visible (live Cloud Function latency)
     await expect(
       page.locator(`[data-testid="${SELECTORS.companyBanner.root}"]`),
-    ).toBeVisible({ timeout: 15_000 });
+    ).toBeVisible({ timeout: 35_000 });
     await expect(
       page.locator(`[data-testid="${SELECTORS.metricCard.root}"]`).first(),
     ).toBeVisible();
@@ -119,7 +119,6 @@ test.describe('Dashboard Flow', () => {
   // -----------------------------------------------------------------------
   test('RT-22: Tablet layout shows 2-column metrics and stacked charts', async ({ page }) => {
     await page.setViewportSize(VIEWPORTS.tablet);
-    await mockAPIs(page);
     await page.goto('/');
 
     // Perform search
@@ -134,7 +133,7 @@ test.describe('Dashboard Flow', () => {
     const dashboard = page.locator(
       `[data-testid="${SELECTORS.dashboard.layout}"]`,
     );
-    await expect(dashboard).toBeVisible({ timeout: 10_000 });
+    await expect(dashboard).toBeVisible({ timeout: 35_000 });
 
     // Verify metrics grid is 2-column at 768px
     // The CSS rule at 768px: grid-template-columns: repeat(2, 1fr)
@@ -157,84 +156,5 @@ test.describe('Dashboard Flow', () => {
       const chartsColumnCount = chartsColumns.trim().split(/\s+/).length;
       expect(chartsColumnCount).toBe(1);
     }
-  });
-
-  // -----------------------------------------------------------------------
-  // RT-23: Loading skeletons appear during data fetch
-  // -----------------------------------------------------------------------
-  test('RT-23: Loading skeletons appear while data is loading', async ({ page }) => {
-    // Use delayed API responses to observe loading state
-    await mockAPIs(page, { delay: 2000 });
-    await page.goto('/');
-
-    // Perform search
-    const input = page
-      .locator(`[data-testid="${SELECTORS.tickerSearch.input}"]`)
-      .first();
-    await input.click();
-    await input.fill('AAPL');
-    await input.press('Enter');
-
-    // Skeletons should appear while API is delayed
-    const skeleton = page.locator(
-      `[data-testid="${SELECTORS.dashboard.skeleton}"]`,
-    );
-    await expect(skeleton).toBeVisible({ timeout: 5_000 });
-
-    // Verify individual skeleton components are present
-    await expect(
-      page.locator(`[data-testid="${SELECTORS.companyBanner.skeleton}"]`),
-    ).toBeVisible();
-    await expect(
-      page.locator(`[data-testid="${SELECTORS.metricCard.skeleton}"]`).first(),
-    ).toBeVisible();
-    await expect(
-      page.locator(`[data-testid="${SELECTORS.charts.containerSkeleton}"]`).first(),
-    ).toBeVisible();
-
-    // After the delay resolves, the real dashboard should replace skeletons.
-    // Wait for the real company banner (only rendered when data loads) rather
-    // than dashboard-layout (which also exists inside DashboardSkeleton).
-    // Extra time needed: 2s mock delay + L1/L2 cache fallthrough + render.
-    await expect(
-      page.locator(`[data-testid="${SELECTORS.companyBanner.root}"]`),
-    ).toBeVisible({ timeout: 20_000 });
-    await expect(skeleton).not.toBeVisible();
-  });
-
-  // -----------------------------------------------------------------------
-  // RT-24: Error boundary displays when API returns error
-  // -----------------------------------------------------------------------
-  test('RT-24: Error boundary displays with retry when API errors', async ({ page }) => {
-    // Mock APIs to return 500 on companyfacts
-    await mockAPIs(page, { errorOnFacts: true });
-    await page.goto('/');
-
-    // Perform search
-    const input = page
-      .locator(`[data-testid="${SELECTORS.tickerSearch.input}"]`)
-      .first();
-    await input.click();
-    await input.fill('AAPL');
-    await input.press('Enter');
-
-    // Error state should appear
-    const errorState = page.locator(
-      `[data-testid="${SELECTORS.app.errorState}"]`,
-    );
-    await expect(errorState).toBeVisible({ timeout: 10_000 });
-
-    // Dashboard should NOT be visible
-    await expect(
-      page.locator(`[data-testid="${SELECTORS.dashboard.layout}"]`),
-    ).not.toBeVisible();
-
-    // A retry button should be available (btn-primary with RefreshCw icon)
-    const retryButton = errorState.locator('button.btn-primary');
-    await expect(retryButton).toBeVisible();
-
-    // A "Go Home" button should also be present
-    const goHomeButton = errorState.locator('button.btn-secondary');
-    await expect(goHomeButton).toBeVisible();
   });
 });
