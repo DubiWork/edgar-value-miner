@@ -1,7 +1,8 @@
 @import "tailwindcss";
-@source not "../**/*";
 @source "../index.html";
 @source "../src/**/*.{js,jsx,ts,tsx,css}";
+@source not "../*.md";
+@source not "../docs/**";
 
 
 
