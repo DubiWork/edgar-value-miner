@@ -13,6 +13,7 @@ import { describe, it, expect } from 'vitest';
 import {
   normalizeCompanyFacts,
   extractTimeSeriesData,
+  findGaapTag,
   NORMALIZATION_VERSION,
 } from '../../utils/gaapNormalizer.js';
 
@@ -475,6 +476,231 @@ describe('P1 #15: Missing shares outstanding', () => {
     expect(result.metrics.sharesOutstanding.annual).toEqual([]);
     expect(result.metrics.sharesOutstanding.quarterly).toEqual([]);
     expect(result.metrics.sharesOutstanding.tag).toBeNull();
+  });
+});
+
+// =============================================================================
+// BUG-1 / #197: Revenue tag recency — findGaapTag returns stale first-match
+// =============================================================================
+
+describe('BUG-1/#197 revenue tag recency', () => {
+  /**
+   * AAPL-shaped scenario: "Revenues" exists but only covers FY2016-FY2018.
+   * "RevenueFromContractWithCustomerExcludingAssessedTax" covers FY2019-FY2025.
+   * findGaapTag must return the tag with recent data, not the first-present tag.
+   */
+  function createAaplShapedFacts() {
+    return createCompanyFacts({
+      facts: {
+        'us-gaap': {
+          Revenues: {
+            label: 'Revenues',
+            units: {
+              USD: [
+                createUnitEntry({ end: '2016-09-24', val: 215639000000, form: '10-K', frame: 'CY2016' }),
+                createUnitEntry({ end: '2017-09-30', val: 229234000000, form: '10-K', frame: 'CY2017' }),
+                createUnitEntry({ end: '2018-09-29', val: 265595000000, form: '10-K', frame: 'CY2018' }),
+              ],
+            },
+          },
+          RevenueFromContractWithCustomerExcludingAssessedTax: {
+            label: 'Revenue From Contract With Customer Excluding Assessed Tax',
+            units: {
+              USD: [
+                createUnitEntry({ end: '2019-09-28', val: 260174000000, form: '10-K', frame: 'CY2019' }),
+                createUnitEntry({ end: '2020-09-26', val: 274515000000, form: '10-K', frame: 'CY2020' }),
+                createUnitEntry({ end: '2021-09-25', val: 365817000000, form: '10-K', frame: 'CY2021' }),
+                createUnitEntry({ end: '2022-09-24', val: 394328000000, form: '10-K', frame: 'CY2022' }),
+                createUnitEntry({ end: '2023-09-30', val: 383285000000, form: '10-K', frame: 'CY2023' }),
+                createUnitEntry({ end: '2024-09-28', val: 391035000000, form: '10-K', frame: 'CY2024' }),
+                createUnitEntry({ end: '2025-09-27', val: 395760000000, form: '10-K', frame: 'CY2025' }),
+              ],
+            },
+          },
+        },
+      },
+    });
+  }
+
+  it('normalizeCompanyFacts: most recent annual[0].fiscalYear should be 2025, not 2018', () => {
+    // BUG: findGaapTag picks "Revenues" (index 0) which only has data through FY2018.
+    // The result.metrics.revenue.annual[0].fiscalYear will be 2018 instead of 2025.
+    const result = normalizeCompanyFacts(createAaplShapedFacts());
+    expect(result.metrics.revenue.annual[0].fiscalYear).toBe(2025);
+  });
+
+  it('normalizeCompanyFacts: annual series should cover recent years (length 5, no year < 2021)', () => {
+    // BUG: today returns FY2016-FY2018 stale data (at most 3 entries from Revenues).
+    const result = normalizeCompanyFacts(createAaplShapedFacts());
+    expect(result.metrics.revenue.annual).toHaveLength(5);
+    const years = result.metrics.revenue.annual.map(d => d.fiscalYear);
+    expect(Math.min(...years)).toBeGreaterThanOrEqual(2021);
+  });
+
+  it('findGaapTag: should return RevenueFromContractWithCustomerExcludingAssessedTax, not Revenues', () => {
+    // BUG: today returns { tag: "Revenues", index: 0 } because it is first in GAAP_TAG_MAP.
+    // The correct tag is the one with more recent data.
+    const tagResult = findGaapTag(createAaplShapedFacts(), 'revenue');
+    expect(tagResult).not.toBeNull();
+    expect(tagResult.tag).toBe('RevenueFromContractWithCustomerExcludingAssessedTax');
+  });
+});
+
+// =============================================================================
+// BUG-2 / #198: Duplicate fiscal year dedup — no-frame + off-by-one-day end
+// =============================================================================
+
+describe('BUG-2/#198 duplicate fiscal year dedup (no-frame, off-by-one-day end)', () => {
+  /**
+   * Stronger than the existing "#8 restated" test.
+   * The existing test uses frame: 'CY2023' on both entries — dedup keys on frame,
+   * so it works. THIS test omits frame entirely (10-K/A restatement shape) and
+   * uses two slightly different end dates (2023-09-30 vs 2023-10-01) for the
+   * same fiscal year. The dedup key becomes item.end, which differs → both survive.
+   */
+  it('extractTimeSeriesData: FY2023 with no-frame + off-by-one-day ends → exactly 1 row', () => {
+    const gaapTagData = {
+      units: {
+        USD: [
+          // Original 10-K for FY2023
+          createUnitEntry({
+            end: '2023-09-30',
+            val: 383285000000,
+            form: '10-K',
+            // no frame — intentional, this is the bug-triggering shape
+            filed: '2023-11-03',
+            accn: '0000320193-23-000077',
+          }),
+          // 10-K/A restatement same fiscal year, end date off by 1 day
+          createUnitEntry({
+            end: '2023-10-01',
+            val: 383000000000,
+            form: '10-K/A',
+            // no frame
+            filed: '2024-01-15',
+            accn: '0000320193-24-000012',
+          }),
+        ],
+      },
+    };
+
+    const result = extractTimeSeriesData(gaapTagData, 'annual');
+
+    // BUG: dedup keys on (frame || end). Without frame, key = end.
+    // '2023-09-30' !== '2023-10-01' → both survive → length is 2, not 1.
+    const fy2023Entries = result.filter(d => d.fiscalYear === 2023);
+    expect(fy2023Entries).toHaveLength(1);
+  });
+
+  it('extractTimeSeriesData: no-frame dedup keeps the later-filed entry (10-K/A value)', () => {
+    const gaapTagData = {
+      units: {
+        USD: [
+          createUnitEntry({
+            end: '2023-09-30',
+            val: 383285000000,
+            form: '10-K',
+            filed: '2023-11-03',
+            accn: '0000320193-23-000077',
+          }),
+          createUnitEntry({
+            end: '2023-10-01',
+            val: 383000000000,
+            form: '10-K/A',
+            filed: '2024-01-15',
+            accn: '0000320193-24-000012',
+          }),
+        ],
+      },
+    };
+
+    const result = extractTimeSeriesData(gaapTagData, 'annual');
+    const fy2023 = result.find(d => d.fiscalYear === 2023);
+
+    // The 10-K/A (later-filed) should be the surviving entry
+    expect(fy2023).toBeDefined();
+    expect(fy2023.value).toBe(383000000000);
+  });
+});
+
+// =============================================================================
+// BUG-3 / #199: Gross margin same-year integrity
+//
+// The same-year guard should live in: useKeyMetrics.js, in the "Gross Margin"
+// section (lines ~177-192). Specifically, before computing:
+//   grossProfitLatest.value / revenueForMargin.value
+// the code must assert grossProfitLatest.fiscalYear === revenueForMargin.fiscalYear.
+// calculateMargins() already enforces this correctly via findByYear() join, but
+// useKeyMetrics bypasses calculateMargins and calls getLatestValue() independently
+// on each metric, allowing cross-year division when BUG-1 stales revenue.
+// =============================================================================
+
+describe('BUG-3/#199 gross margin same-year integrity', () => {
+  /**
+   * Reproduce the AAPL cross-year mismatch:
+   * - revenue resolves to FY2018 (BUG-1 stale tag path)
+   * - grossProfit resolves to FY2025 (GrossProfit tag has current data)
+   * After BUG-1 is fixed, revenue.annual[0].fiscalYear must equal
+   * grossProfit.annual[0].fiscalYear. This test encodes the invariant at the
+   * normalizedData level so it fails today (before either bug is fixed) and
+   * passes once both tags resolve to the same latest year.
+   */
+  it('normalizeCompanyFacts: revenue.annual[0].fiscalYear must equal grossProfit.annual[0].fiscalYear for AAPL-shaped data', () => {
+    const facts = createCompanyFacts({
+      facts: {
+        'us-gaap': {
+          // Stale revenue tag (FY2016-FY2018 only) — triggers BUG-1
+          Revenues: {
+            label: 'Revenues',
+            units: {
+              USD: [
+                createUnitEntry({ end: '2016-09-24', val: 215639000000, form: '10-K', frame: 'CY2016' }),
+                createUnitEntry({ end: '2017-09-30', val: 229234000000, form: '10-K', frame: 'CY2017' }),
+                createUnitEntry({ end: '2018-09-29', val: 265595000000, form: '10-K', frame: 'CY2018' }),
+              ],
+            },
+          },
+          // Current revenue tag (FY2019-FY2025)
+          RevenueFromContractWithCustomerExcludingAssessedTax: {
+            label: 'Revenue From Contract With Customer Excluding Assessed Tax',
+            units: {
+              USD: [
+                createUnitEntry({ end: '2019-09-28', val: 260174000000, form: '10-K', frame: 'CY2019' }),
+                createUnitEntry({ end: '2020-09-26', val: 274515000000, form: '10-K', frame: 'CY2020' }),
+                createUnitEntry({ end: '2021-09-25', val: 365817000000, form: '10-K', frame: 'CY2021' }),
+                createUnitEntry({ end: '2022-09-24', val: 394328000000, form: '10-K', frame: 'CY2022' }),
+                createUnitEntry({ end: '2023-09-30', val: 383285000000, form: '10-K', frame: 'CY2023' }),
+                createUnitEntry({ end: '2024-09-28', val: 391035000000, form: '10-K', frame: 'CY2024' }),
+                createUnitEntry({ end: '2025-09-27', val: 395760000000, form: '10-K', frame: 'CY2025' }),
+              ],
+            },
+          },
+          // GrossProfit has current data through FY2025
+          GrossProfit: {
+            label: 'Gross Profit',
+            units: {
+              USD: [
+                createUnitEntry({ end: '2021-09-25', val: 152836000000, form: '10-K', frame: 'CY2021' }),
+                createUnitEntry({ end: '2022-09-24', val: 170782000000, form: '10-K', frame: 'CY2022' }),
+                createUnitEntry({ end: '2023-09-30', val: 169148000000, form: '10-K', frame: 'CY2023' }),
+                createUnitEntry({ end: '2024-09-28', val: 180683000000, form: '10-K', frame: 'CY2024' }),
+                createUnitEntry({ end: '2025-09-27', val: 184830000000, form: '10-K', frame: 'CY2025' }),
+              ],
+            },
+          },
+        },
+      },
+    });
+
+    const result = normalizeCompanyFacts(facts);
+
+    const revYear = result.metrics.revenue.annual[0]?.fiscalYear;
+    const gpYear = result.metrics.grossProfit.annual[0]?.fiscalYear;
+
+    // BUG: today revYear = 2018 (stale Revenues tag), gpYear = 2025.
+    // A gross margin computed from these would divide FY2025 grossProfit by FY2018 revenue.
+    // After fix: both should resolve to 2025 (or at minimum, the same year).
+    expect(revYear).toBe(gpYear);
   });
 });
 
