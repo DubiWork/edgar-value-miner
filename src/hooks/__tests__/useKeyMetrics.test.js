@@ -299,6 +299,34 @@ describe('useKeyMetrics', () => {
       const margin = result.current.find((m) => m.id === 'gross-margin');
       expect(margin.trend).toBe('up');
     });
+
+    it('BUG-3 same-year guard: shows "--" when grossProfit latest year != revenue latest year', () => {
+      // grossProfit latest = FY2025, revenue latest = FY2018 — cross-year mismatch
+      // The hook must NOT divide them; it must surface the unavailable sentinel ('--').
+      const data = createMockNormalizedData({
+        grossProfit: {
+          annual: [
+            { value: 200000000000, period: 'CY2025', fiscalYear: 2025, form: '10-K', confidence: 'high' },
+            { value: 169148000000, period: 'CY2023', fiscalYear: 2023, form: '10-K', confidence: 'high' },
+          ],
+          quarterly: [],
+          tag: 'GrossProfit',
+        },
+        revenue: {
+          annual: [
+            { value: 394328000000, period: 'CY2018', fiscalYear: 2018, form: '10-K', confidence: 'high' },
+            { value: 365817000000, period: 'CY2017', fiscalYear: 2017, form: '10-K', confidence: 'high' },
+          ],
+          quarterly: [],
+          tag: 'Revenues',
+        },
+      });
+
+      const { result } = renderHook(() => useKeyMetrics(data));
+
+      const margin = result.current.find((m) => m.id === 'gross-margin');
+      expect(margin.value).toBe('--');
+    });
   });
 
   // ===========================================================================

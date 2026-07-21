@@ -174,7 +174,12 @@ export function useKeyMetrics(normalizedData, stockQuote = null) {
     let grossMarginUnit;
     let grossMarginTrend;
 
-    if (grossProfitLatest && revenueForMargin && revenueForMargin.value !== 0) {
+    if (
+      grossProfitLatest &&
+      revenueForMargin &&
+      revenueForMargin.value !== 0 &&
+      grossProfitLatest.fiscalYear === revenueForMargin.fiscalYear
+    ) {
       const currentMargin = grossProfitLatest.value / revenueForMargin.value;
       grossMarginValue = formatPercentage(currentMargin);
       grossMarginUnit = revenueForMargin.fiscalYear ? `FY${revenueForMargin.fiscalYear}` : undefined;
