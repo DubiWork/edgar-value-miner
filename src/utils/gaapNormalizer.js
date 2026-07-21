@@ -540,16 +540,53 @@ export function findGaapTag(companyFacts, metricName) {
     return null;
   }
 
-  // Try each tag in priority order
+  // Collect all present tags with their priority index
+  const candidates = [];
   for (let i = 0; i < tags.length; i++) {
     const tag = tags[i];
     if (usGaap[tag] && usGaap[tag].units) {
-      return { tag, data: usGaap[tag], index: i };
+      candidates.push({ tag, data: usGaap[tag], index: i });
     }
   }
 
-  devLog('log', `No matching tag found for metric: ${metricName}`);
-  return null;
+  if (candidates.length === 0) {
+    devLog('log', `No matching tag found for metric: ${metricName}`);
+    return null;
+  }
+
+  // Single match — return immediately (unchanged behaviour)
+  if (candidates.length === 1) {
+    return candidates[0];
+  }
+
+  // Multiple matches — pick the tag with the most recent max(end date).
+  // Tie-break: prefer lower priority index (earlier in the list).
+  function maxEndDate(tagData) {
+    const unitArrays = Object.values(tagData.units);
+    let latest = '';
+    for (const arr of unitArrays) {
+      if (!Array.isArray(arr)) continue;
+      for (const entry of arr) {
+        if (entry.end && entry.end > latest) latest = entry.end;
+      }
+    }
+    return latest;
+  }
+
+  let best = candidates[0];
+  let bestEnd = maxEndDate(best.data);
+
+  for (let c = 1; c < candidates.length; c++) {
+    const candidate = candidates[c];
+    const candidateEnd = maxEndDate(candidate.data);
+    if (candidateEnd > bestEnd) {
+      best = candidate;
+      bestEnd = candidateEnd;
+    }
+    // tie: keep best (lower index wins — already set)
+  }
+
+  return best;
 }
 
 /**
