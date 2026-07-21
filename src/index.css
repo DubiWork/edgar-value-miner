@@ -1,4 +1,10 @@
 @import "tailwindcss";
+@source not "../**/*";
+@source "../index.html";
+@source "../src/**/*.{js,jsx,ts,tsx,css}";
+
+
+
 
 /* =================================================================
    Theme Configuration: TailwindCSS v4 @theme block
@@ -61,7 +67,7 @@
   --color-focus-ring: #0ea5e9;
   --color-overlay: rgba(0, 0, 0, 0.5);
 
-  /* Chart colors (light theme — deeper for white backgrounds) */
+  /* Chart colors (light theme - deeper for white backgrounds) */
   --chart-1: #0284c7;
   --chart-2: #7c3aed;
   --chart-3: #059669;
@@ -104,7 +110,7 @@
   --color-focus-ring: #38bdf8;
   --color-overlay: rgba(0, 0, 0, 0.7);
 
-  /* Chart colors (dark theme — brighter for dark backgrounds) */
+  /* Chart colors (dark theme - brighter for dark backgrounds) */
   --chart-1: #38bdf8;
   --chart-2: #a78bfa;
   --chart-3: #34d399;
