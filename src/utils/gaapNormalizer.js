@@ -687,11 +687,19 @@ export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
   });
 
   // Deduplicate by period (keep most recent filing for each period)
-  // For restated financials: sort by filed date (most recent first) so the
-  // latest filing for each period is kept when deduplicating
+  // For annual data: key on fiscal year (item.fy or year from end date) so that
+  // restatements with off-by-one-day end dates (e.g. 2023-09-30 vs 2023-10-01)
+  // that lack a frame field still collapse to one row per fiscal year.
+  // For quarterly data: keep existing frame/end keying so Q1-Q4 are not collapsed.
   const seenPeriods = new Set();
   const deduplicatedData = sortedData.filter(item => {
-    const period = item.frame || item.end;
+    let period;
+    if (periodType === 'annual') {
+      // Prefer the SEC XBRL fy field; fall back to year extracted from end date
+      period = item.fy != null ? String(item.fy) : (item.end ? String(item.end).slice(0, 4) : (item.frame || item.end));
+    } else {
+      period = item.frame || item.end;
+    }
     if (seenPeriods.has(period)) {
       return false;
     }
