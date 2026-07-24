@@ -21,7 +21,7 @@ const TICKER_ALLOWED_CHARS = /^[A-Za-z0-9.\-]+$/;
  * Pattern to detect HTML tags (including script tags)
  * @constant {RegExp}
  */
-const HTML_TAG_PATTERN = /<[^>]*>/g;
+const HTML_TAG_PATTERN = /<[^>]*>/;
 
 /**
  * Pattern to detect common XSS vectors
@@ -42,9 +42,10 @@ const MAX_TICKER_LENGTH = 10;
 /**
  * Strips HTML tags repeatedly until the string stabilizes.
  *
- * A single-pass `.replace(/<[^>]*>/g, '')` can, in principle, leave residue
- * that re-forms a tag once inner matches are removed. Looping until no further
- * match guarantees no tag survives (CodeQL js/incomplete-multi-character-sanitization, #212).
+ * Per CodeQL js/incomplete-multi-character-sanitization guidance, applying the
+ * tag-removal replace repeatedly until no further match remains guarantees no
+ * tag can re-form from residue — while still removing the full tag (name +
+ * attributes), unlike a single-char `[<>]` strip that would leave tag bodies. (#212, #215)
  *
  * @param {string} input
  * @returns {string}
@@ -54,7 +55,7 @@ function stripHtmlTags(input) {
   let out = input;
   do {
     prev = out;
-    out = out.replace(HTML_TAG_PATTERN, '');
+    out = out.replace(/<[^>]*>/g, '');
   } while (out !== prev);
   return out;
 }
@@ -98,10 +99,13 @@ export function sanitizeTickerInput(input) {
     warnings.push('Input contained potential XSS pattern');
   }
 
-  // Strip HTML tags FIRST (before truncation to avoid breaking tag boundaries)
-  if (HTML_TAG_PATTERN.test(working)) {
+  // Strip HTML tags FIRST (before truncation to avoid breaking tag boundaries).
+  // Always strip (loop is a no-op when there are no tags); avoids the stateful
+  // lastIndex bug of calling .test() on a global regex.
+  const strippedTicker = stripHtmlTags(working);
+  if (strippedTicker !== working) {
     warnings.push('Input contained HTML tags');
-    working = stripHtmlTags(working);
+    working = strippedTicker;
   }
 
   // Remove any characters not in the allowlist
@@ -163,10 +167,12 @@ export function sanitizeTextInput(input, options = {}) {
     warnings.push('Input contained potential XSS pattern');
   }
 
-  // Strip HTML tags
-  if (HTML_TAG_PATTERN.test(working)) {
+  // Strip HTML tags. Always strip (stateless) to avoid the global-regex
+  // lastIndex bug of reusing HTML_TAG_PATTERN.test() across calls.
+  const strippedText = stripHtmlTags(working);
+  if (strippedText !== working) {
     warnings.push('Input contained HTML tags');
-    working = stripHtmlTags(working);
+    working = strippedText;
   }
 
   return { sanitized: working.trim(), original, warnings };
