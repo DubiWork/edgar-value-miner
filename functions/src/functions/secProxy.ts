@@ -26,6 +26,7 @@ const ALLOWED_SEC_HOSTS = new Set(['www.sec.gov', 'data.sec.gov']);
 export function fetchFromSec(url: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
     // SSRF guard: only allow HTTPS requests to approved SEC hosts.
+    // (Both www.sec.gov — tickers — and data.sec.gov — company facts.)
     let parsed: URL;
     try {
       parsed = new URL(url);
