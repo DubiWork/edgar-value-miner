@@ -17,6 +17,7 @@
  * - Mixed valid/invalid entries
  * - Chronological sorting verified
  * - Label format "FY2023" verified
+ * - CI #200: calculateMargins non-empty on full overlap (positive counterpart to same-year guard)
  */
 
 import { describe, it, expect } from 'vitest';
@@ -504,6 +505,87 @@ describe('calculateMargins', () => {
       const result = calculateMargins(metrics);
       expect(result[0].label).toBe('FY2023');
       expect(result[0].grossMargin).toBe(60.0);
+    });
+  });
+
+  // ===========================================================================
+  // CI #200 — calculateMargins non-empty on overlap (positive counterpart to
+  // the same-year guard in useKeyMetrics).
+  //
+  // When revenue AND grossProfit both cover FY2021-FY2025 (full overlap),
+  // calculateMargins must return 5 entries with non-null grossMargin for
+  // every year. This is the positive case: the year-matching join inside
+  // calculateMargins guarantees no cross-year contamination.
+  // ===========================================================================
+
+  describe('CI #200: calculateMargins non-empty on full overlap (FY2021-FY2025)', () => {
+    // Synthetic values: roughly AAPL-shaped ratios but not real filings.
+    const fullOverlapMetrics = {
+      revenue: [
+        { value: 365817000000, fiscalYear: 2021 },
+        { value: 394328000000, fiscalYear: 2022 },
+        { value: 383285000000, fiscalYear: 2023 },
+        { value: 391035000000, fiscalYear: 2024 },
+        { value: 395760000000, fiscalYear: 2025 },
+      ],
+      grossProfit: [
+        { value: 152836000000, fiscalYear: 2021 },
+        { value: 170782000000, fiscalYear: 2022 },
+        { value: 169148000000, fiscalYear: 2023 },
+        { value: 180683000000, fiscalYear: 2024 },
+        { value: 184830000000, fiscalYear: 2025 },
+      ],
+      operatingIncome: [
+        { value: 108949000000, fiscalYear: 2021 },
+        { value: 119437000000, fiscalYear: 2022 },
+        { value: 114301000000, fiscalYear: 2023 },
+        { value: 123216000000, fiscalYear: 2024 },
+        { value: 131133000000, fiscalYear: 2025 },
+      ],
+      netIncome: [
+        { value: 94680000000, fiscalYear: 2021 },
+        { value: 99803000000, fiscalYear: 2022 },
+        { value: 96995000000, fiscalYear: 2023 },
+        { value: 93736000000, fiscalYear: 2024 },
+        { value: 96150000000, fiscalYear: 2025 },
+      ],
+    };
+
+    it('returns 5 entries for a full 5-year overlap', () => {
+      const result = calculateMargins(fullOverlapMetrics);
+      expect(result).toHaveLength(5);
+    });
+
+    it('grossMargin is non-null for every overlapping year', () => {
+      const result = calculateMargins(fullOverlapMetrics);
+      result.forEach((entry) => {
+        expect(entry.grossMargin).not.toBeNull();
+      });
+    });
+
+    it('grossMargin is a finite number between 0 and 100 for each year', () => {
+      const result = calculateMargins(fullOverlapMetrics);
+      result.forEach((entry) => {
+        expect(typeof entry.grossMargin).toBe('number');
+        expect(isFinite(entry.grossMargin)).toBe(true);
+        expect(entry.grossMargin).toBeGreaterThan(0);
+        expect(entry.grossMargin).toBeLessThan(100);
+      });
+    });
+
+    it('each entry is keyed to the correct fiscal year (no cross-year mixing)', () => {
+      const result = calculateMargins(fullOverlapMetrics);
+      const years = result.map((e) => e.fiscalYear);
+      expect(years).toEqual([2021, 2022, 2023, 2024, 2025]);
+    });
+
+    it('grossMargin for FY2025 is computed from FY2025 revenue and FY2025 grossProfit only', () => {
+      const result = calculateMargins(fullOverlapMetrics);
+      const fy2025 = result.find((e) => e.fiscalYear === 2025);
+      // 184830000000 / 395760000000 * 100 = 46.7...  → 46.7
+      expect(fy2025.grossMargin).toBe(
+        Math.round((184830000000 / 395760000000) * 100 * 10) / 10
+      );
     });
   });
 

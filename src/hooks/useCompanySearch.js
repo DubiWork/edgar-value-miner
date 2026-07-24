@@ -116,6 +116,13 @@ export function useCompanySearch() {
    */
   const isMountedRef = useRef(true);
 
+  /**
+   * Mirrors the loading state so searchCompany can read the current value
+   * without capturing a stale closure. Updated in sync with every setLoading call.
+   * @type {React.MutableRefObject<boolean>}
+   */
+  const loadingRef = useRef(false);
+
   // ---------------------------------------------------------------------------
   // Cleanup on Unmount
   // ---------------------------------------------------------------------------
@@ -237,9 +244,11 @@ export function useCompanySearch() {
 
     const normalizedTicker = ticker.trim().toUpperCase();
 
-    // Prevent duplicate requests for the same ticker
+    // Prevent duplicate requests for the same ticker.
+    // Use loadingRef instead of the loading state variable to avoid reading
+    // a stale closure value (loading is not in the useCallback deps array).
     if (
-      loading &&
+      loadingRef.current &&
       lastSearchedTickerRef.current === normalizedTicker &&
       !options.forceRefresh
     ) {
@@ -258,6 +267,7 @@ export function useCompanySearch() {
 
     // Clear previous error
     setError(null);
+    loadingRef.current = true;
     setLoading(true);
 
     // Announce to screen readers (accessibility)
@@ -304,6 +314,7 @@ export function useCompanySearch() {
 
         setData(enhancedData);
         setMetadata(result.metadata || null);
+        loadingRef.current = false;
         setLoading(false);
         setError(null);
 
@@ -323,6 +334,7 @@ export function useCompanySearch() {
       if (isMountedRef.current) {
         const categorizedError = createCategorizedError(err, normalizedTicker);
         setError(categorizedError);
+        loadingRef.current = false;
         setLoading(false);
         setData(null);
         setMetadata(null);
@@ -338,7 +350,7 @@ export function useCompanySearch() {
         }
       }
     }
-  }, [loading, createCategorizedError]);
+  }, [createCategorizedError]);
 
   // ---------------------------------------------------------------------------
   // Utility Functions
@@ -363,6 +375,7 @@ export function useCompanySearch() {
     }
 
     setData(null);
+    loadingRef.current = false;
     setLoading(false);
     setError(null);
     setMetadata(null);

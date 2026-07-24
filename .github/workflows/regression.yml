@@ -12,6 +12,7 @@ permissions:
 jobs:
   staging-regression:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,10 +25,18 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Run regression on staging
         id: staging
-        run: npx playwright test e2e/regression/ --reporter=github
+        run: npx playwright test --project=regression
         env:
+          CI: 'true'
           BASE_URL: https://edgar-value-miner-staging.web.app
         continue-on-error: true
+      - name: Upload staging HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-regression-report
+          path: playwright-report/
+          retention-days: 14
       - name: Report on baking epic
         if: always()
         uses: actions/github-script@v7
@@ -61,6 +70,7 @@ jobs:
 
   prod-regression:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -73,10 +83,18 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Run regression on production
         id: prod
-        run: npx playwright test e2e/regression/ --reporter=github
+        run: npx playwright test --project=regression
         env:
+          CI: 'true'
           BASE_URL: https://edgar-value-miner.web.app
         continue-on-error: true
+      - name: Upload production HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-regression-report
+          path: playwright-report/
+          retention-days: 14
       - name: Create issue on failure
         if: steps.prod.outcome == 'failure'
         uses: actions/github-script@v7

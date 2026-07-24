@@ -189,15 +189,15 @@ describe('WatchlistCard', () => {
   });
 
   // =========================================================================
-  // 9. Card click calls onSelect(ticker)
+  // 9. Select button click calls onSelect(ticker)
   // =========================================================================
 
-  it('card click calls onSelect(ticker)', () => {
+  it('select button click calls onSelect(ticker)', () => {
     const onSelect = vi.fn();
     renderCard({ onSelect });
 
-    const card = screen.getByTestId('watchlist-card');
-    fireEvent.click(card);
+    const selectBtn = screen.getByTestId('watchlist-card-select');
+    fireEvent.click(selectBtn);
 
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect).toHaveBeenCalledWith('AAPL');
@@ -221,25 +221,51 @@ describe('WatchlistCard', () => {
   });
 
   // =========================================================================
-  // 11. Card is keyboard-navigable (Enter/Space)
+  // 11. Outer element is div[role="group"] — no role="button", no tabIndex
   // =========================================================================
 
-  it('card is keyboard-navigable with Enter and Space', () => {
-    const onSelect = vi.fn();
-    renderCard({ onSelect });
+  it('outer element is div[role="group"] with no role="button" or tabIndex', () => {
+    renderCard();
 
     const card = screen.getByTestId('watchlist-card');
-
-    fireEvent.keyDown(card, { key: 'Enter' });
-    expect(onSelect).toHaveBeenCalledTimes(1);
-    expect(onSelect).toHaveBeenCalledWith('AAPL');
-
-    fireEvent.keyDown(card, { key: ' ' });
-    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(card.tagName).toBe('DIV');
+    expect(card.getAttribute('role')).toBe('group');
+    expect(card.getAttribute('role')).not.toBe('button');
+    expect(card.getAttribute('tabIndex')).toBeNull();
   });
 
   // =========================================================================
-  // 12. Remove button has aria-label
+  // 12. Inner select button exists and is a native button element
+  // =========================================================================
+
+  it('inner select button is a native <button> element', () => {
+    renderCard();
+
+    const selectBtn = screen.getByTestId('watchlist-card-select');
+    expect(selectBtn.tagName).toBe('BUTTON');
+    expect(selectBtn.getAttribute('type')).toBe('button');
+  });
+
+  // =========================================================================
+  // 13. Keyboard Enter on select button fires onSelect once (no double-fire)
+  // =========================================================================
+
+  it('keyboard Enter on select button fires onSelect exactly once', () => {
+    const onSelect = vi.fn();
+    renderCard({ onSelect });
+
+    const selectBtn = screen.getByTestId('watchlist-card-select');
+    fireEvent.keyDown(selectBtn, { key: 'Enter' });
+    fireEvent.click(selectBtn);
+
+    // keyDown alone should not call onSelect (native button handles via click)
+    // click fires onSelect once
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith('AAPL');
+  });
+
+  // =========================================================================
+  // 14. Remove button has aria-label
   // =========================================================================
 
   it('remove button has descriptive aria-label', () => {
@@ -250,7 +276,7 @@ describe('WatchlistCard', () => {
   });
 
   // =========================================================================
-  // 13. Truncates long company names with ellipsis
+  // 15. Truncates long company names with ellipsis
   // =========================================================================
 
   it('truncates long company names with ellipsis via CSS class', () => {
@@ -265,7 +291,7 @@ describe('WatchlistCard', () => {
   });
 
   // =========================================================================
-  // 14. Hover lift effect matches MetricCard (CSS class present)
+  // 16. Hover lift effect matches MetricCard (CSS class present)
   // =========================================================================
 
   it('has card class for hover lift effect matching MetricCard', () => {
@@ -277,7 +303,7 @@ describe('WatchlistCard', () => {
   });
 
   // =========================================================================
-  // 15. Handles missing addedAt gracefully
+  // 17. Handles missing addedAt gracefully
   // =========================================================================
 
   it('handles missing addedAt gracefully by showing "Updated Unknown"', () => {
@@ -285,5 +311,28 @@ describe('WatchlistCard', () => {
 
     const timestamp = screen.getByTestId('watchlist-timestamp');
     expect(timestamp.textContent).toBe('Updated Unknown');
+  });
+
+  // =========================================================================
+  // 18. No nested button elements (no <button> inside <button>)
+  // =========================================================================
+
+  it('has no nested button elements', () => {
+    renderCard();
+
+    const selectBtn = screen.getByTestId('watchlist-card-select');
+    const nestedButtons = selectBtn.querySelectorAll('button');
+    expect(nestedButtons.length).toBe(0);
+  });
+
+  // =========================================================================
+  // 19. aria-label on group includes ticker and company name
+  // =========================================================================
+
+  it('outer div[role="group"] has aria-label with ticker and company name', () => {
+    renderCard();
+
+    const card = screen.getByTestId('watchlist-card');
+    expect(card.getAttribute('aria-label')).toBe('AAPL - Apple Inc.');
   });
 });

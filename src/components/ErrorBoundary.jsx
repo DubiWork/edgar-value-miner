@@ -48,7 +48,7 @@ export function ErrorFallback({ error, resetError, errorType }) {
           className="inline-flex p-4 rounded-full mb-6"
           style={{ backgroundColor: 'color-mix(in srgb, var(--color-accent) 15%, transparent)' }}
         >
-          <Icon className={`h-10 w-10 ${config.iconColor}`} />
+          <Icon className={`h-10 w-10 ${config.iconColor}`} aria-hidden="true" />
         </div>
 
         {/* Title */}
@@ -74,7 +74,7 @@ export function ErrorFallback({ error, resetError, errorType }) {
               onClick={handleRetry}
               className="btn-primary inline-flex items-center justify-center gap-2"
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
               {config.retryLabel}
             </button>
           )}
@@ -82,7 +82,7 @@ export function ErrorFallback({ error, resetError, errorType }) {
             onClick={handleGoHome}
             className="btn-secondary inline-flex items-center justify-center gap-2"
           >
-            <Home className="h-4 w-4" />
+            <Home className="h-4 w-4" aria-hidden="true" />
             Go Home
           </button>
         </div>

@@ -446,7 +446,7 @@ export async function checkCacheStatus(ticker) {
     let isStale = cached.needsRefresh || false;
     let reason = null;
 
-    if (age > INVALIDATION_CONFIG.CACHE_TTL_MS) {
+    if (age >= INVALIDATION_CONFIG.CACHE_TTL_MS) {
       isStale = true;
       reason = INVALIDATION_REASONS.EXPIRY;
     }

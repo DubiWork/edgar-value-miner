@@ -7,6 +7,7 @@ import {
   CompanyBanner,
   MetricCard,
   ChartContainer,
+  RevenueChart,
   FCFChart,
   MarginsChart,
   ValuationPanel,
@@ -17,6 +18,7 @@ import { useCompanySearch } from './hooks/useCompanySearch'
 import { useStockQuote } from './hooks/useStockQuote'
 import { useKeyMetrics } from './hooks/useKeyMetrics'
 import { useWatchlist } from './hooks/useWatchlist'
+import { useReducedMotion } from './hooks/useReducedMotion'
 import gaapNormalizer from './utils/gaapNormalizer'
 import { calculateMargins } from './utils/calculateMargins'
 
@@ -28,6 +30,9 @@ function App() {
 
   // Watchlist state
   const { watchlist, addToWatchlist, removeFromWatchlist, isInWatchlist, isFull } = useWatchlist()
+
+  // Disable JS-driven chart animations when the user prefers reduced motion
+  const prefersReducedMotion = useReducedMotion()
 
   const handleSearch = (ticker) => {
     searchCompany(ticker)
@@ -57,6 +62,8 @@ function App() {
       className="min-h-screen transition-colors duration-200"
       style={{ backgroundColor: 'var(--color-bg-primary)' }}
     >
+      <a href="#main-content" className="skip-link">Skip to main content</a>
+
       {/* Header */}
       <header
         className="border-b"
@@ -69,7 +76,7 @@ function App() {
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <div className="flex items-center space-x-2">
-              <Gem className="h-8 w-8 text-brand-500" />
+              <Gem className="h-8 w-8 text-brand-500" aria-hidden="true" />
               <span
                 className="text-xl font-bold"
                 style={{ color: 'var(--color-text-primary)' }}
@@ -95,11 +102,11 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome State (no data loaded, not loading, no error) */}
         {!data && !loading && !error && (
           <div className="text-center py-16" data-testid="welcome-state">
-            <Gem className="h-20 w-20 text-brand-500 mx-auto mb-6" />
+            <Gem className="h-20 w-20 text-brand-500 mx-auto mb-6" aria-hidden="true" />
             <h1
               className="text-4xl font-bold mb-4"
               style={{ color: 'var(--color-text-primary)' }}
@@ -146,6 +153,7 @@ function App() {
                     <TrendingUp
                       className="h-6 w-6"
                       style={{ color: 'var(--color-success)' }}
+                      aria-hidden="true"
                     />
                   </div>
                   <h3
@@ -172,6 +180,7 @@ function App() {
                     <DollarSign
                       className="h-6 w-6"
                       style={{ color: 'var(--color-accent)' }}
+                      aria-hidden="true"
                     />
                   </div>
                   <h3
@@ -198,6 +207,7 @@ function App() {
                     <BarChart3
                       className="h-6 w-6"
                       style={{ color: 'var(--color-info)' }}
+                      aria-hidden="true"
                     />
                   </div>
                   <h3
@@ -260,19 +270,17 @@ function App() {
             ))}
             heroChart={
               <ChartContainer title="Revenue" loading={false}>
-                <div
-                  className="flex items-center justify-center h-full"
-                  style={{ color: 'var(--color-text-muted)' }}
-                >
-                  Chart placeholder — Recharts integration coming in Issue #5
-                </div>
+                <RevenueChart
+                  data={data?.metrics?.revenue?.annual}
+                  animationDisabled={prefersReducedMotion}
+                />
               </ChartContainer>
             }
             secondaryCharts={[
               <ChartContainer key="fcf-chart" title="Free Cash Flow" loading={false}>
                 <FCFChart
                   data={data?.metrics?.freeCashFlow?.annual}
-                  animationDisabled={false}
+                  animationDisabled={prefersReducedMotion}
                 />
               </ChartContainer>,
               <ChartContainer key="margins-chart" title="Margins" loading={false}>
@@ -283,7 +291,7 @@ function App() {
                     operatingIncome: data?.metrics?.operatingIncome?.annual,
                     netIncome: data?.metrics?.netIncome?.annual,
                   })}
-                  animationDisabled={false}
+                  animationDisabled={prefersReducedMotion}
                 />
               </ChartContainer>,
             ]}

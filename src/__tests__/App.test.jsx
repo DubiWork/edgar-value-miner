@@ -150,6 +150,11 @@ vi.mock('../components/Dashboard', () => ({
       {children}
     </div>
   ),
+  RevenueChart: ({ data }) => (
+    <div data-testid="revenue-chart" data-has-data={Array.isArray(data) && data.length > 0}>
+      RevenueChart mock
+    </div>
+  ),
   FCFChart: ({ data }) => (
     <div data-testid="fcf-chart" data-has-data={Array.isArray(data) && data.length > 0}>
       FCFChart mock

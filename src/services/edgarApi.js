@@ -15,17 +15,34 @@
  * SEC API Configuration
  * @constant {Object}
  */
+/**
+ * Cloud Function base URL used when VITE_FUNCTIONS_BASE_URL is not set.
+ * Format: https://<region>-<project-id>.cloudfunctions.net
+ * This default targets the production project — staging deployments must set
+ * VITE_FUNCTIONS_BASE_URL explicitly in their environment.
+ */
+const FUNCTIONS_BASE_URL =
+  import.meta.env.VITE_FUNCTIONS_BASE_URL ||
+  'https://us-central1-edgar-value-miner.cloudfunctions.net';
+
 const SEC_CONFIG = {
-  /** Base URL for Company Facts API */
-  COMPANY_FACTS_BASE_URL: 'https://data.sec.gov/api/xbrl/companyfacts',
+  /**
+   * Base URL for Company Facts API.
+   * In development, Vite proxies /api/sec-company-facts to the Cloud Function emulator.
+   * In production, requests go through the secCompanyFacts Cloud Function to avoid CORS.
+   */
+  COMPANY_FACTS_BASE_URL: import.meta.env.DEV
+    ? '/api/sec-company-facts'
+    : `${FUNCTIONS_BASE_URL}/secCompanyFacts`,
   /**
    * URL for Company Tickers list.
    * In development, Vite proxies /api/sec-tickers to SEC to avoid CORS.
-   * In production, use VITE_SEC_TICKERS_PROXY_URL env var or fall back to direct SEC URL.
+   * In production, requests go through the secTickers Cloud Function to avoid CORS.
+   * VITE_SEC_TICKERS_PROXY_URL can override the default Cloud Function URL.
    */
   COMPANY_TICKERS_URL: import.meta.env.DEV
     ? '/api/sec-tickers'
-    : (import.meta.env.VITE_SEC_TICKERS_PROXY_URL || 'https://www.sec.gov/files/company_tickers.json'),
+    : (import.meta.env.VITE_SEC_TICKERS_PROXY_URL || `${FUNCTIONS_BASE_URL}/secTickers`),
   /** User-Agent header required by SEC (from environment variable) */
   USER_AGENT: import.meta.env.VITE_SEC_USER_AGENT || 'getedgar (admincontact@getedgar.com)',
   /** Maximum CIK length with leading zeros */
@@ -567,7 +584,12 @@ export async function mapTickerToCik(ticker) {
  */
 export async function fetchCompanyFacts(cik) {
   const paddedCik = padCik(cik);
-  const url = `${SEC_CONFIG.COMPANY_FACTS_BASE_URL}/CIK${paddedCik}.json`;
+  // In development the Vite proxy forwards /api/sec-company-facts/<path> directly to
+  // data.sec.gov, matching the original SEC URL structure.
+  // In production the Cloud Function accepts a ?cik= query parameter instead.
+  const url = import.meta.env.DEV
+    ? `${SEC_CONFIG.COMPANY_FACTS_BASE_URL}/CIK${paddedCik}.json`
+    : `${SEC_CONFIG.COMPANY_FACTS_BASE_URL}?cik=${paddedCik}`;
 
   try {
     const data = await fetchWithRateLimitAndRetry(

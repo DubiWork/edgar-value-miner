@@ -1,4 +1,11 @@
 @import "tailwindcss";
+@source "../index.html";
+@source "../src/**/*.{js,jsx,ts,tsx,css}";
+@source not "../*.md";
+@source not "../docs/**";
+
+
+
 
 /* =================================================================
    Theme Configuration: TailwindCSS v4 @theme block
@@ -37,7 +44,7 @@
   /* Text */
   --color-text-primary: #0f172a;
   --color-text-secondary: #475569;
-  --color-text-muted: #94a3b8;
+  --color-text-muted: #64748b;
 
   /* Borders */
   --color-border: #e2e8f0;
@@ -46,6 +53,10 @@
   /* Accent (brand) */
   --color-accent: #0ea5e9;
   --color-accent-hover: #0284c7;
+  --color-accent-text: #0369a1;
+
+  /* Star / watchlist */
+  --color-star-active: #b45309;
 
   /* Status */
   --color-success: #16a34a;
@@ -57,7 +68,7 @@
   --color-focus-ring: #0ea5e9;
   --color-overlay: rgba(0, 0, 0, 0.5);
 
-  /* Chart colors (light theme — deeper for white backgrounds) */
+  /* Chart colors (light theme - deeper for white backgrounds) */
   --chart-1: #0284c7;
   --chart-2: #7c3aed;
   --chart-3: #059669;
@@ -85,6 +96,10 @@
   /* Accent (brand) */
   --color-accent: #0ea5e9;
   --color-accent-hover: #38bdf8;
+  --color-accent-text: #38bdf8;
+
+  /* Star / watchlist */
+  --color-star-active: #fbbf24;
 
   /* Status */
   --color-success: #22c55e;
@@ -96,7 +111,7 @@
   --color-focus-ring: #38bdf8;
   --color-overlay: rgba(0, 0, 0, 0.7);
 
-  /* Chart colors (dark theme — brighter for dark backgrounds) */
+  /* Chart colors (dark theme - brighter for dark backgrounds) */
   --chart-1: #38bdf8;
   --chart-2: #a78bfa;
   --chart-3: #34d399;
@@ -110,6 +125,7 @@
    ================================================================= */
 @layer base {
   body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background-color: var(--color-bg-primary);
     color: var(--color-text-primary);
     transition-property: color, background-color;
@@ -167,6 +183,25 @@
 }
 
 /* =================================================================
+   Skip Navigation Link
+   ================================================================= */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  padding: 8px 16px;
+  z-index: 100;
+  transition: top 0.2s;
+}
+.skip-link:focus {
+  top: 0;
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* =================================================================
    Theme Toggle Animation
    ================================================================= */
 .theme-toggle-icon {
@@ -176,6 +211,20 @@
 @media (prefers-reduced-motion: reduce) {
   .theme-toggle-icon {
     transition: none;
+  }
+}
+
+/* =================================================================
+   Reduced Motion: Disable all CSS animations
+   ================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin,
+  .animate-pulse,
+  .animate-bounce,
+  [class*="animate-shimmer"],
+  [style*="animation"] {
+    animation: none !important;
+    transition: none !important;
   }
 }
 
