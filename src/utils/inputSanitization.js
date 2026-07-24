@@ -40,6 +40,26 @@ const MAX_TICKER_LENGTH = 10;
 // =============================================================================
 
 /**
+ * Strips HTML tags repeatedly until the string stabilizes.
+ *
+ * A single-pass `.replace(/<[^>]*>/g, '')` can, in principle, leave residue
+ * that re-forms a tag once inner matches are removed. Looping until no further
+ * match guarantees no tag survives (CodeQL js/incomplete-multi-character-sanitization, #212).
+ *
+ * @param {string} input
+ * @returns {string}
+ */
+function stripHtmlTags(input) {
+  let prev;
+  let out = input;
+  do {
+    prev = out;
+    out = out.replace(HTML_TAG_PATTERN, '');
+  } while (out !== prev);
+  return out;
+}
+
+/**
  * Sanitizes a ticker symbol input string
  *
  * Removes any potentially dangerous characters and validates the input
@@ -81,7 +101,7 @@ export function sanitizeTickerInput(input) {
   // Strip HTML tags FIRST (before truncation to avoid breaking tag boundaries)
   if (HTML_TAG_PATTERN.test(working)) {
     warnings.push('Input contained HTML tags');
-    working = working.replace(HTML_TAG_PATTERN, '');
+    working = stripHtmlTags(working);
   }
 
   // Remove any characters not in the allowlist
@@ -146,7 +166,7 @@ export function sanitizeTextInput(input, options = {}) {
   // Strip HTML tags
   if (HTML_TAG_PATTERN.test(working)) {
     warnings.push('Input contained HTML tags');
-    working = working.replace(HTML_TAG_PATTERN, '');
+    working = stripHtmlTags(working);
   }
 
   return { sanitized: working.trim(), original, warnings };

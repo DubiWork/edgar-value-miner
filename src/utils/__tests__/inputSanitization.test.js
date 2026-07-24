@@ -407,3 +407,29 @@ describe('containsXss', () => {
     expect(containsXss('<div>text</div>')).toBe(true);
   });
 });
+
+// =============================================================================
+// Incomplete multi-character sanitization (CodeQL HIGH, #212)
+// A single-pass tag strip can re-create a tag from interleaved/nested markup.
+// After sanitization the result must contain NO angle brackets / tag residue.
+// =============================================================================
+describe('incomplete multi-character sanitization (#212)', () => {
+  const nestedPayloads = [
+    '<scr<script>ipt>alert(1)</scr</script>ipt>',
+    '<<script>script>alert(1)<</script>/script>',
+    '<img<img src=x> src=x onerror=alert(1)>',
+    '<<>>',
+  ];
+
+  it.each(nestedPayloads)('sanitizeTextInput leaves no tag residue for %s', (payload) => {
+    const { sanitized } = sanitizeTextInput(payload);
+    expect(sanitized).not.toMatch(/<[^>]*>/);
+    expect(sanitized).not.toContain('<script');
+  });
+
+  it.each(nestedPayloads)('sanitizeTickerInput leaves no tag residue for %s', (payload) => {
+    const { sanitized } = sanitizeTickerInput(payload);
+    // ticker allowlist also strips <>, but assert no tag survives regardless
+    expect(sanitized).not.toMatch(/<[^>]*>/);
+  });
+});
