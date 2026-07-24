@@ -8,14 +8,34 @@ const SEC_USER_AGENT = 'edgar-value-miner (contact@example.com)';
 const CACHE_DURATION_SECONDS = 24 * 60 * 60; // 24 hours
 
 /**
+ * Hostnames this proxy is permitted to fetch from. Prevents SSRF: even though
+ * callers build URLs from validated input, fetchFromSec independently rejects
+ * any URL whose host is not an approved SEC endpoint (CodeQL js/request-forgery, #215).
+ */
+const ALLOWED_SEC_HOSTS = new Set(['www.sec.gov', 'data.sec.gov']);
+
+/**
  * Fetches a URL from the SEC EDGAR API server-side, handling GZip decompression.
  * Sets the required User-Agent header (SEC blocks requests without it).
+ *
+ * Exported for unit testing of the SSRF host allowlist.
  *
  * @param url - The SEC URL to fetch
  * @returns Parsed JSON response
  */
-function fetchFromSec(url: string): Promise<unknown> {
+export function fetchFromSec(url: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
+    // SSRF guard: only allow HTTPS requests to approved SEC hosts.
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return reject(new Error('Invalid SEC URL'));
+    }
+    if (parsed.protocol !== 'https:' || !ALLOWED_SEC_HOSTS.has(parsed.hostname)) {
+      return reject(new Error(`Refusing to fetch non-SEC URL: ${parsed.hostname}`));
+    }
+
     const options = {
       headers: {
         'User-Agent': SEC_USER_AGENT,
