@@ -23,6 +23,9 @@ async function mockAPIs(page) {
 
   await page.route('**/api/sec-tickers', tickersHandler);
   await page.route('**/www.sec.gov/files/company_tickers.json', tickersHandler);
+  // Production build fetches tickers via the secTickers Cloud Function proxy
+  // (VITE_SEC_TICKERS_PROXY_URL / FUNCTIONS_BASE_URL), not sec.gov directly.
+  await page.route('**/secTickers', tickersHandler);
 
   // Mock companyfacts for AAPL (CIK padded to 10 digits)
   await page.route(
@@ -33,6 +36,14 @@ async function mockAPIs(page) {
         contentType: 'application/json',
         body: JSON.stringify(AAPL_COMPANY_FACTS),
       }),
+  );
+  // Production build fetches company facts via the secCompanyFacts Cloud Function.
+  await page.route('**/secCompanyFacts**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(AAPL_COMPANY_FACTS),
+    }),
   );
 
   // Block all Firebase / Firestore requests so the app does not hang
@@ -52,7 +63,7 @@ test.describe('Dashboard smoke tests', () => {
   // -----------------------------------------------------------------------
   test('Welcome State renders correctly', async ({ page }) => {
     await mockAPIs(page);
-    await page.goto('/');
+    await page.goto('');
 
     // Header logo text
     await expect(page.getByText('EDGAR Value Miner')).toBeVisible();
@@ -80,7 +91,7 @@ test.describe('Dashboard smoke tests', () => {
   // -----------------------------------------------------------------------
   test('Theme toggle switches data-theme attribute', async ({ page }) => {
     await mockAPIs(page);
-    await page.goto('/');
+    await page.goto('');
 
     // Wait for the app to be fully rendered before reading attributes
     await expect(page.locator('[data-testid="welcome-state"]')).toBeVisible();
@@ -110,7 +121,7 @@ test.describe('Dashboard smoke tests', () => {
   // -----------------------------------------------------------------------
   test('Search autocomplete shows suggestions for AAPL', async ({ page }) => {
     await mockAPIs(page);
-    await page.goto('/');
+    await page.goto('');
 
     const input = page.locator('[data-testid="ticker-search-input"]').first();
     await input.click();
@@ -133,7 +144,7 @@ test.describe('Dashboard smoke tests', () => {
   // -----------------------------------------------------------------------
   test('Search to Dashboard via Enter key loads company data', async ({ page }) => {
     await mockAPIs(page);
-    await page.goto('/');
+    await page.goto('');
 
     const input = page.locator('[data-testid="ticker-search-input"]').first();
     await input.click();
@@ -171,7 +182,7 @@ test.describe('Dashboard smoke tests', () => {
   // -----------------------------------------------------------------------
   test('Search to Dashboard via suggestion click loads company data', async ({ page }) => {
     await mockAPIs(page);
-    await page.goto('/');
+    await page.goto('');
 
     const input = page.locator('[data-testid="ticker-search-input"]').first();
     await input.click();
