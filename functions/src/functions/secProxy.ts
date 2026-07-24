@@ -8,35 +8,23 @@ const SEC_USER_AGENT = 'edgar-value-miner (contact@example.com)';
 const CACHE_DURATION_SECONDS = 24 * 60 * 60; // 24 hours
 
 /**
- * Hostnames this proxy is permitted to fetch from. Prevents SSRF: even though
- * callers build URLs from validated input, fetchFromSec independently rejects
- * any URL whose host is not an approved SEC endpoint (CodeQL js/request-forgery, #215).
+ * Fully server-controlled SEC endpoint URLs. The only variable part — the CIK —
+ * is a plain integer re-derived by the server (never a user-supplied string),
+ * so no user input flows into the request URL (CodeQL js/request-forgery, #215).
  */
-const ALLOWED_SEC_HOSTS = new Set(['www.sec.gov', 'data.sec.gov']);
+const SEC_ENDPOINTS = {
+  tickers: () => 'https://www.sec.gov/files/company_tickers.json',
+  companyFacts: (cik: number) =>
+    `https://data.sec.gov/api/xbrl/companyfacts/CIK${String(cik).padStart(10, '0')}.json`,
+} as const;
 
 /**
- * Fetches a URL from the SEC EDGAR API server-side, handling GZip decompression.
- * Sets the required User-Agent header (SEC blocks requests without it).
- *
- * Exported for unit testing of the SSRF host allowlist.
- *
- * @param url - The SEC URL to fetch
- * @returns Parsed JSON response
+ * Performs the actual HTTPS GET to a server-constructed SEC URL, handling GZip.
+ * `url` here is always built from SEC_ENDPOINTS (constant host + integer CIK),
+ * never from a user-supplied string.
  */
-export function fetchFromSec(url: string): Promise<unknown> {
+function httpsGetJson(url: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
-    // SSRF guard: only allow HTTPS requests to approved SEC hosts.
-    // (Both www.sec.gov — tickers — and data.sec.gov — company facts.)
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      return reject(new Error('Invalid SEC URL'));
-    }
-    if (parsed.protocol !== 'https:' || !ALLOWED_SEC_HOSTS.has(parsed.hostname)) {
-      return reject(new Error(`Refusing to fetch non-SEC URL: ${parsed.hostname}`));
-    }
-
     const options = {
       headers: {
         'User-Agent': SEC_USER_AGENT,
@@ -82,6 +70,29 @@ export function fetchFromSec(url: string): Promise<unknown> {
 }
 
 /**
+ * Fetches a SEC endpoint by server-controlled key. The endpoint URL is built
+ * entirely from SEC_ENDPOINTS constants; the only variable — cik — is coerced
+ * to a Number so no user-supplied string can influence the request URL.
+ * This is the SSRF barrier (CodeQL js/request-forgery, #215): callers never
+ * pass a URL, only an allow-listed endpoint key.
+ *
+ * @param endpoint - 'tickers' | 'companyFacts'
+ * @param cik - required numeric CIK for 'companyFacts'
+ */
+export function fetchFromSec(
+  endpoint: keyof typeof SEC_ENDPOINTS,
+  cik?: number
+): Promise<unknown> {
+  if (endpoint === 'companyFacts') {
+    if (!Number.isInteger(cik) || (cik as number) < 0) {
+      return Promise.reject(new Error('companyFacts requires a non-negative integer CIK'));
+    }
+    return httpsGetJson(SEC_ENDPOINTS.companyFacts(cik as number));
+  }
+  return httpsGetJson(SEC_ENDPOINTS.tickers());
+}
+
+/**
  * Sets CORS headers on the response to allow all origins.
  */
 function setCorsHeaders(res: Response): void {
@@ -118,7 +129,7 @@ export async function secTickersHandler(
   }
 
   try {
-    const data = await fetchFromSec('https://www.sec.gov/files/company_tickers.json');
+    const data = await fetchFromSec('tickers');
     res.set('Cache-Control', `public, max-age=${CACHE_DURATION_SECONDS}, s-maxage=${CACHE_DURATION_SECONDS}`);
     res.status(200).json(data);
   } catch (err) {
@@ -161,11 +172,14 @@ export async function secCompanyFactsHandler(
     return;
   }
 
-  const paddedCik = cikParam.trim().padStart(10, '0');
-  const secUrl = `https://data.sec.gov/api/xbrl/companyfacts/CIK${paddedCik}.json`;
+  // Re-parse to an integer: this is the SSRF barrier. Only a Number (not the
+  // user-supplied string) is passed onward; fetchFromSec builds the URL from
+  // constants, so no user input can influence the request host or path.
+  const cikNumber = Number.parseInt(cikParam.trim(), 10);
+  const paddedCik = String(cikNumber).padStart(10, '0');
 
   try {
-    const data = await fetchFromSec(secUrl);
+    const data = await fetchFromSec('companyFacts', cikNumber);
     res.set('Cache-Control', `public, max-age=${CACHE_DURATION_SECONDS}, s-maxage=${CACHE_DURATION_SECONDS}`);
     res.status(200).json(data);
   } catch (err) {

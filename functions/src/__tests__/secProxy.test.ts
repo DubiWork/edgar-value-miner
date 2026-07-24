@@ -126,32 +126,36 @@ function mockSecError(statusCode: number): void {
 import { secTickersHandler, secCompanyFactsHandler, fetchFromSec } from '../functions/secProxy.js';
 
 // ---------------------------------------------------------------------------
-// Tests: fetchFromSec SSRF host allowlist (#215)
+// Tests: fetchFromSec is SSRF-safe by construction (#215)
+// Callers pass a server-controlled endpoint key + a numeric CIK — never a URL.
 // ---------------------------------------------------------------------------
-describe('fetchFromSec SSRF guard', () => {
+describe('fetchFromSec SSRF-safe endpoint API', () => {
   beforeEach(() => {
     mockGet.mockReset();
   });
 
-  it.each([
-    'http://www.sec.gov/x',            // non-https
-    'https://evil.example.com/x',       // disallowed host
-    'https://data.sec.gov.evil.com/x',  // suffix trick
-    'https://169.254.169.254/latest',   // cloud metadata
-    'not a url',                        // unparseable
-  ])('rejects non-SEC / unsafe URL %s without calling https.get', async (url) => {
-    await expect(fetchFromSec(url)).rejects.toThrow();
-    expect(mockGet).not.toHaveBeenCalled();
+  it('builds the tickers URL from constants (host www.sec.gov)', () => {
+    fetchFromSec('tickers').catch(() => {});
+    expect(mockGet).toHaveBeenCalled();
+    const calledUrl = mockGet.mock.calls[0][0] as string;
+    expect(calledUrl).toBe('https://www.sec.gov/files/company_tickers.json');
+  });
+
+  it('builds the companyFacts URL from a numeric CIK (host data.sec.gov, padded)', () => {
+    fetchFromSec('companyFacts', 320193).catch(() => {});
+    expect(mockGet).toHaveBeenCalled();
+    const calledUrl = mockGet.mock.calls[0][0] as string;
+    expect(calledUrl).toBe('https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json');
   });
 
   it.each([
-    'https://www.sec.gov/files/company_tickers.json',
-    'https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json',
-  ])('permits approved SEC host %s (reaches https.get)', async (url) => {
-    // https.get is mocked to never resolve; assert it was invoked, then abort.
-    fetchFromSec(url).catch(() => {});
-    await Promise.resolve();
-    expect(mockGet).toHaveBeenCalled();
+    undefined,
+    -1,
+    1.5,
+    NaN,
+  ])('rejects a non-integer/negative CIK (%s) without calling https.get', async (badCik) => {
+    await expect(fetchFromSec('companyFacts', badCik as number)).rejects.toThrow();
+    expect(mockGet).not.toHaveBeenCalled();
   });
 });
 
