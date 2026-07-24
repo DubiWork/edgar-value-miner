@@ -123,7 +123,37 @@ function mockSecError(statusCode: number): void {
 // ---------------------------------------------------------------------------
 // Import handlers AFTER mocks are in place
 // ---------------------------------------------------------------------------
-import { secTickersHandler, secCompanyFactsHandler } from '../functions/secProxy.js';
+import { secTickersHandler, secCompanyFactsHandler, fetchFromSec } from '../functions/secProxy.js';
+
+// ---------------------------------------------------------------------------
+// Tests: fetchFromSec SSRF host allowlist (#215)
+// ---------------------------------------------------------------------------
+describe('fetchFromSec SSRF guard', () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+  });
+
+  it.each([
+    'http://www.sec.gov/x',            // non-https
+    'https://evil.example.com/x',       // disallowed host
+    'https://data.sec.gov.evil.com/x',  // suffix trick
+    'https://169.254.169.254/latest',   // cloud metadata
+    'not a url',                        // unparseable
+  ])('rejects non-SEC / unsafe URL %s without calling https.get', async (url) => {
+    await expect(fetchFromSec(url)).rejects.toThrow();
+    expect(mockGet).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'https://www.sec.gov/files/company_tickers.json',
+    'https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json',
+  ])('permits approved SEC host %s (reaches https.get)', async (url) => {
+    // https.get is mocked to never resolve; assert it was invoked, then abort.
+    fetchFromSec(url).catch(() => {});
+    await Promise.resolve();
+    expect(mockGet).toHaveBeenCalled();
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Tests: secTickersHandler

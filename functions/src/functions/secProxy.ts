@@ -8,28 +8,35 @@ const SEC_USER_AGENT = 'edgar-value-miner (contact@example.com)';
 const CACHE_DURATION_SECONDS = 24 * 60 * 60; // 24 hours
 
 /**
+ * Hostnames this proxy is permitted to fetch from. Prevents SSRF: even though
+ * callers build URLs from validated input, fetchFromSec independently rejects
+ * any URL whose host is not an approved SEC endpoint (CodeQL js/request-forgery, #215).
+ */
+const ALLOWED_SEC_HOSTS = new Set(['www.sec.gov', 'data.sec.gov']);
+
+/**
  * Fetches a URL from the SEC EDGAR API server-side, handling GZip decompression.
  * Sets the required User-Agent header (SEC blocks requests without it).
+ *
+ * Exported for unit testing of the SSRF host allowlist.
  *
  * @param url - The SEC URL to fetch
  * @returns Parsed JSON response
  */
-function fetchFromSec(url: string): Promise<unknown> {
-  const parsedUrl = new URL(url);
-
-  if (parsedUrl.protocol !== 'https:') {
-    throw new Error(`Invalid SEC URL protocol: ${parsedUrl.protocol}`);
-  }
-
-  if (parsedUrl.hostname !== 'data.sec.gov') {
-    throw new Error(`Invalid SEC URL host: ${parsedUrl.hostname}`);
-  }
-
-  if (!/^\/api\/xbrl\/companyfacts\/CIK\d{10}\.json$/.test(parsedUrl.pathname)) {
-    throw new Error(`Invalid SEC URL path: ${parsedUrl.pathname}`);
-  }
-
+export function fetchFromSec(url: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
+    // SSRF guard: only allow HTTPS requests to approved SEC hosts.
+    // (Both www.sec.gov — tickers — and data.sec.gov — company facts.)
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return reject(new Error('Invalid SEC URL'));
+    }
+    if (parsed.protocol !== 'https:' || !ALLOWED_SEC_HOSTS.has(parsed.hostname)) {
+      return reject(new Error(`Refusing to fetch non-SEC URL: ${parsed.hostname}`));
+    }
+
     const options = {
       headers: {
         'User-Agent': SEC_USER_AGENT,
@@ -38,12 +45,12 @@ function fetchFromSec(url: string): Promise<unknown> {
       },
     };
 
-    https.get(parsedUrl, options, (res) => {
+    https.get(url, options, (res) => {
       const { statusCode, headers: resHeaders } = res;
 
       if (statusCode !== 200) {
         res.resume();
-        return reject(new Error(`SEC API returned status ${statusCode} for ${parsedUrl.toString()}`));
+        return reject(new Error(`SEC API returned status ${statusCode} for ${url}`));
       }
 
       const encoding = resHeaders['content-encoding'];
@@ -67,7 +74,7 @@ function fetchFromSec(url: string): Promise<unknown> {
           const body = Buffer.concat(chunks).toString('utf-8');
           resolve(JSON.parse(body));
         } catch (err) {
-          reject(new Error(`Failed to parse SEC JSON response from ${parsedUrl.toString()}: ${(err as Error).message}`));
+          reject(new Error(`Failed to parse SEC JSON response from ${url}: ${(err as Error).message}`));
         }
       });
     }).on('error', reject);
