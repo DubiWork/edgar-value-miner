@@ -56,6 +56,9 @@ jobs:
         run: cd functions && npm test
 
   preview:
+    # DISABLED (#208): GitHub Pages build_type 'workflow' mismatches this job's
+    # gh-pages branch push, so per-PR previews 404. Re-enable once #208 is fixed.
+    if: false
     needs: test
     runs-on: ubuntu-latest
     steps:
@@ -120,6 +123,8 @@ jobs:
             });
 
   e2e:
+    # DISABLED (#208): depends on the preview deploy, which 404s. Re-enable with #208.
+    if: false
     needs: preview
     runs-on: ubuntu-latest
     timeout-minutes: 15
