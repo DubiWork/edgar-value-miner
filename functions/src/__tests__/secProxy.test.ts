@@ -123,7 +123,41 @@ function mockSecError(statusCode: number): void {
 // ---------------------------------------------------------------------------
 // Import handlers AFTER mocks are in place
 // ---------------------------------------------------------------------------
-import { secTickersHandler, secCompanyFactsHandler } from '../functions/secProxy.js';
+import { secTickersHandler, secCompanyFactsHandler, fetchFromSec } from '../functions/secProxy.js';
+
+// ---------------------------------------------------------------------------
+// Tests: fetchFromSec is SSRF-safe by construction (#215)
+// Callers pass a server-controlled endpoint key + a numeric CIK — never a URL.
+// ---------------------------------------------------------------------------
+describe('fetchFromSec SSRF-safe endpoint API', () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+  });
+
+  it('builds the tickers URL from constants (host www.sec.gov)', () => {
+    fetchFromSec('tickers').catch(() => {});
+    expect(mockGet).toHaveBeenCalled();
+    const calledUrl = mockGet.mock.calls[0][0] as string;
+    expect(calledUrl).toBe('https://www.sec.gov/files/company_tickers.json');
+  });
+
+  it('builds the companyFacts URL from a numeric CIK (host data.sec.gov, padded)', () => {
+    fetchFromSec('companyFacts', 320193).catch(() => {});
+    expect(mockGet).toHaveBeenCalled();
+    const calledUrl = mockGet.mock.calls[0][0] as string;
+    expect(calledUrl).toBe('https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json');
+  });
+
+  it.each([
+    undefined,
+    -1,
+    1.5,
+    NaN,
+  ])('rejects a non-integer/negative CIK (%s) without calling https.get', async (badCik) => {
+    await expect(fetchFromSec('companyFacts', badCik as number)).rejects.toThrow();
+    expect(mockGet).not.toHaveBeenCalled();
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Tests: secTickersHandler
