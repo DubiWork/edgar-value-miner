@@ -15,6 +15,20 @@ const CACHE_DURATION_SECONDS = 24 * 60 * 60; // 24 hours
  * @returns Parsed JSON response
  */
 function fetchFromSec(url: string): Promise<unknown> {
+  const parsedUrl = new URL(url);
+
+  if (parsedUrl.protocol !== 'https:') {
+    throw new Error(`Invalid SEC URL protocol: ${parsedUrl.protocol}`);
+  }
+
+  if (parsedUrl.hostname !== 'data.sec.gov') {
+    throw new Error(`Invalid SEC URL host: ${parsedUrl.hostname}`);
+  }
+
+  if (!/^\/api\/xbrl\/companyfacts\/CIK\d{10}\.json$/.test(parsedUrl.pathname)) {
+    throw new Error(`Invalid SEC URL path: ${parsedUrl.pathname}`);
+  }
+
   return new Promise((resolve, reject) => {
     const options = {
       headers: {
@@ -24,12 +38,12 @@ function fetchFromSec(url: string): Promise<unknown> {
       },
     };
 
-    https.get(url, options, (res) => {
+    https.get(parsedUrl, options, (res) => {
       const { statusCode, headers: resHeaders } = res;
 
       if (statusCode !== 200) {
         res.resume();
-        return reject(new Error(`SEC API returned status ${statusCode} for ${url}`));
+        return reject(new Error(`SEC API returned status ${statusCode} for ${parsedUrl.toString()}`));
       }
 
       const encoding = resHeaders['content-encoding'];
@@ -53,7 +67,7 @@ function fetchFromSec(url: string): Promise<unknown> {
           const body = Buffer.concat(chunks).toString('utf-8');
           resolve(JSON.parse(body));
         } catch (err) {
-          reject(new Error(`Failed to parse SEC JSON response from ${url}: ${(err as Error).message}`));
+          reject(new Error(`Failed to parse SEC JSON response from ${parsedUrl.toString()}: ${(err as Error).message}`));
         }
       });
     }).on('error', reject);
