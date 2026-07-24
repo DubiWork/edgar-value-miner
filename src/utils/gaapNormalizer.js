@@ -540,16 +540,53 @@ export function findGaapTag(companyFacts, metricName) {
     return null;
   }
 
-  // Try each tag in priority order
+  // Collect all present tags with their priority index
+  const candidates = [];
   for (let i = 0; i < tags.length; i++) {
     const tag = tags[i];
     if (usGaap[tag] && usGaap[tag].units) {
-      return { tag, data: usGaap[tag], index: i };
+      candidates.push({ tag, data: usGaap[tag], index: i });
     }
   }
 
-  devLog('log', `No matching tag found for metric: ${metricName}`);
-  return null;
+  if (candidates.length === 0) {
+    devLog('log', `No matching tag found for metric: ${metricName}`);
+    return null;
+  }
+
+  // Single match — return immediately (unchanged behaviour)
+  if (candidates.length === 1) {
+    return candidates[0];
+  }
+
+  // Multiple matches — pick the tag with the most recent max(end date).
+  // Tie-break: prefer lower priority index (earlier in the list).
+  function maxEndDate(tagData) {
+    const unitArrays = Object.values(tagData.units);
+    let latest = '';
+    for (const arr of unitArrays) {
+      if (!Array.isArray(arr)) continue;
+      for (const entry of arr) {
+        if (entry.end && entry.end > latest) latest = entry.end;
+      }
+    }
+    return latest;
+  }
+
+  let best = candidates[0];
+  let bestEnd = maxEndDate(best.data);
+
+  for (let c = 1; c < candidates.length; c++) {
+    const candidate = candidates[c];
+    const candidateEnd = maxEndDate(candidate.data);
+    if (candidateEnd > bestEnd) {
+      best = candidate;
+      bestEnd = candidateEnd;
+    }
+    // tie: keep best (lower index wins — already set)
+  }
+
+  return best;
 }
 
 /**
@@ -650,11 +687,19 @@ export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
   });
 
   // Deduplicate by period (keep most recent filing for each period)
-  // For restated financials: sort by filed date (most recent first) so the
-  // latest filing for each period is kept when deduplicating
+  // For annual data: key on fiscal year (item.fy or year from end date) so that
+  // restatements with off-by-one-day end dates (e.g. 2023-09-30 vs 2023-10-01)
+  // that lack a frame field still collapse to one row per fiscal year.
+  // For quarterly data: keep existing frame/end keying so Q1-Q4 are not collapsed.
   const seenPeriods = new Set();
   const deduplicatedData = sortedData.filter(item => {
-    const period = item.frame || item.end;
+    let period;
+    if (periodType === 'annual') {
+      // Prefer the SEC XBRL fy field; fall back to year extracted from end date
+      period = item.fy != null ? String(item.fy) : (item.end ? String(item.end).slice(0, 4) : (item.frame || item.end));
+    } else {
+      period = item.frame || item.end;
+    }
     if (seenPeriods.has(period)) {
       return false;
     }
