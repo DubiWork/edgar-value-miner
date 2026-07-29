@@ -46,6 +46,9 @@ jobs:
           VITE_FEATURE_PERSONAL_NOTES: ${{ secrets.VITE_FEATURE_PERSONAL_NOTES }}
           VITE_FEATURE_SOCIAL_SHARING: ${{ secrets.VITE_FEATURE_SOCIAL_SHARING }}
           VITE_FEATURE_UPGRADE_CTA: ${{ secrets.VITE_FEATURE_UPGRADE_CTA }}
+      - name: Build Cloud Functions
+        working-directory: functions
+        run: npm run build
       - name: Deploy to Firebase Production
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
@@ -55,6 +58,7 @@ jobs:
           projectId: edgar-value-miner
           channelId: live
       - name: Deploy Cloud Functions to Production
+        working-directory: functions
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/gcloud.json
         run: |
