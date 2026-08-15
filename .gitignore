@@ -33,3 +33,24 @@ dist-ssr
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+/.playwright-mcp/
+
+# Local session artifacts
+*.png
+*.bak
+/whats-next.md
+/functions/lib/
+/.claude/
+/CLAUDE.md
+/docs/PRODUCTION-BLOCKED-HANDOFF.md
+/docs/PRODUCT_VISION.md
+/docs/agents/
+/docs/bugs/
+/docs/happy-path-aapl-production.md
+/docs/plans/
+/docs/reviews/
+/docs/validation-results-*.md
+/.github/ISSUE_*.md
+/.github/grooming/
+/.out-of-scope/
+/src/index.css.bak
