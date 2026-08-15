@@ -7,6 +7,20 @@
 
 ---
 
+## TL;DR
+
+We ran the normalizer against 5 real companies to see where it breaks. Two companies work great (AAPL, MSFT). Two have silent bugs that return wrong numbers (SAP returns nothing at all; SOFI's revenue is 6× too low). One returns correct numbers but only 2 years of history instead of 5 (SHOP).
+
+**What we learned:**
+- The normalizer is US-GAAP-only. Foreign companies that file using IFRS (SAP, ASML, etc.) get zero metrics back — no error, just silence plus a misleading "pre-revenue" warning.
+- Bank/fintech revenue is systematically wrong. SOFI's real revenue is $3.6B but we return $0.6B because banks use a different revenue tag that's not in our map.
+- Older filings often lack the SEC frame annotation that our year-deduplication logic requires. SHOP has 8 years of history in EDGAR but we only return 2.
+- The normalizer always reports `currency: "USD"` even for non-USD filers — doubly misleading for SAP (EUR).
+
+**What comes next:** #251 fixes the tag gaps (SOFI revenue, SHOP frame fallback). #252 fixes IFRS detection and the hardcoded currency.
+
+---
+
 ## Companies Tested
 
 | Ticker | CIK         | Type                   |
