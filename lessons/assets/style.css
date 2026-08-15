@@ -1,0 +1,26 @@
+/* Shared stylesheet for all VIRE lessons */
+body {
+  font-family: 'Georgia', serif;
+  max-width: 780px;
+  margin: 40px auto;
+  padding: 0 24px;
+  color: #1a1a1a;
+  line-height: 1.7;
+  background: #fafaf8;
+}
+h1 { font-size: 1.8rem; border-bottom: 2px solid #c8a96e; padding-bottom: 8px; color: #2c1810; }
+h2 { font-size: 1.2rem; color: #2c1810; margin-top: 2rem; }
+h3 { font-size: 1rem; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
+code, pre { font-family: 'Menlo', 'Consolas', monospace; font-size: 0.88rem; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 6px; overflow-x: auto; }
+.ac { background: #fff; border-left: 4px solid #c8a96e; padding: 10px 16px; margin: 12px 0; border-radius: 0 6px 6px 0; }
+.ac.met { border-left-color: #4caf50; }
+.ac.lesson { border-left-color: #2196f3; }
+.quiz { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 24px 0; }
+.quiz button { background: #c8a96e; color: #fff; border: none; padding: 8px 18px; border-radius: 4px; cursor: pointer; margin: 4px; font-size: 0.9rem; }
+.quiz button:hover { background: #b8955a; }
+.feedback { margin-top: 12px; font-weight: bold; min-height: 24px; }
+.correct { color: #4caf50; }
+.wrong { color: #e53935; }
+nav { font-size: 0.85rem; color: #888; margin-bottom: 32px; }
+.tag { display: inline-block; background: #f0ebe3; color: #7a5c2e; font-size: 0.78rem; padding: 2px 8px; border-radius: 10px; margin: 2px; }

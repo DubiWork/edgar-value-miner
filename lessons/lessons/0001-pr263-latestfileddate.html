@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Lesson 1 — PR #263: latestFiledDate</title>
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<nav>VIRE Teaching Workspace › Lesson 1 of ?</nav>
+
+<h1>PR #263 — <code>latestFiledDate</code></h1>
+<p><span class="tag">data-layer</span> <span class="tag">feat</span> <span class="tag">issue #250</span></p>
+
+<h2>Why does this utility exist?</h2>
+<p>The <code>cacheWriter</code> Cloud Function stores SEC data locally so we don't hammer the EDGAR API every time. But how does it know if the cached data is stale — i.e., if Apple filed something new since we last fetched?</p>
+<p>The answer: compare the <strong>most recent <code>filed</code> date</strong> in the cached blob against the one in the freshly-fetched blob. If they differ, re-normalize. If not, skip.</p>
+<p><code>latestFiledDate</code> does exactly one thing: scan a raw SEC companyfacts JSON blob and return the latest <code>filed</code> date string it finds. That's it.</p>
+
+<h2>What does the SEC blob look like?</h2>
+<pre>{
+  facts: {
+    "us-gaap": {
+      "Revenues": {
+        units: {
+          "USD": [
+            { filed: "2024-11-01", val: 391035000000, ... },
+            { filed: "2023-10-27", val: 383285000000, ... }
+          ],
+          "shares": [ ... ],
+          "USD/shares": [ ... ]
+        }
+      },
+      "NetIncomeLoss": { ... },
+      ...
+    },
+    "ifrs-full": { ... }   // only for foreign filers like SAP
+  }
+}</pre>
+<p>Every filing event gets a <code>filed</code> date. The most recent one across <em>all</em> tags and <em>all</em> unit types tells us when Apple last filed anything.</p>
+
+<h2>The implementation — 13 lines</h2>
+<pre>export function latestFiledDate(companyFactsJson) {
+  const usGaap = companyFactsJson?.facts?.['us-gaap'];
+  if (!usGaap) return null;          // IFRS filers, empty blobs, nulls
+
+  let max = null;
+  for (const tag of Object.values(usGaap)) {
+    for (const entries of Object.values(tag.units ?? {})) {
+      for (const { filed } of entries) {
+        if (filed && (max === null || filed > max)) max = filed;
+      }
+    }
+  }
+  return max;
+}</pre>
+<p>Key design choices:</p>
+<ul>
+  <li><strong>us-gaap only</strong> — IFRS filers (SAP, ASML) have no <code>us-gaap</code> key. The guard <code>if (!usGaap) return null</code> handles them. This is intentional — IFRS support is deferred to #252.</li>
+  <li><strong>String comparison</strong> — ISO dates (<code>YYYY-MM-DD</code>) sort correctly as strings. <code>"2025-06-15" &gt; "2024-03-01"</code> is true. No Date parsing needed.</li>
+  <li><strong>Returns null, not undefined</strong> — consistent with the <code>gaapNormalizer.js</code> null convention.</li>
+</ul>
+
+<h2>The 6 Acceptance Criteria — and what we learned from each</h2>
+
+<div class="ac met">
+  <strong>AC1:</strong> Function exported from <code>src/utils/latestFiledDate.js</code><br>
+  <em>Simple location contract. Tells the agent exactly where to put it.</em>
+</div>
+
+<div class="ac met">
+  <strong>AC2:</strong> Accepts raw SEC companyfacts JSON, returns max <code>filed</code> string (ISO format)<br>
+  <em>Specifies the input shape AND output format. "ISO format" prevents returning a Date object.</em>
+</div>
+
+<div class="ac met">
+  <strong>AC3:</strong> Returns <code>null</code> (not undefined) when <code>facts</code> is missing or empty<br>
+  <em>"Not undefined" is load-bearing — callers do <code>=== null</code> checks. A missing word here would have caused a subtle bug.</em>
+</div>
+
+<div class="ac met">
+  <strong>AC4:</strong> Handles multiple unit types (USD, shares, pure) — scans all unit arrays<br>
+  <em>This is why the loop goes 3 levels deep. Without this AC, an agent might only scan USD and miss a later filing in a shares entry.</em>
+</div>
+
+<div class="ac lesson">
+  <strong>AC5:</strong> Unit tests using existing AAPL fixture data<br>
+  <em>⚠️ This AC caused two review iterations. "Existing AAPL fixture" was ambiguous — no raw SEC fixture existed in the repo. We resolved it by slicing real EDGAR data into <code>src/__fixtures__/aaplCompanyFacts.js</code>. Lesson: when an AC references "existing" data, verify it exists before writing the AC.</em>
+</div>
+
+<div class="ac met">
+  <strong>AC6:</strong> Non-breaking — no changes to existing normalizer behavior<br>
+  <em>Scope guard. Prevents an agent from "helpfully" touching gaapNormalizer.js.</em>
+</div>
+
+<h2>What the review rounds taught us</h2>
+<ol>
+  <li><strong>Round 1</strong> — Tests used inline synthetic data, not the AC5 fixture. Also: the multi-unit test body was truncated in the diff — AC4 was unverifiable.</li>
+  <li><strong>Round 2</strong> — Tests used real fixture, but tests 1 and 2 were identical (same input, same assertion). No isolation.</li>
+  <li><strong>Round 3</strong> — Duplicate test fixed. AC4 IFRS scope test added. All 7 tests pass. Clean.</li>
+</ol>
+
+<h2>What this means for #251 and #252</h2>
+<p>Three patterns to carry forward:</p>
+<ul>
+  <li><strong>Name the fixture in the AC.</strong> Don't say "using existing fixture data" — say "using <code>src/__fixtures__/aaplCompanyFacts.js</code>".</li>
+  <li><strong>Each test must isolate one thing.</strong> If two tests share the same input and assertion, one is dead weight. For #251 (tag stitching), write one test per era — not one test that "covers eras" with the same blob.</li>
+  <li><strong>IFRS is a known boundary.</strong> Any utility that reads <code>us-gaap</code> must explicitly test what happens with an IFRS-only blob. We established this pattern here — carry it into #251 and #252.</li>
+</ul>
+
+<h2>Quick-recall quiz</h2>
+<div class="quiz">
+  <p><strong>Q: Why does <code>latestFiledDate</code> return <code>null</code> for SAP (an IFRS filer)?</strong></p>
+  <button onclick="reveal('q1','correct')">SAP has no <code>us-gaap</code> key in its facts</button>
+  <button onclick="reveal('q1','wrong')">SAP reports in EUR, not USD</button>
+  <button onclick="reveal('q1','wrong')">SAP hasn't filed recently</button>
+  <div id="q1" class="feedback"></div>
+</div>
+
+<div class="quiz">
+  <p><strong>Q: Why is <code>filed &gt; max</code> safe for ISO date strings?</strong></p>
+  <button onclick="reveal('q2','wrong')">JavaScript auto-converts them to Date objects</button>
+  <button onclick="reveal('q2','correct')"><code>YYYY-MM-DD</code> sorts correctly as a string</button>
+  <button onclick="reveal('q2','wrong')">The SEC always returns dates in ascending order</button>
+  <div id="q2" class="feedback"></div>
+</div>
+
+<div class="quiz">
+  <p><strong>Q: What AC pattern should we carry into #251?</strong></p>
+  <button onclick="reveal('q3','wrong')">Always use inline synthetic data for speed</button>
+  <button onclick="reveal('q3','wrong')">Skip fixture tests if coverage is equivalent</button>
+  <button onclick="reveal('q3','correct')">Name the exact fixture file in the AC; isolate one case per test</button>
+  <div id="q3" class="feedback"></div>
+</div>
+
+<hr>
+<p style="font-size:0.85rem; color:#888;">💬 Ask your teacher any follow-up question — they can go deeper on any part of this lesson.</p>
+
+<script>
+function reveal(id, outcome) {
+  const el = document.getElementById(id);
+  if (outcome === 'correct') {
+    el.className = 'feedback correct';
+    el.textContent = '✓ Correct.';
+  } else {
+    el.className = 'feedback wrong';
+    el.textContent = '✗ Not quite — try another.';
+  }
+}
+</script>
+
+</body>
+</html>
