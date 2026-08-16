@@ -1204,5 +1204,11 @@ describe('#251 Fix 2 — bank revenue tags (SOFI real fixture)', () => {
     expect(result.metrics.revenue.tag).not.toBe('RevenuesNetOfInterestExpense');
     expect(result.metrics.revenue.tag).not.toBe('InterestAndDividendIncomeOperating');
   });
+
+  it('MSFT revenue tag is not a bank-specific tag (no regression)', () => {
+    const result = normalizeCompanyFacts(msftFacts);
+    expect(result.metrics.revenue.tag).not.toBe('RevenuesNetOfInterestExpense');
+    expect(result.metrics.revenue.tag).not.toBe('InterestAndDividendIncomeOperating');
+  });
 });
 

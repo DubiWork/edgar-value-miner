@@ -923,9 +923,9 @@ export function stitchTimeSeriesData(companyFacts, metricName, periodType, optio
   merged.sort((a, b) => (b.fiscalYear ?? 0) - (a.fiscalYear ?? 0));
   const result = merged.slice(0, maxPeriods);
 
-  if (result.length > primaryData.length) {
-    result._stitched = true;
-  }
+  // _stitched = true when stitching was triggered (primary was short),
+  // regardless of whether older tags actually contributed extra years.
+  result._stitched = true;
 
   return result;
 }
