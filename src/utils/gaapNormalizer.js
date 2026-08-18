@@ -879,26 +879,26 @@ export function getQuarterlyValues(metric, quarters = 8) {
  * @param {string} metricName - Standard metric name
  * @param {'annual'|'quarterly'} periodType
  * @param {Object} [options={}]
- * @returns {Array} Data points, sorted by fiscalYear descending. Array may have
- *   a `_stitched: true` property when data from multiple tags was merged.
+ * @returns {{ data: Array, stitched: boolean }} data sorted by fiscalYear descending;
+ *   stitched is true when the primary tag was short and older era tags were scanned.
  */
 export function stitchTimeSeriesData(companyFacts, metricName, periodType, options = {}) {
   const { maxPeriods = periodType === 'annual' ? ANNUAL_YEARS : QUARTERLY_PERIODS } = options;
 
   const primaryTag = findGaapTag(companyFacts, metricName);
-  if (!primaryTag) return [];
+  if (!primaryTag) return { data: [], stitched: false };
 
   const primaryData = extractTimeSeriesData(primaryTag.data, periodType, {
     tagIndex: primaryTag.index,
-    maxPeriods: 9999,
+    maxPeriods: Infinity,
   });
 
   if (primaryData.length >= maxPeriods) {
-    return primaryData.slice(0, maxPeriods);
+    return { data: primaryData.slice(0, maxPeriods), stitched: false };
   }
 
   const usGaap = companyFacts?.facts?.['us-gaap'];
-  if (!usGaap) return primaryData.slice(0, maxPeriods);
+  if (!usGaap) return { data: primaryData.slice(0, maxPeriods), stitched: true };
 
   const allTags = GAAP_TAG_MAP[metricName] || [];
   const coveredYears = new Set(primaryData.map(d => d.fiscalYear));
@@ -909,7 +909,7 @@ export function stitchTimeSeriesData(companyFacts, metricName, periodType, optio
     if (tag === primaryTag.tag) continue;
     if (!usGaap[tag]?.units) continue;
 
-    const extraData = extractTimeSeriesData(usGaap[tag], periodType, { tagIndex: i, maxPeriods: 9999 });
+    const extraData = extractTimeSeriesData(usGaap[tag], periodType, { tagIndex: i, maxPeriods: Infinity });
     for (const point of extraData) {
       if (!coveredYears.has(point.fiscalYear)) {
         merged.push(point);
@@ -921,13 +921,7 @@ export function stitchTimeSeriesData(companyFacts, metricName, periodType, optio
   }
 
   merged.sort((a, b) => (b.fiscalYear ?? 0) - (a.fiscalYear ?? 0));
-  const result = merged.slice(0, maxPeriods);
-
-  // _stitched = true when stitching was triggered (primary was short),
-  // regardless of whether older tags actually contributed extra years.
-  result._stitched = true;
-
-  return result;
+  return { data: merged.slice(0, maxPeriods), stitched: true };
 }
 
 // =============================================================================
@@ -994,8 +988,8 @@ export function normalizeCompanyFacts(companyFactsJson) {
 
     if (tagResult) {
       // Extract time series for both annual and quarterly
-      const annual = stitchTimeSeriesData(companyFactsJson, metricName, 'annual', { tagIndex: tagResult.index });
-      if (annual._stitched) anyStitched = true;
+      const { data: annual, stitched } = stitchTimeSeriesData(companyFactsJson, metricName, 'annual', { tagIndex: tagResult.index });
+      if (stitched) anyStitched = true;
       const quarterly = extractTimeSeriesData(tagResult.data, 'quarterly', {
         tagIndex: tagResult.index,
       });
