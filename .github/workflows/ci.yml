@@ -135,14 +135,14 @@ jobs:
         run: |
           URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${{ github.event.number }}/"
           echo "Polling $URL until it serves the app (GitHub Pages propagation is async)..."
-          for i in $(seq 1 40); do
+          for i in $(seq 1 60); do
             CODE=$(curl -s -o /tmp/preview.html -w "%{http_code}" "$URL" || echo "000")
             if [ "$CODE" = "200" ] && grep -q "EDGAR Value Miner" /tmp/preview.html; then
               echo "Preview live after ~$((i*6))s (HTTP $CODE)"; exit 0
             fi
             echo "attempt $i: HTTP $CODE, not ready yet"; sleep 6
           done
-          echo "::error::Preview URL did not become ready within ~240s"; exit 1
+          echo "::error::Preview URL did not become ready within ~360s"; exit 1
       - name: Run smoke tests on preview
         run: npx playwright test --project=smoke
         env:
