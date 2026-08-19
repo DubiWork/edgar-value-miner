@@ -964,9 +964,43 @@ export function stitchTimeSeriesData(companyFacts, metricName, periodType, optio
  * console.log(normalized.metrics.netIncome.quarterly); // Last 20 quarters of net income
  * console.log(normalized.metrics.freeCashFlow.annual); // Calculated FCF
  */
+
+/**
+ * Detects the reporting currency from a companyfacts JSON blob.
+ * Checks us-gaap first, then ifrs-full, returns first 3-letter uppercase
+ * currency code found. Falls back to 'USD'.
+ * @param {Object} companyFactsJson
+ * @returns {string} ISO 4217 currency code
+ */
+export function detectFilingCurrency(companyFactsJson) {
+  const facts = companyFactsJson?.facts;
+  if (!facts) return 'USD';
+  for (const ns of ['us-gaap', 'ifrs-full']) {
+    const namespace = facts[ns];
+    if (!namespace) continue;
+    for (const tag of Object.values(namespace)) {
+      for (const unit of Object.keys(tag?.units ?? {})) {
+        // ponytail: returns first currency found; multi-currency filers may get minority currency — fix when real case emerges
+        if (/^[A-Z]{3}$/.test(unit)) return unit;
+      }
+    }
+  }
+  return 'USD';
+}
+
 export function normalizeCompanyFacts(companyFactsJson) {
   if (!companyFactsJson) {
     throw new Error('Company facts JSON is required');
+  }
+
+  // Reject IFRS-only filers
+  const facts = companyFactsJson.facts ?? {};
+  const hasIfrs = facts['ifrs-full'] && Object.keys(facts['ifrs-full']).length > 0;
+  const hasUsGaap = facts['us-gaap'] && Object.keys(facts['us-gaap']).length > 0;
+  if (hasIfrs && !hasUsGaap) {
+    throw new Error(
+      'IFRS filer detected: IFRS namespace not supported. Only US-GAAP filers are supported in this version.'
+    );
   }
 
   // Extract basic company info
@@ -1125,7 +1159,7 @@ export function normalizeCompanyFacts(companyFactsJson) {
     metadata: {
       fiscalYearEnd,
       fiscalYearEndDefaulted,
-      currency: 'USD',
+      currency: detectFilingCurrency(companyFactsJson),
       normalized: true,
       normalizationVersion: NORMALIZATION_VERSION,
       normalizedAt: new Date().toISOString(),
@@ -1261,6 +1295,7 @@ export function validateRequiredMetrics(normalizedData, requiredMetrics = ['reve
 export default {
   // Main functions
   normalizeCompanyFacts,
+  detectFilingCurrency,
   findGaapTag,
   extractTimeSeriesData,
   stitchTimeSeriesData,
