@@ -1291,3 +1291,18 @@ describe('#252 normalizeCompanyFacts — metadata.currency from filing', () => {
   });
 });
 
+describe('#252 normalizeCompanyFacts — IFRS guard with empty us-gaap', () => {
+  it('throws when us-gaap is empty object and ifrs-full has data', () => {
+    const ifrsEmptyUsGaap = createCompanyFacts({
+      facts: { 'us-gaap': {}, 'ifrs-full': { Revenue: { units: { EUR: [] } } } },
+    });
+    expect(() => normalizeCompanyFacts(ifrsEmptyUsGaap)).toThrow('IFRS filer detected');
+  });
+});
+
+describe('detectFilingCurrency — null tag safety', () => {
+  it('returns USD when a tag value is null', () => {
+    expect(detectFilingCurrency({ facts: { 'us-gaap': { Revenue: null } } })).toBe('USD');
+  });
+});
+

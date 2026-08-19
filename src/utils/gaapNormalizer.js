@@ -40,6 +40,10 @@ const QUARTERLY_PERIODS = 20;
  */
 const ANNUAL_FORMS = ['10-K', '10-K/A'];
 
+const GAAP_NAMESPACE = 'us-gaap';
+const IFRS_NAMESPACE = 'ifrs-full';
+const DEFAULT_CURRENCY = 'USD';
+
 /**
  * Forms used for quarterly filings
  * @constant {string[]}
@@ -623,6 +627,7 @@ export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
   }
 
   // Get USD data (most common), fall back to shares for share-based metrics
+  // Non-USD currencies fall through to Object.values(...)[0] as last resort
   const unitData = gaapTagData.units.USD ||
                    gaapTagData.units.shares ||
                    gaapTagData.units['USD/shares'] ||
@@ -929,6 +934,29 @@ export function stitchTimeSeriesData(companyFacts, metricName, periodType, optio
 // =============================================================================
 
 /**
+ * Detects the reporting currency from a companyfacts JSON blob.
+ * Checks us-gaap first, then ifrs-full, returns first 3-letter uppercase
+ * currency code found. Falls back to 'USD'.
+ * @param {Object} companyFactsJson
+ * @returns {string} ISO 4217 currency code
+ */
+export function detectFilingCurrency(companyFactsJson) {
+  const facts = companyFactsJson?.facts;
+  if (!facts) return DEFAULT_CURRENCY;
+  for (const namespaceKey of [GAAP_NAMESPACE, IFRS_NAMESPACE]) {
+    const namespace = facts[namespaceKey];
+    if (!namespace) continue;
+    for (const tag of Object.values(namespace)) {
+      for (const unit of Object.keys(tag?.units ?? {})) {
+        // ponytail: returns first currency found; multi-currency filers may get minority currency — fix when real case emerges
+        if (/^[A-Z]{3}$/.test(unit)) return unit;
+      }
+    }
+  }
+  return DEFAULT_CURRENCY;
+}
+
+/**
  * Normalizes raw SEC Company Facts JSON into standardized financial metrics
  *
  * This is the main entry point for normalization. It:
@@ -964,40 +992,15 @@ export function stitchTimeSeriesData(companyFacts, metricName, periodType, optio
  * console.log(normalized.metrics.netIncome.quarterly); // Last 20 quarters of net income
  * console.log(normalized.metrics.freeCashFlow.annual); // Calculated FCF
  */
-
-/**
- * Detects the reporting currency from a companyfacts JSON blob.
- * Checks us-gaap first, then ifrs-full, returns first 3-letter uppercase
- * currency code found. Falls back to 'USD'.
- * @param {Object} companyFactsJson
- * @returns {string} ISO 4217 currency code
- */
-export function detectFilingCurrency(companyFactsJson) {
-  const facts = companyFactsJson?.facts;
-  if (!facts) return 'USD';
-  for (const ns of ['us-gaap', 'ifrs-full']) {
-    const namespace = facts[ns];
-    if (!namespace) continue;
-    for (const tag of Object.values(namespace)) {
-      for (const unit of Object.keys(tag?.units ?? {})) {
-        // ponytail: returns first currency found; multi-currency filers may get minority currency — fix when real case emerges
-        if (/^[A-Z]{3}$/.test(unit)) return unit;
-      }
-    }
-  }
-  return 'USD';
-}
-
 export function normalizeCompanyFacts(companyFactsJson) {
   if (!companyFactsJson) {
     throw new Error('Company facts JSON is required');
   }
 
-  // Reject IFRS-only filers
+  // Reject IFRS-only filers (also catches empty us-gaap object)
   const facts = companyFactsJson.facts ?? {};
-  const hasIfrs = facts['ifrs-full'] && Object.keys(facts['ifrs-full']).length > 0;
-  const hasUsGaap = facts['us-gaap'] && Object.keys(facts['us-gaap']).length > 0;
-  if (hasIfrs && !hasUsGaap) {
+  const hasUsGaap = facts[GAAP_NAMESPACE] && Object.keys(facts[GAAP_NAMESPACE]).length > 0;
+  if (!hasUsGaap && facts[IFRS_NAMESPACE] && Object.keys(facts[IFRS_NAMESPACE]).length > 0) {
     throw new Error(
       'IFRS filer detected: IFRS namespace not supported. Only US-GAAP filers are supported in this version.'
     );
