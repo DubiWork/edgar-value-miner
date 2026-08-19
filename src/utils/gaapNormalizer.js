@@ -64,6 +64,8 @@ export const GAAP_TAG_MAP = {
   /** Total revenue/sales */
   revenue: [
     'Revenues',
+    'RevenuesNetOfInterestExpense',
+    'InterestAndDividendIncomeOperating',
     'RevenueFromContractWithCustomerExcludingAssessedTax',
     'RevenueFromContractWithCustomerIncludingAssessedTax',
     'SalesRevenueNet',
@@ -711,7 +713,7 @@ export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
   const limitedData = deduplicatedData.slice(0, maxPeriods);
 
   // Transform to standardized format
-  return limitedData.map(item => ({
+  const result = limitedData.map(item => ({
     value: item.val,
     period: item.frame || item.end,
     fiscalYear: extractFiscalYear(item.end),
@@ -720,6 +722,7 @@ export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
     form: item.form,
     confidence: determineConfidence(item, '', tagIndex),
   }));
+  return result;
 }
 
 /**
@@ -865,6 +868,63 @@ export function getQuarterlyValues(metric, quarters = 8) {
 }
 
 // =============================================================================
+// Tag Stitching
+// =============================================================================
+
+/**
+ * Extracts annual time series for a metric, stitching data from older XBRL tag
+ * eras when the primary tag returns fewer than maxPeriods points.
+ *
+ * @param {Object} companyFacts - Raw SEC Company Facts JSON
+ * @param {string} metricName - Standard metric name
+ * @param {'annual'|'quarterly'} periodType
+ * @param {Object} [options={}]
+ * @returns {{ data: Array, stitched: boolean }} data sorted by fiscalYear descending;
+ *   stitched is true when the primary tag was short and older era tags were scanned.
+ */
+export function stitchTimeSeriesData(companyFacts, metricName, periodType, options = {}) {
+  const { maxPeriods = periodType === 'annual' ? ANNUAL_YEARS : QUARTERLY_PERIODS } = options;
+
+  const primaryTag = findGaapTag(companyFacts, metricName);
+  if (!primaryTag) return { data: [], stitched: false };
+
+  const primaryData = extractTimeSeriesData(primaryTag.data, periodType, {
+    tagIndex: primaryTag.index,
+    maxPeriods: Infinity,
+  });
+
+  if (primaryData.length >= maxPeriods) {
+    return { data: primaryData.slice(0, maxPeriods), stitched: false };
+  }
+
+  const usGaap = companyFacts?.facts?.['us-gaap'];
+  if (!usGaap) return { data: primaryData.slice(0, maxPeriods), stitched: true };
+
+  const allTags = GAAP_TAG_MAP[metricName] || [];
+  const coveredYears = new Set(primaryData.map(d => d.fiscalYear));
+  const merged = [...primaryData];
+
+  for (let i = 0; i < allTags.length; i++) {
+    const tag = allTags[i];
+    if (tag === primaryTag.tag) continue;
+    if (!usGaap[tag]?.units) continue;
+
+    const extraData = extractTimeSeriesData(usGaap[tag], periodType, { tagIndex: i, maxPeriods: Infinity });
+    for (const point of extraData) {
+      if (!coveredYears.has(point.fiscalYear)) {
+        merged.push(point);
+        coveredYears.add(point.fiscalYear);
+      }
+    }
+
+    if (merged.length >= maxPeriods) break;
+  }
+
+  merged.sort((a, b) => (b.fiscalYear ?? 0) - (a.fiscalYear ?? 0));
+  return { data: merged.slice(0, maxPeriods), stitched: true };
+}
+
+// =============================================================================
 // Main Normalization Function
 // =============================================================================
 
@@ -921,15 +981,15 @@ export function normalizeCompanyFacts(companyFactsJson) {
 
   // Process all standard metrics
   const allMetrics = Object.keys(GAAP_TAG_MAP);
+  let anyStitched = false;
 
   for (const metricName of allMetrics) {
     const tagResult = findGaapTag(companyFactsJson, metricName);
 
     if (tagResult) {
       // Extract time series for both annual and quarterly
-      const annual = extractTimeSeriesData(tagResult.data, 'annual', {
-        tagIndex: tagResult.index,
-      });
+      const { data: annual, stitched } = stitchTimeSeriesData(companyFactsJson, metricName, 'annual', { tagIndex: tagResult.index });
+      if (stitched) anyStitched = true;
       const quarterly = extractTimeSeriesData(tagResult.data, 'quarterly', {
         tagIndex: tagResult.index,
       });
@@ -1035,6 +1095,15 @@ export function normalizeCompanyFacts(companyFactsJson) {
 
   // Build warnings array
   const warnings = [];
+  const BANK_REVENUE_TAGS = ['RevenuesNetOfInterestExpense', 'InterestAndDividendIncomeOperating'];
+  if (BANK_REVENUE_TAGS.includes(metrics.revenue?.tag)) {
+    warnings.push('Bank/fintech revenue tag used — total revenue includes interest income');
+  }
+
+  if (anyStitched) {
+    warnings.push('Tag stitching applied — historical data merged from multiple XBRL era tags');
+  }
+
   if (isPreRevenue) {
     warnings.push('Company appears to be pre-revenue (revenue is zero or missing)');
   }
@@ -1194,6 +1263,7 @@ export default {
   normalizeCompanyFacts,
   findGaapTag,
   extractTimeSeriesData,
+  stitchTimeSeriesData,
 
   // Calculated metrics
   calculateFreeCashFlow,

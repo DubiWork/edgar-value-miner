@@ -16,6 +16,9 @@ import {
   findGaapTag,
   NORMALIZATION_VERSION,
 } from '../../utils/gaapNormalizer.js';
+import msftFacts from '../../__fixtures__/msftCompanyFacts.json';
+import sofiFacts from '../../__fixtures__/sofiCompanyFacts.json';
+import aaplFacts from '../../__fixtures__/aaplCompanyFacts.json';
 
 // =============================================================================
 // Mock Data Helpers
@@ -1093,3 +1096,119 @@ describe('Combined edge cases', () => {
     expect(() => normalizeCompanyFacts(undefined)).toThrow('Company facts JSON is required');
   });
 });
+
+// =============================================================================
+// #251 Fix 1 — Tag stitching (MSFT real fixture)
+// =============================================================================
+
+describe('#251 Fix 1 — tag stitching across eras', () => {
+  // Stitching triggers when the primary (most-recent) tag returns fewer than
+  // ANNUAL_YEARS (5) points. We use a synthetic fixture with an intentional
+  // era gap: primary tag covers only 3 years, older era tag covers 4 more.
+  function createEraGapFacts() {
+    return {
+      entityName: 'Test Corp',
+      cik: '0000000001',
+      ticker: 'TEST',
+      facts: {
+        'us-gaap': {
+          // Current era tag — only 3 years of data
+          RevenueFromContractWithCustomerExcludingAssessedTax: {
+            label: 'Revenue',
+            units: {
+              USD: [
+                { end: '2025-06-30', val: 200_000_000_000, form: '10-K', frame: 'CY2025', filed: '2025-08-01', fy: 2025 },
+                { end: '2024-06-30', val: 180_000_000_000, form: '10-K', frame: 'CY2024', filed: '2024-08-01', fy: 2024 },
+                { end: '2023-06-30', val: 160_000_000_000, form: '10-K', frame: 'CY2023', filed: '2023-08-01', fy: 2023 },
+              ],
+            },
+          },
+          // Older era tag — covers 4 earlier years (no overlap)
+          SalesRevenueNet: {
+            label: 'Sales Revenue Net',
+            units: {
+              USD: [
+                { end: '2022-06-30', val: 140_000_000_000, form: '10-K', frame: 'CY2022', filed: '2022-08-01', fy: 2022 },
+                { end: '2021-06-30', val: 120_000_000_000, form: '10-K', frame: 'CY2021', filed: '2021-08-01', fy: 2021 },
+                { end: '2020-06-30', val: 100_000_000_000, form: '10-K', frame: 'CY2020', filed: '2020-08-01', fy: 2020 },
+                { end: '2019-06-30', val:  80_000_000_000, form: '10-K', frame: 'CY2019', filed: '2019-08-01', fy: 2019 },
+              ],
+            },
+          },
+        },
+      },
+    };
+  }
+
+  it('stitches older era tags when primary tag has < ANNUAL_YEARS points', () => {
+    const result = normalizeCompanyFacts(createEraGapFacts());
+    expect(result.metrics.revenue.annual.length).toBe(5);
+  });
+
+  it('stitched result has no duplicate fiscal years', () => {
+    const result = normalizeCompanyFacts(createEraGapFacts());
+    const years = result.metrics.revenue.annual.map(d => d.fiscalYear);
+    expect(years.length).toBe(new Set(years).size);
+  });
+
+  it('stitched result is sorted by fiscal year descending', () => {
+    const result = normalizeCompanyFacts(createEraGapFacts());
+    const years = result.metrics.revenue.annual.map(d => d.fiscalYear);
+    expect(years).toEqual([...years].sort((a, b) => b - a));
+  });
+
+  it('emits a stitching warning when eras are merged', () => {
+    const result = normalizeCompanyFacts(createEraGapFacts());
+    expect(result.metadata.warnings.some(w => w.toLowerCase().includes('stitch'))).toBe(true);
+  });
+
+  it('AAPL revenue returns 5 years (current tag has enough — no stitching)', () => {
+    const result = normalizeCompanyFacts(aaplFacts);
+    expect(result.metrics.revenue.annual.length).toBe(5);
+  });
+
+  it('AAPL does NOT emit a stitching warning', () => {
+    const result = normalizeCompanyFacts(aaplFacts);
+    expect(result.metadata.warnings.some(w => w.toLowerCase().includes('stitch'))).toBe(false);
+  });
+
+  it('MSFT revenue returns 5 years (current tag covers 9 years — no stitching needed)', () => {
+    const result = normalizeCompanyFacts(msftFacts);
+    expect(result.metrics.revenue.annual.length).toBe(5);
+  });
+});
+
+// =============================================================================
+// #251 Fix 2 — Bank revenue tags (SOFI real fixture)
+// =============================================================================
+
+describe('#251 Fix 2 — bank revenue tags (SOFI real fixture)', () => {
+  it('SOFI revenue ≥ $3B (RevenuesNetOfInterestExpense, not fee-only)', () => {
+    const result = normalizeCompanyFacts(sofiFacts);
+    const latest = result.metrics.revenue.annual[0]?.value;
+    expect(latest).toBeGreaterThan(3_000_000_000);
+  });
+
+  it('SOFI revenue tag is RevenuesNetOfInterestExpense', () => {
+    const result = normalizeCompanyFacts(sofiFacts);
+    expect(result.metrics.revenue.tag).toBe('RevenuesNetOfInterestExpense');
+  });
+
+  it('SOFI warns about bank tag', () => {
+    const result = normalizeCompanyFacts(sofiFacts);
+    expect(result.metadata.warnings.some(w => w.includes('Bank') || w.includes('bank'))).toBe(true);
+  });
+
+  it('AAPL revenue tag is not a bank-specific tag (no regression)', () => {
+    const result = normalizeCompanyFacts(aaplFacts);
+    expect(result.metrics.revenue.tag).not.toBe('RevenuesNetOfInterestExpense');
+    expect(result.metrics.revenue.tag).not.toBe('InterestAndDividendIncomeOperating');
+  });
+
+  it('MSFT revenue tag is not a bank-specific tag (no regression)', () => {
+    const result = normalizeCompanyFacts(msftFacts);
+    expect(result.metrics.revenue.tag).not.toBe('RevenuesNetOfInterestExpense');
+    expect(result.metrics.revenue.tag).not.toBe('InterestAndDividendIncomeOperating');
+  });
+});
+
