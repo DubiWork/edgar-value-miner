@@ -1025,7 +1025,10 @@ export function normalizeCompanyFacts(companyFactsJson, { fullHistory = false } 
 
     if (tagResult) {
       // Extract time series for both annual and quarterly
-      const { data: annual, stitched } = stitchTimeSeriesData(companyFactsJson, metricName, 'annual', { tagIndex: tagResult.index, maxPeriods: fullHistory ? Infinity : ANNUAL_YEARS });
+      const { data: annual, stitched } = stitchTimeSeriesData(companyFactsJson, metricName, 'annual', {
+        tagIndex: tagResult.index,
+        maxPeriods: fullHistory ? Infinity : ANNUAL_YEARS,
+      });
       if (stitched) anyStitched = true;
       const quarterly = extractTimeSeriesData(tagResult.data, 'quarterly', {
         tagIndex: tagResult.index,
