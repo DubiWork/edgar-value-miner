@@ -14,6 +14,7 @@ import {
   normalizeCompanyFacts,
   extractTimeSeriesData,
   findGaapTag,
+  detectFilingCurrency,
   NORMALIZATION_VERSION,
 } from '../../utils/gaapNormalizer.js';
 import msftFacts from '../../__fixtures__/msftCompanyFacts.json';
@@ -1209,6 +1210,99 @@ describe('#251 Fix 2 — bank revenue tags (SOFI real fixture)', () => {
     const result = normalizeCompanyFacts(msftFacts);
     expect(result.metrics.revenue.tag).not.toBe('RevenuesNetOfInterestExpense');
     expect(result.metrics.revenue.tag).not.toBe('InterestAndDividendIncomeOperating');
+  });
+});
+
+// =============================================================================
+// #252: Currency detection
+// =============================================================================
+
+describe('#252 detectFilingCurrency', () => {
+  it('returns USD for us-gaap facts with USD units', () => {
+    const facts = { facts: { 'us-gaap': { Revenues: { units: { USD: [] } } } } };
+    expect(detectFilingCurrency(facts)).toBe('USD');
+  });
+
+  it('returns EUR when units key is EUR', () => {
+    const facts = { facts: { 'us-gaap': { Revenues: { units: { EUR: [] } } } } };
+    expect(detectFilingCurrency(facts)).toBe('EUR');
+  });
+
+  it('skips non-currency units (shares, pure, USD/shares)', () => {
+    const facts = {
+      facts: {
+        'us-gaap': {
+          ShareCount: { units: { shares: [] } },
+          Ratio: { units: { pure: [] } },
+          EPS: { units: { 'USD/shares': [] } },
+          Revenues: { units: { CAD: [] } },
+        },
+      },
+    };
+    expect(detectFilingCurrency(facts)).toBe('CAD');
+  });
+
+  it('falls back to USD for empty facts', () => {
+    expect(detectFilingCurrency({})).toBe('USD');
+    expect(detectFilingCurrency({ facts: {} })).toBe('USD');
+  });
+
+  it('checks ifrs-full when us-gaap absent', () => {
+    const facts = { facts: { 'ifrs-full': { Revenue: { units: { GBP: [] } } } } };
+    expect(detectFilingCurrency(facts)).toBe('GBP');
+  });
+});
+
+describe('#252 normalizeCompanyFacts — IFRS detection', () => {
+  it('throws for IFRS-only filer', () => {
+    const ifrsOnly = createCompanyFacts({
+      facts: { 'ifrs-full': { Revenue: { units: { EUR: [] } } } },
+    });
+    expect(() => normalizeCompanyFacts(ifrsOnly)).toThrow(
+      'IFRS filer detected: IFRS namespace not supported. Only US-GAAP filers are supported in this version.'
+    );
+  });
+
+  it('does NOT throw when both us-gaap and ifrs-full are present', () => {
+    const dual = createCompanyFacts({
+      facts: {
+        'us-gaap': { Revenues: { units: { USD: [] } } },
+        'ifrs-full': { Revenue: { units: { USD: [] } } },
+      },
+    });
+    expect(() => normalizeCompanyFacts(dual)).not.toThrow();
+  });
+});
+
+describe('#252 normalizeCompanyFacts — metadata.currency from filing', () => {
+  it('AAPL metadata.currency is USD (from fixture, not hardcoded)', () => {
+    const result = normalizeCompanyFacts(aaplFacts);
+    expect(result.metadata.currency).toBe('USD');
+  });
+
+  it('metadata.currency reflects EUR when fixture uses EUR units', () => {
+    const eurFacts = createCompanyFacts({
+      facts: { 'us-gaap': { Revenues: { label: 'Revenues', units: { EUR: [
+        createUnitEntry({ end: '2023-12-31', val: 1000000, form: '10-K', frame: 'CY2023' }),
+      ] } } } },
+    });
+    const result = normalizeCompanyFacts(eurFacts);
+    expect(result.metadata.currency).toBe('EUR');
+  });
+});
+
+describe('#252 normalizeCompanyFacts — IFRS guard with empty us-gaap', () => {
+  it('throws when us-gaap is empty object and ifrs-full has data', () => {
+    const ifrsEmptyUsGaap = createCompanyFacts({
+      facts: { 'us-gaap': {}, 'ifrs-full': { Revenue: { units: { EUR: [] } } } },
+    });
+    expect(() => normalizeCompanyFacts(ifrsEmptyUsGaap)).toThrow('IFRS filer detected');
+  });
+});
+
+describe('detectFilingCurrency — null tag safety', () => {
+  it('returns USD when a tag value is null', () => {
+    expect(detectFilingCurrency({ facts: { 'us-gaap': { Revenue: null } } })).toBe('USD');
   });
 });
 
