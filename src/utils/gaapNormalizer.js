@@ -992,7 +992,7 @@ export function detectFilingCurrency(companyFactsJson) {
  * console.log(normalized.metrics.netIncome.quarterly); // Last 20 quarters of net income
  * console.log(normalized.metrics.freeCashFlow.annual); // Calculated FCF
  */
-export function normalizeCompanyFacts(companyFactsJson) {
+export function normalizeCompanyFacts(companyFactsJson, { fullHistory = false } = {}) {
   if (!companyFactsJson) {
     throw new Error('Company facts JSON is required');
   }
@@ -1025,10 +1025,14 @@ export function normalizeCompanyFacts(companyFactsJson) {
 
     if (tagResult) {
       // Extract time series for both annual and quarterly
-      const { data: annual, stitched } = stitchTimeSeriesData(companyFactsJson, metricName, 'annual', { tagIndex: tagResult.index });
+      const { data: annual, stitched } = stitchTimeSeriesData(companyFactsJson, metricName, 'annual', {
+        tagIndex: tagResult.index,
+        maxPeriods: fullHistory ? Infinity : ANNUAL_YEARS,
+      });
       if (stitched) anyStitched = true;
       const quarterly = extractTimeSeriesData(tagResult.data, 'quarterly', {
         tagIndex: tagResult.index,
+        maxPeriods: fullHistory ? Infinity : QUARTERLY_PERIODS,
       });
 
       metrics[metricName] = {
