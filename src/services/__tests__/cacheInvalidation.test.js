@@ -112,7 +112,6 @@ describe('cacheInvalidation', () => {
 
     vi.mocked(firestoreCache.invalidateGlobalCache).mockResolvedValue(true);
     vi.mocked(firestoreCache.getCompanyFactsFromFirestore).mockResolvedValue(null);
-    vi.mocked(firestoreCache.setCompanyFactsToFirestore).mockResolvedValue(true);
 
     vi.mocked(edgarApi.fetchCompanyFactsByTicker).mockResolvedValue({
       facts: freshMockData.data,
@@ -504,14 +503,6 @@ describe('cacheInvalidation', () => {
       expect(true).toBe(true);
     });
 
-    it('should attempt Firestore update even if it fails', async () => {
-      vi.mocked(firestoreCache.setCompanyFactsToFirestore).mockRejectedValue(new Error('Client-side Firestore'));
-
-      await triggerBackgroundRefresh('AAPL');
-
-      // Function should handle error gracefully
-      expect(true).toBe(true);
-    });
 
     it('should clean up activeRefreshes after window expires', async () => {
       vi.useFakeTimers();
@@ -1175,19 +1166,6 @@ describe('cacheInvalidation', () => {
     it('should handle API error in background refresh', async () => {
       const apiError = new Error('SEC API rate limit exceeded');
       vi.mocked(edgarApi.fetchCompanyFactsByTicker).mockRejectedValue(apiError);
-
-      // Should not throw
-      await triggerBackgroundRefresh('AAPL');
-
-      // Function should complete
-      expect(true).toBe(true);
-    });
-
-    it('should handle Firestore write failing gracefully in background refresh', async () => {
-      const firestoreError = new Error('Permission denied');
-      vi.mocked(firestoreCache.setCompanyFactsToFirestore).mockRejectedValue(
-        firestoreError
-      );
 
       // Should not throw
       await triggerBackgroundRefresh('AAPL');

@@ -42,7 +42,6 @@ vi.mock('../edgarCache.js', () => ({
 vi.mock('../firestoreCache.js', () => ({
   default: {
     getCompanyFactsFromFirestore: vi.fn(),
-    setCompanyFactsToFirestore: vi.fn(),
     invalidateGlobalCache: vi.fn(),
     getGlobalCacheStats: vi.fn(),
   },
@@ -151,7 +150,6 @@ describe('cacheCoordinator', () => {
       });
 
       edgarCache.setCompanyFacts.mockResolvedValue(true);
-      firestoreCache.setCompanyFactsToFirestore.mockResolvedValue(true);
 
       const result = await getCompanyData('AAPL');
 
@@ -159,9 +157,8 @@ describe('cacheCoordinator', () => {
       expect(result.metadata.source).toBe(CACHE_SOURCES.SEC_API);
       expect(result.metadata.cacheHit).toBe(false);
 
-      // Should backfill both caches
+      // Should backfill IndexedDB
       expect(edgarCache.setCompanyFacts).toHaveBeenCalled();
-      expect(firestoreCache.setCompanyFactsToFirestore).toHaveBeenCalled();
     });
 
     it('should skip cache and fetch from SEC when forceRefresh=true', async () => {
@@ -637,7 +634,6 @@ describe('cacheCoordinator', () => {
       });
 
       edgarCache.setCompanyFacts.mockResolvedValue(true);
-      firestoreCache.setCompanyFactsToFirestore.mockResolvedValue(true);
 
       // Fire 3 concurrent requests for the same ticker
       const [result1, result2, result3] = await Promise.all([
@@ -665,7 +661,6 @@ describe('cacheCoordinator', () => {
       });
 
       edgarCache.setCompanyFacts.mockResolvedValue(true);
-      firestoreCache.setCompanyFactsToFirestore.mockResolvedValue(true);
 
       // Fire concurrent requests for different tickers
       await Promise.all([
@@ -690,7 +685,6 @@ describe('cacheCoordinator', () => {
       });
 
       edgarCache.setCompanyFacts.mockResolvedValue(true);
-      firestoreCache.setCompanyFactsToFirestore.mockResolvedValue(true);
 
       // Fire 2 forceRefresh requests - should NOT deduplicate
       await Promise.all([
@@ -711,7 +705,6 @@ describe('cacheCoordinator', () => {
       });
 
       edgarCache.setCompanyFacts.mockResolvedValue(true);
-      firestoreCache.setCompanyFactsToFirestore.mockResolvedValue(true);
 
       // First request
       await getCompanyData('AAPL');
@@ -738,7 +731,6 @@ describe('cacheCoordinator', () => {
         companyInfo: mockCompanyInfo,
       });
       edgarCache.setCompanyFacts.mockResolvedValue(true);
-      firestoreCache.setCompanyFactsToFirestore.mockResolvedValue(true);
 
       const result2 = await getCompanyData('AAPL');
       expect(result2.success).toBe(true);

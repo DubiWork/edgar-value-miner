@@ -19,7 +19,6 @@
  *
  * 3. Fetch from SEC API
  *    - Save to IndexedDB (local cache)
- *    - Save to Firestore (will fail on client, handled by Cloud Function)
  *    - Return data
  *
  * @module cacheCoordinator
@@ -230,14 +229,6 @@ function startBackgroundRefresh(ticker) {
 
       // Update IndexedDB (local cache)
       await edgarCache.setCompanyFacts(normalizedTicker, facts, companyInfo.cik);
-
-      // Attempt to update Firestore (will fail on client, handled by Cloud Function)
-      await firestoreCache.setCompanyFactsToFirestore(
-        normalizedTicker,
-        facts,
-        companyInfo.cik,
-        companyInfo.name
-      );
 
       devLog('log', `Background refresh completed for ${normalizedTicker}`);
     } catch (error) {
@@ -470,18 +461,6 @@ async function _getCompanyDataInternal(normalizedTicker, options) {
     // Save to IndexedDB (local cache) - async, don't wait
     edgarCache.setCompanyFacts(normalizedTicker, facts, companyInfo.cik)
       .catch(err => devLog('warn', 'Failed to save to IndexedDB', err.message));
-
-    // Attempt to save to Firestore (will fail on client due to security rules)
-    // Cloud Function will handle this via a separate mechanism
-    firestoreCache.setCompanyFactsToFirestore(
-      normalizedTicker,
-      facts,
-      companyInfo.cik,
-      companyInfo.name
-    ).catch(err => {
-      // Expected to fail on client - Cloud Functions handle global cache writes
-      devLog('log', 'Firestore write skipped (expected on client)', err.message);
-    });
 
     devLog('log', `L3 (SEC API) success for ${normalizedTicker}`);
 

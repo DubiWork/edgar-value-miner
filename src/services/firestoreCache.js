@@ -9,7 +9,7 @@
  * Security Model:
  * - Read: Anyone can read (client-side reads allowed)
  * - Write: Only Cloud Functions can write (security rules block client writes)
- * - Write functions are provided for use by Cloud Functions (Sub-task #8)
+ * - Write functions are provided for use by Cloud Functions (#254)
  *
  * Features:
  * - Global shared cache across all users
@@ -531,7 +531,7 @@ export async function updateAccessCount(ticker) {
  * Users will see old data while fresh data is fetched.
  *
  * NOTE: This function is intended for use by Cloud Functions
- * (event-triggered invalidation from Sub-task #8).
+ * (event-triggered invalidation, see #254).
  *
  * @param {string} ticker - The ticker symbol (e.g., "AAPL")
  * @returns {Promise<boolean>} True if invalidation was successful
