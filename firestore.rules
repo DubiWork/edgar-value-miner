@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // edgarCache: anyone can read; only Cloud Functions (no auth token) can write
+    match /edgarCache/{ticker} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
