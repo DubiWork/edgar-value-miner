@@ -1306,3 +1306,28 @@ describe('detectFilingCurrency — null tag safety', () => {
   });
 });
 
+describe('normalizeCompanyFacts — fullHistory flag (#253)', () => {
+  it('default call caps annual at 5', () => {
+    const result = normalizeCompanyFacts(aaplFacts);
+    expect(result.metrics.revenue.annual.length).toBeLessThanOrEqual(5);
+  });
+
+  it('fullHistory:true returns more than 5 annual periods for AAPL', () => {
+    const capped = normalizeCompanyFacts(aaplFacts);
+    const full = normalizeCompanyFacts(aaplFacts, { fullHistory: true });
+    expect(full.metrics.revenue.annual.length).toBeGreaterThan(capped.metrics.revenue.annual.length);
+  });
+
+  it('fullHistory:true returns more than 20 quarterly periods for AAPL', () => {
+    const capped = normalizeCompanyFacts(aaplFacts);
+    const full = normalizeCompanyFacts(aaplFacts, { fullHistory: true });
+    expect(full.metrics.revenue.quarterly.length).toBeGreaterThan(capped.metrics.revenue.quarterly.length);
+  });
+
+  it('default behavior unchanged when fullHistory not passed', () => {
+    const a = normalizeCompanyFacts(aaplFacts);
+    const b = normalizeCompanyFacts(aaplFacts, {});
+    expect(a.metrics.revenue.annual.length).toBe(b.metrics.revenue.annual.length);
+  });
+});
+
