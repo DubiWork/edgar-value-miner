@@ -36,15 +36,32 @@ import {
 // =============================================================================
 
 const mockCompanyFacts = {
+  ticker: 'AAPL',
+  cik: '0000320193',
+  companyName: 'Apple Inc.',
+  metrics: {
+    revenue: [{ year: 2023, value: 383285000000, period: 'FY' }],
+  },
+  metadata: {
+    fiscalYearEnd: '09-30',
+    currency: 'USD',
+    normalized: true,
+    normalizationVersion: '1.0.0',
+    normalizedAt: '2024-01-01T00:00:00.000Z',
+    metricsFound: 1,
+    metricsTotal: 10,
+    warnings: [],
+  },
+};
+
+const mockRawSecData = {
   cik: '0000320193',
   entityName: 'Apple Inc.',
   facts: {
     'us-gaap': {
       Revenues: {
         label: 'Revenues',
-        units: {
-          USD: [{ end: '2023-09-30', val: 383285000000 }],
-        },
+        units: { USD: [{ end: '2023-09-30', val: 383285000000 }] },
       },
     },
   },
@@ -499,58 +516,54 @@ describe('edgarCache', () => {
     });
 
     it('should return null for cache entry with missing data (via raw write)', async () => {
-      // Use initializeCache to get the DB then write directly
-      await initializeCache();
-
-      // We'll use a workaround: save valid data first, then corrupt it
-      await setCompanyFacts('AAPL', mockCompanyFacts, '0000320193');
-
-      // Verify it works first
-      const validResult = await getCompanyFacts('AAPL');
-      expect(validResult).not.toBeNull();
-
-      // Now overwrite with corrupt data via the module's internal DB
-      // We can't easily access the internal DB, so let's test with setCompanyFacts
-      // passing null data - the setCompanyFacts function will write it but getCompanyFacts
-      // validation should catch it
       await setCompanyFacts('CORRUPT1', null, '0000000001');
 
       const result = await getCompanyFacts('CORRUPT1');
       expect(result).toBeNull();
     });
 
-    it('should return null for entry with data missing facts field', async () => {
-      // Save data without 'facts' key - validation should catch this
-      await setCompanyFacts('CORRUPT2', { entityName: 'Bad Company' }, '0000000002');
+    it('should return null for raw SEC data (old schema — has facts, no metrics)', async () => {
+      await setCompanyFacts('RAW', mockRawSecData, '0000320193');
 
-      const result = await getCompanyFacts('CORRUPT2');
+      const result = await getCompanyFacts('RAW');
       expect(result).toBeNull();
     });
 
-    it('should accept entry with proper facts structure', async () => {
+    it('should return null when metadata.normalized is false', async () => {
+      await setCompanyFacts('NOT_NORMALIZED', {
+        ticker: 'NOT_NORMALIZED',
+        cik: '0000000001',
+        companyName: 'Test',
+        metrics: { revenue: [] },
+        metadata: { normalized: false },
+      }, '0000000001');
+
+      const result = await getCompanyFacts('NOT_NORMALIZED');
+      expect(result).toBeNull();
+    });
+
+    it('should accept entry with proper normalized structure', async () => {
       await setCompanyFacts('GOOD', {
+        ticker: 'GOOD',
         cik: '0000000005',
-        entityName: 'Good Company',
-        facts: { 'us-gaap': {} },
+        companyName: 'Good Company',
+        metrics: { revenue: [] },
+        metadata: { normalized: true },
       }, '0000000005');
 
       const result = await getCompanyFacts('GOOD');
       expect(result).not.toBeNull();
-      expect(result.data.entityName).toBe('Good Company');
+      expect(result.data.companyName).toBe('Good Company');
     });
 
     it('should clean up corrupt entry so it can be re-saved', async () => {
-      // Save corrupt data
-      await setCompanyFacts('FIXME', { entityName: 'No facts' }, '000');
+      await setCompanyFacts('FIXME', { entityName: 'No metrics' }, '000');
 
-      // Read returns null (corrupt)
       const result1 = await getCompanyFacts('FIXME');
       expect(result1).toBeNull();
 
-      // Now save proper data
       await setCompanyFacts('FIXME', mockCompanyFacts, '0000320193');
 
-      // Should work now
       const result2 = await getCompanyFacts('FIXME');
       expect(result2).not.toBeNull();
       expect(result2.data).toEqual(mockCompanyFacts);
