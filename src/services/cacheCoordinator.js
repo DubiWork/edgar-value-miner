@@ -27,6 +27,7 @@
 import edgarApi from './edgarApi';
 import edgarCache from './edgarCache';
 import firestoreCache from './firestoreCache';
+import { normalizeCompanyFacts } from '../utils/gaapNormalizer.js';
 
 // =============================================================================
 // Configuration
@@ -227,8 +228,10 @@ function startBackgroundRefresh(ticker) {
       // Fetch fresh data from SEC API
       const { facts, companyInfo } = await edgarApi.fetchCompanyFactsByTicker(normalizedTicker);
 
-      // Update IndexedDB (local cache)
-      await edgarCache.setCompanyFacts(normalizedTicker, facts, companyInfo.cik);
+      const normalized = normalizeCompanyFacts(facts, { fullHistory: true });
+
+      // Update IndexedDB (local cache) with normalized output
+      await edgarCache.setCompanyFacts(normalizedTicker, normalized, companyInfo.cik);
 
       devLog('log', `Background refresh completed for ${normalizedTicker}`);
     } catch (error) {
@@ -380,8 +383,8 @@ async function _getCompanyDataInternal(normalizedTicker, options) {
           success: true,
           data: {
             ticker: normalizedTicker,
-            cik: indexedDbResult.cik || '',
-            companyName: indexedDbResult.data?.entityName || '',
+            cik: indexedDbResult.cik || indexedDbResult.data?.cik || '',
+            companyName: indexedDbResult.data?.companyName || '',
             companyFacts: indexedDbResult.data,
           },
           metadata: includeMetadata ? {
@@ -414,10 +417,12 @@ async function _getCompanyDataInternal(normalizedTicker, options) {
           needsRefresh: firestoreResult.needsRefresh,
         });
 
-        // Save to IndexedDB for faster future access (async, don't wait)
+        const normalized = normalizeCompanyFacts(firestoreResult.data, { fullHistory: true });
+
+        // Save normalized output to IndexedDB for faster future access (async, don't wait)
         edgarCache.setCompanyFacts(
           normalizedTicker,
-          firestoreResult.data,
+          normalized,
           firestoreResult.cik
         ).catch(err => devLog('warn', 'Failed to save to IndexedDB', err.message));
 
@@ -431,8 +436,8 @@ async function _getCompanyDataInternal(normalizedTicker, options) {
           data: {
             ticker: normalizedTicker,
             cik: firestoreResult.cik || '',
-            companyName: firestoreResult.companyName || firestoreResult.data?.entityName || '',
-            companyFacts: firestoreResult.data,
+            companyName: normalized.companyName || firestoreResult.companyName || '',
+            companyFacts: normalized,
           },
           metadata: includeMetadata ? {
             source: CACHE_SOURCES.FIRESTORE,
@@ -458,8 +463,10 @@ async function _getCompanyDataInternal(normalizedTicker, options) {
 
     const { facts, companyInfo } = await edgarApi.fetchCompanyFactsByTicker(normalizedTicker);
 
-    // Save to IndexedDB (local cache) - async, don't wait
-    edgarCache.setCompanyFacts(normalizedTicker, facts, companyInfo.cik)
+    const normalized = normalizeCompanyFacts(facts, { fullHistory: true });
+
+    // Save normalized output to IndexedDB (local cache) - async, don't wait
+    edgarCache.setCompanyFacts(normalizedTicker, normalized, companyInfo.cik)
       .catch(err => devLog('warn', 'Failed to save to IndexedDB', err.message));
 
     devLog('log', `L3 (SEC API) success for ${normalizedTicker}`);
@@ -469,8 +476,8 @@ async function _getCompanyDataInternal(normalizedTicker, options) {
       data: {
         ticker: normalizedTicker,
         cik: companyInfo.cik,
-        companyName: companyInfo.name,
-        companyFacts: facts,
+        companyName: normalized.companyName || companyInfo.name,
+        companyFacts: normalized,
       },
       metadata: includeMetadata ? {
         source: CACHE_SOURCES.SEC_API,

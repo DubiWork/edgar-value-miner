@@ -47,16 +47,21 @@ vi.mock('../firestoreCache.js', () => ({
   },
 }));
 
+vi.mock('../../utils/gaapNormalizer.js', () => ({
+  normalizeCompanyFacts: vi.fn(),
+}));
+
 // Import mocked modules
 import edgarApi from '../edgarApi.js';
 import edgarCache from '../edgarCache.js';
 import firestoreCache from '../firestoreCache.js';
+import { normalizeCompanyFacts } from '../../utils/gaapNormalizer.js';
 
 // =============================================================================
 // Mock Data
 // =============================================================================
 
-const mockCompanyFacts = {
+const mockRawFirestoreData = {
   cik: '0000320193',
   entityName: 'Apple Inc.',
   facts: {
@@ -69,6 +74,14 @@ const mockCompanyFacts = {
       },
     },
   },
+};
+
+const mockNormalizedData = {
+  ticker: 'AAPL',
+  cik: '0000320193',
+  companyName: 'Apple Inc.',
+  metrics: { revenue: [{ year: 2023, value: 383285000000, period: 'FY' }] },
+  metadata: { normalized: true, currency: 'USD' },
 };
 
 const mockCompanyInfo = {
@@ -92,7 +105,7 @@ describe('cacheCoordinator', () => {
   describe('3-Tier Cache Hierarchy', () => {
     it('should hit L1 (IndexedDB) first and return immediately', async () => {
       edgarCache.getCompanyFacts.mockResolvedValue({
-        data: mockCompanyFacts,
+        data: mockNormalizedData,
         cik: '0000320193',
         needsRefresh: false,
         lastUpdated: Date.now(),
@@ -114,13 +127,14 @@ describe('cacheCoordinator', () => {
       edgarCache.getCompanyFacts.mockResolvedValue(null); // L1 miss
 
       firestoreCache.getCompanyFactsFromFirestore.mockResolvedValue({
-        data: mockCompanyFacts,
+        data: mockRawFirestoreData,
         cik: '0000320193',
         companyName: 'Apple Inc.',
         needsRefresh: false,
         lastUpdated: new Date(),
       });
 
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
       edgarCache.setCompanyFacts.mockResolvedValue(true);
 
       const result = await getCompanyData('AAPL');
@@ -128,13 +142,11 @@ describe('cacheCoordinator', () => {
       expect(result.success).toBe(true);
       expect(result.metadata.source).toBe(CACHE_SOURCES.FIRESTORE);
       expect(result.metadata.cacheHit).toBe(true);
+      expect(result.data.companyName).toBe('Apple Inc.');
 
-      // Should backfill L1 cache
-      expect(edgarCache.setCompanyFacts).toHaveBeenCalledWith(
-        'AAPL',
-        mockCompanyFacts,
-        '0000320193'
-      );
+      // Should normalize and backfill L1 with normalized data
+      expect(normalizeCompanyFacts).toHaveBeenCalledWith(mockRawFirestoreData, { fullHistory: true });
+      expect(edgarCache.setCompanyFacts).toHaveBeenCalledWith('AAPL', mockNormalizedData, '0000320193');
 
       // Should NOT call SEC API
       expect(edgarApi.fetchCompanyFactsByTicker).not.toHaveBeenCalled();
@@ -145,10 +157,11 @@ describe('cacheCoordinator', () => {
       firestoreCache.getCompanyFactsFromFirestore.mockResolvedValue(null); // L2 miss
 
       edgarApi.fetchCompanyFactsByTicker.mockResolvedValue({
-        facts: mockCompanyFacts,
+        facts: mockRawFirestoreData,
         companyInfo: mockCompanyInfo,
       });
 
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
       edgarCache.setCompanyFacts.mockResolvedValue(true);
 
       const result = await getCompanyData('AAPL');
@@ -156,17 +169,20 @@ describe('cacheCoordinator', () => {
       expect(result.success).toBe(true);
       expect(result.metadata.source).toBe(CACHE_SOURCES.SEC_API);
       expect(result.metadata.cacheHit).toBe(false);
+      expect(result.data.companyName).toBe('Apple Inc.');
 
-      // Should backfill IndexedDB
-      expect(edgarCache.setCompanyFacts).toHaveBeenCalled();
+      // Should normalize and backfill IndexedDB with normalized data
+      expect(normalizeCompanyFacts).toHaveBeenCalledWith(mockRawFirestoreData, { fullHistory: true });
+      expect(edgarCache.setCompanyFacts).toHaveBeenCalledWith('AAPL', mockNormalizedData, '0000320193');
     });
 
     it('should skip cache and fetch from SEC when forceRefresh=true', async () => {
       edgarApi.fetchCompanyFactsByTicker.mockResolvedValue({
-        facts: mockCompanyFacts,
+        facts: mockRawFirestoreData,
         companyInfo: mockCompanyInfo,
       });
 
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
       edgarCache.setCompanyFacts.mockResolvedValue(true);
 
       const result = await getCompanyData('AAPL', { forceRefresh: true });
@@ -187,16 +203,18 @@ describe('cacheCoordinator', () => {
   describe('Background Refresh', () => {
     it('should trigger background refresh for stale L1 cache', async () => {
       edgarCache.getCompanyFacts.mockResolvedValue({
-        data: mockCompanyFacts,
+        data: mockNormalizedData,
         cik: '0000320193',
         needsRefresh: true, // Stale!
         lastUpdated: Date.now() - 1000000,
       });
 
       edgarApi.fetchCompanyFactsByTicker.mockResolvedValue({
-        facts: mockCompanyFacts,
+        facts: mockRawFirestoreData,
         companyInfo: mockCompanyInfo,
       });
+
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
 
       const result = await getCompanyData('AAPL', { backgroundRefresh: true });
 
@@ -213,7 +231,7 @@ describe('cacheCoordinator', () => {
 
     it('should NOT trigger background refresh when backgroundRefresh=false', async () => {
       edgarCache.getCompanyFacts.mockResolvedValue({
-        data: mockCompanyFacts,
+        data: mockNormalizedData,
         cik: '0000320193',
         needsRefresh: true,
         lastUpdated: Date.now() - 1000000,
@@ -227,16 +245,18 @@ describe('cacheCoordinator', () => {
 
     it('should prevent duplicate background refreshes', async () => {
       edgarCache.getCompanyFacts.mockResolvedValue({
-        data: mockCompanyFacts,
+        data: mockNormalizedData,
         cik: '0000320193',
         needsRefresh: true,
         lastUpdated: Date.now() - 1000000,
       });
 
       edgarApi.fetchCompanyFactsByTicker.mockResolvedValue({
-        facts: mockCompanyFacts,
+        facts: mockRawFirestoreData,
         companyInfo: mockCompanyInfo,
       });
+
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
 
       // Fire multiple requests rapidly
       await Promise.all([
@@ -288,17 +308,57 @@ describe('cacheCoordinator', () => {
       edgarCache.getCompanyFacts.mockRejectedValue(new Error('IndexedDB error'));
 
       firestoreCache.getCompanyFactsFromFirestore.mockResolvedValue({
-        data: mockCompanyFacts,
+        data: mockRawFirestoreData,
         cik: '0000320193',
         companyName: 'Apple Inc.',
         needsRefresh: false,
         lastUpdated: new Date(),
       });
 
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
+
       const result = await getCompanyData('AAPL');
 
       expect(result.success).toBe(true);
       expect(result.metadata.source).toBe(CACHE_SOURCES.FIRESTORE);
+    });
+
+    it('should fall through to L3 when normalizeCompanyFacts throws on L2', async () => {
+      edgarCache.getCompanyFacts.mockResolvedValue(null);
+      firestoreCache.getCompanyFactsFromFirestore.mockResolvedValue({
+        data: mockRawFirestoreData,
+        cik: '0000320193',
+        needsRefresh: false,
+        lastUpdated: new Date(),
+      });
+      normalizeCompanyFacts.mockImplementationOnce(() => { throw new Error('normalize error'); });
+
+      edgarApi.fetchCompanyFactsByTicker.mockResolvedValue({
+        facts: mockRawFirestoreData,
+        companyInfo: mockCompanyInfo,
+      });
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
+      edgarCache.setCompanyFacts.mockResolvedValue(true);
+
+      const result = await getCompanyData('AAPL');
+
+      expect(result.success).toBe(true);
+      expect(result.metadata.source).toBe(CACHE_SOURCES.SEC_API);
+    });
+
+    it('should return SEC_API_ERROR when normalizeCompanyFacts throws on L3', async () => {
+      edgarCache.getCompanyFacts.mockResolvedValue(null);
+      firestoreCache.getCompanyFactsFromFirestore.mockResolvedValue(null);
+      edgarApi.fetchCompanyFactsByTicker.mockResolvedValue({
+        facts: mockRawFirestoreData,
+        companyInfo: mockCompanyInfo,
+      });
+      normalizeCompanyFacts.mockImplementation(() => { throw new Error('normalize error'); });
+
+      const result = await getCompanyData('AAPL');
+
+      expect(result.success).toBe(false);
+      expect(result.error.code).toBe(COORDINATOR_ERROR_CODES.SEC_API_ERROR);
     });
 
     it('should handle L2 timeout', async () => {
@@ -310,9 +370,12 @@ describe('cacheCoordinator', () => {
       );
 
       edgarApi.fetchCompanyFactsByTicker.mockResolvedValue({
-        facts: mockCompanyFacts,
+        facts: mockRawFirestoreData,
         companyInfo: mockCompanyInfo,
       });
+
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
+      edgarCache.setCompanyFacts.mockResolvedValue(true);
 
       const result = await getCompanyData('AAPL');
 
@@ -421,7 +484,7 @@ describe('cacheCoordinator', () => {
   describe('Prefetch', () => {
     it('should prefetch multiple tickers', async () => {
       edgarCache.getCompanyFacts.mockResolvedValue({
-        data: mockCompanyFacts,
+        data: mockNormalizedData,
         cik: '0000320193',
         needsRefresh: false,
       });
@@ -437,7 +500,7 @@ describe('cacheCoordinator', () => {
 
     it('should respect concurrency limit', async () => {
       edgarCache.getCompanyFacts.mockResolvedValue({
-        data: mockCompanyFacts,
+        data: mockNormalizedData,
         cik: '0000320193',
         needsRefresh: false,
       });
@@ -452,7 +515,7 @@ describe('cacheCoordinator', () => {
 
     it('should call progress callback', async () => {
       edgarCache.getCompanyFacts.mockResolvedValue({
-        data: mockCompanyFacts,
+        data: mockNormalizedData,
         cik: '0000320193',
         needsRefresh: false,
       });
@@ -483,7 +546,7 @@ describe('cacheCoordinator', () => {
           throw new Error('Failed');
         }
         return {
-          data: mockCompanyFacts,
+          data: mockNormalizedData,
           cik: '0000320193',
           needsRefresh: false,
         };
@@ -508,14 +571,17 @@ describe('cacheCoordinator', () => {
   describe('Refresh Stale Cache', () => {
     it('should start refresh for stale cache', async () => {
       edgarCache.getCompanyFacts.mockResolvedValue({
-        data: mockCompanyFacts,
+        data: mockNormalizedData,
         needsRefresh: true,
       });
 
       edgarApi.fetchCompanyFactsByTicker.mockResolvedValue({
-        facts: mockCompanyFacts,
+        facts: mockRawFirestoreData,
         companyInfo: mockCompanyInfo,
       });
+
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
+      edgarCache.setCompanyFacts.mockResolvedValue(true);
 
       const result = await refreshStaleCache('AAPL');
 
@@ -530,7 +596,7 @@ describe('cacheCoordinator', () => {
 
     it('should NOT start refresh for fresh cache', async () => {
       edgarCache.getCompanyFacts.mockResolvedValue({
-        data: mockCompanyFacts,
+        data: mockNormalizedData,
         needsRefresh: false,
       });
 
@@ -545,9 +611,12 @@ describe('cacheCoordinator', () => {
       edgarCache.getCompanyFacts.mockResolvedValue(null);
 
       edgarApi.fetchCompanyFactsByTicker.mockResolvedValue({
-        facts: mockCompanyFacts,
+        facts: mockRawFirestoreData,
         companyInfo: mockCompanyInfo,
       });
+
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
+      edgarCache.setCompanyFacts.mockResolvedValue(true);
 
       const result = await refreshStaleCache('AAPL');
 
@@ -557,14 +626,17 @@ describe('cacheCoordinator', () => {
 
     it('should prevent duplicate refreshes', async () => {
       edgarCache.getCompanyFacts.mockResolvedValue({
-        data: mockCompanyFacts,
+        data: mockNormalizedData,
         needsRefresh: true,
       });
 
       edgarApi.fetchCompanyFactsByTicker.mockResolvedValue({
-        facts: mockCompanyFacts,
+        facts: mockRawFirestoreData,
         companyInfo: mockCompanyInfo,
       });
+
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
+      edgarCache.setCompanyFacts.mockResolvedValue(true);
 
       // Start first refresh
       const result1 = await refreshStaleCache('AAPL');
@@ -584,7 +656,7 @@ describe('cacheCoordinator', () => {
   describe('Metadata', () => {
     it('should include metadata by default', async () => {
       edgarCache.getCompanyFacts.mockResolvedValue({
-        data: mockCompanyFacts,
+        data: mockNormalizedData,
         cik: '0000320193',
         needsRefresh: false,
         lastUpdated: Date.now(),
@@ -601,7 +673,7 @@ describe('cacheCoordinator', () => {
 
     it('should exclude metadata when includeMetadata=false', async () => {
       edgarCache.getCompanyFacts.mockResolvedValue({
-        data: mockCompanyFacts,
+        data: mockNormalizedData,
         cik: '0000320193',
         needsRefresh: false,
       });
@@ -626,13 +698,14 @@ describe('cacheCoordinator', () => {
         return new Promise((resolve) => {
           setTimeout(() => {
             resolve({
-              facts: mockCompanyFacts,
+              facts: mockRawFirestoreData,
               companyInfo: mockCompanyInfo,
             });
           }, 100);
         });
       });
 
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
       edgarCache.setCompanyFacts.mockResolvedValue(true);
 
       // Fire 3 concurrent requests for the same ticker
@@ -656,10 +729,11 @@ describe('cacheCoordinator', () => {
       firestoreCache.getCompanyFactsFromFirestore.mockResolvedValue(null);
 
       edgarApi.fetchCompanyFactsByTicker.mockResolvedValue({
-        facts: mockCompanyFacts,
+        facts: mockRawFirestoreData,
         companyInfo: mockCompanyInfo,
       });
 
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
       edgarCache.setCompanyFacts.mockResolvedValue(true);
 
       // Fire concurrent requests for different tickers
@@ -677,13 +751,14 @@ describe('cacheCoordinator', () => {
         return new Promise((resolve) => {
           setTimeout(() => {
             resolve({
-              facts: mockCompanyFacts,
+              facts: mockRawFirestoreData,
               companyInfo: mockCompanyInfo,
             });
           }, 50);
         });
       });
 
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
       edgarCache.setCompanyFacts.mockResolvedValue(true);
 
       // Fire 2 forceRefresh requests - should NOT deduplicate
@@ -700,10 +775,11 @@ describe('cacheCoordinator', () => {
       firestoreCache.getCompanyFactsFromFirestore.mockResolvedValue(null);
 
       edgarApi.fetchCompanyFactsByTicker.mockResolvedValue({
-        facts: mockCompanyFacts,
+        facts: mockRawFirestoreData,
         companyInfo: mockCompanyInfo,
       });
 
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
       edgarCache.setCompanyFacts.mockResolvedValue(true);
 
       // First request
@@ -727,9 +803,10 @@ describe('cacheCoordinator', () => {
 
       // Second call should work (not stuck in dedup map)
       edgarApi.fetchCompanyFactsByTicker.mockResolvedValueOnce({
-        facts: mockCompanyFacts,
+        facts: mockRawFirestoreData,
         companyInfo: mockCompanyInfo,
       });
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
       edgarCache.setCompanyFacts.mockResolvedValue(true);
 
       const result2 = await getCompanyData('AAPL');
