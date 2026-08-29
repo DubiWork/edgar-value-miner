@@ -1,4 +1,4 @@
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import type { CallableRequest } from 'firebase-functions/v2/https';
 import { fetchFromSec } from './secProxy.js';
 
@@ -29,6 +29,24 @@ interface CacheWriterResult {
   updated: boolean;
 }
 
+const STALENESS_DAYS = 90;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+// Firestore document hard limit is 1 MB; reject blobs approaching it
+const MAX_BLOB_BYTES = 900_000;
+
+function assertBlobSize(companyFacts: Record<string, unknown>): void {
+  const blobBytes = Buffer.byteLength(JSON.stringify(companyFacts), 'utf8');
+  if (blobBytes > MAX_BLOB_BYTES) {
+    throw new Error(`companyFacts blob too large for Firestore (${blobBytes} bytes)`);
+  }
+}
+
+function isStale(lastUpdated: Timestamp | null): boolean {
+  if (!lastUpdated) return true;
+  const ageMs = Math.max(0, Date.now() - lastUpdated.toDate().getTime());
+  return ageMs > STALENESS_DAYS * MS_PER_DAY;
+}
+
 export async function cacheWriterHandler(
   req: CallableRequest<CacheWriterData>
 ): Promise<CacheWriterResult> {
@@ -48,23 +66,54 @@ export async function cacheWriterHandler(
   const docRef = db.collection(COLLECTION).doc(ticker);
   const snap = await docRef.get();
 
-  if (snap.exists) {
-    return { ticker, latestFiledDate: null, updated: false };
+  if (!snap.exists) {
+    const companyFacts = await fetchFromSec('companyFacts', data.cik) as Record<string, unknown>;
+    const latestFiledDate = extractLatestFiledDate(companyFacts);
+
+    assertBlobSize(companyFacts);
+
+    await docRef.set({
+      ticker,
+      cik: paddedCik,
+      companyFacts,
+      latestFiledDate,
+      lastUpdated: FieldValue.serverTimestamp(),
+      needsRefresh: false,
+      accessCount: 0,
+      version: 1,
+    });
+
+    return { ticker, latestFiledDate, updated: true };
+  }
+
+  const docData = snap.data() ?? {};
+  const storedLastUpdated = docData.lastUpdated instanceof Timestamp ? docData.lastUpdated : null;
+  const storedLatestFiledDate = typeof docData.latestFiledDate === 'string' ? docData.latestFiledDate : null;
+
+  if (!isStale(storedLastUpdated)) {
+    return { ticker, latestFiledDate: storedLatestFiledDate, updated: false };
   }
 
   const companyFacts = await fetchFromSec('companyFacts', data.cik) as Record<string, unknown>;
-  const latestFiledDate = extractLatestFiledDate(companyFacts);
+  const newLatestFiledDate = extractLatestFiledDate(companyFacts);
+
+  if (newLatestFiledDate !== null && newLatestFiledDate === storedLatestFiledDate) {
+    await docRef.update({ lastUpdated: FieldValue.serverTimestamp() });
+    return { ticker, latestFiledDate: storedLatestFiledDate, updated: false };
+  }
+
+  assertBlobSize(companyFacts);
 
   await docRef.set({
     ticker,
     cik: paddedCik,
     companyFacts,
-    latestFiledDate,
+    latestFiledDate: newLatestFiledDate,
     lastUpdated: FieldValue.serverTimestamp(),
     needsRefresh: false,
-    accessCount: 0,
+    accessCount: docData.accessCount ?? 0,
     version: 1,
   });
 
-  return { ticker, latestFiledDate, updated: true };
+  return { ticker, latestFiledDate: newLatestFiledDate, updated: true };
 }

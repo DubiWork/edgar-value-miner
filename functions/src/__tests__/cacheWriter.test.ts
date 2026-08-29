@@ -3,8 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---------------------------------------------------------------------------
 // Hoisted mocks
 // ---------------------------------------------------------------------------
-const { mockSet, mockGet, mockDocFn, mockCollectionFn } = vi.hoisted(() => ({
+const { mockSet, mockUpdate, mockGet, mockDocFn, mockCollectionFn } = vi.hoisted(() => ({
   mockSet: vi.fn(),
+  mockUpdate: vi.fn(),
   mockGet: vi.fn(),
   mockDocFn: vi.fn(),
   mockCollectionFn: vi.fn(),
@@ -20,14 +21,21 @@ vi.mock('firebase-functions', () => ({
   logger: { error: vi.fn(), info: vi.fn() },
 }));
 
-vi.mock('firebase-admin/firestore', () => ({
-  getFirestore: vi.fn(() => ({
-    collection: mockCollectionFn,
-  })),
-  FieldValue: {
-    serverTimestamp: vi.fn(() => ({ _isServerTimestamp: true })),
-  },
-}));
+vi.mock('firebase-admin/firestore', () => {
+  class MockTimestamp {
+    constructor(private _date: Date) {}
+    toDate() { return this._date; }
+  }
+  return {
+    getFirestore: vi.fn(() => ({
+      collection: mockCollectionFn,
+    })),
+    FieldValue: {
+      serverTimestamp: vi.fn(() => ({ _isServerTimestamp: true })),
+    },
+    Timestamp: MockTimestamp,
+  };
+});
 
 vi.mock('../functions/secProxy.js', () => ({
   fetchFromSec: mockFetchFromSec,
@@ -37,20 +45,29 @@ vi.mock('../functions/secProxy.js', () => ({
 // Import handler after mocks
 // ---------------------------------------------------------------------------
 import { cacheWriterHandler } from '../functions/cacheWriter.js';
+import { Timestamp } from 'firebase-admin/firestore';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-function makeDocRef(exists: boolean) {
+function makeDocRef(exists: boolean, data: Record<string, unknown> = {}) {
   const docRef = {
     get: mockGet,
     set: mockSet,
+    update: mockUpdate,
   };
-  mockGet.mockResolvedValue({ exists });
+  mockGet.mockResolvedValue({ exists, data: () => data });
   mockSet.mockResolvedValue(undefined);
+  mockUpdate.mockResolvedValue(undefined);
   mockDocFn.mockReturnValue(docRef);
   mockCollectionFn.mockReturnValue({ doc: mockDocFn });
   return docRef;
+}
+
+function daysAgo(days: number): Timestamp {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return new (Timestamp as any)(d);
 }
 
 function makeCompanyFacts(filed = '2024-11-01') {
@@ -101,14 +118,14 @@ describe('cacheWriterHandler', () => {
     expect(result).toEqual({ ticker: 'AAPL', latestFiledDate: '2024-11-01', updated: true });
   });
 
-  it('skips write and returns updated:false when doc already exists', async () => {
-    makeDocRef(true);
+  it('skips write and returns updated:false when doc already exists and is within 90 days', async () => {
+    makeDocRef(true, { lastUpdated: daysAgo(1), latestFiledDate: '2024-11-01' });
 
     const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
 
     expect(mockFetchFromSec).not.toHaveBeenCalled();
     expect(mockSet).not.toHaveBeenCalled();
-    expect(result).toEqual({ ticker: 'AAPL', latestFiledDate: null, updated: false });
+    expect(result).toEqual({ ticker: 'AAPL', latestFiledDate: '2024-11-01', updated: false });
   });
 
   it('normalizes ticker to uppercase', async () => {
@@ -133,5 +150,52 @@ describe('cacheWriterHandler', () => {
     await expect(
       cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 'notanumber' }))
     ).rejects.toThrow('cik');
+  });
+
+  // --- Staleness branches ---
+
+  it('updates timestamp only when stale but latestFiledDate unchanged', async () => {
+    const facts = makeCompanyFacts('2024-11-01');
+    mockFetchFromSec.mockResolvedValue(facts);
+    makeDocRef(true, { lastUpdated: daysAgo(100), latestFiledDate: '2024-11-01' });
+
+    const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+
+    expect(mockFetchFromSec).toHaveBeenCalledOnce();
+    expect(mockSet).not.toHaveBeenCalled();
+    expect(mockUpdate).toHaveBeenCalledOnce();
+    const [updateData] = mockUpdate.mock.calls[0];
+    expect(updateData).not.toHaveProperty('companyFacts');
+    expect(updateData).toHaveProperty('lastUpdated');
+    expect(result).toEqual({ ticker: 'AAPL', latestFiledDate: '2024-11-01', updated: false });
+  });
+
+  it('replaces full blob when stale and latestFiledDate changed', async () => {
+    const facts = makeCompanyFacts('2025-02-01');
+    mockFetchFromSec.mockResolvedValue(facts);
+    makeDocRef(true, { lastUpdated: daysAgo(100), latestFiledDate: '2024-11-01' });
+
+    const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+
+    expect(mockFetchFromSec).toHaveBeenCalledOnce();
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockSet).toHaveBeenCalledOnce();
+    const [writeData] = mockSet.mock.calls[0];
+    expect(writeData).toMatchObject({
+      companyFacts: facts,
+      latestFiledDate: '2025-02-01',
+    });
+    expect(result).toEqual({ ticker: 'AAPL', latestFiledDate: '2025-02-01', updated: true });
+  });
+
+  it('throws when companyFacts blob exceeds Firestore size limit', async () => {
+    const largeFacts = { facts: { 'us-gaap': { x: 'a'.repeat(950_000) } } };
+    mockFetchFromSec.mockResolvedValue(largeFacts);
+    makeDocRef(false);
+
+    await expect(
+      cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }))
+    ).rejects.toThrow('too large for Firestore');
+    expect(mockSet).not.toHaveBeenCalled();
   });
 });
