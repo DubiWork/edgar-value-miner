@@ -224,7 +224,7 @@ describe('cacheCoordinator', () => {
 
       // Background refresh should be triggered (async)
       // Wait a bit for async operation
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       expect(edgarApi.fetchCompanyFactsByTicker).toHaveBeenCalledWith('AAPL');
     });
@@ -266,10 +266,42 @@ describe('cacheCoordinator', () => {
       ]);
 
       // Wait for background operations
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Should only trigger once
       expect(edgarApi.fetchCompanyFactsByTicker).toHaveBeenCalledTimes(1);
+    });
+
+    it('should invalidate IndexedDB before re-storing on background refresh', async () => {
+      edgarCache.getCompanyFacts.mockResolvedValue({
+        data: mockNormalizedData,
+        cik: '0000320193',
+        needsRefresh: true,
+        lastUpdated: Date.now() - 1000000,
+      });
+
+      edgarApi.fetchCompanyFactsByTicker.mockResolvedValue({
+        facts: mockRawFirestoreData,
+        companyInfo: mockCompanyInfo,
+      });
+
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
+      edgarCache.invalidateCache.mockResolvedValue(true);
+      edgarCache.setCompanyFacts.mockResolvedValue(true);
+
+      // Return is not blocked
+      const result = await getCompanyData('AAPL', { backgroundRefresh: true });
+      expect(result.success).toBe(true);
+      expect(result.metadata.source).toBe(CACHE_SOURCES.INDEXEDDB);
+
+      // Wait for background operation
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // invalidateCache must be called BEFORE setCompanyFacts
+      const invalidateOrder = edgarCache.invalidateCache.mock.invocationCallOrder[0];
+      const setOrder = edgarCache.setCompanyFacts.mock.invocationCallOrder[0];
+      expect(invalidateOrder).toBeLessThan(setOrder);
+      expect(edgarCache.invalidateCache).toHaveBeenCalledWith('AAPL');
     });
   });
 
@@ -589,7 +621,7 @@ describe('cacheCoordinator', () => {
       expect(result.reason).toContain('stale');
 
       // Wait for async operation
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       expect(edgarApi.fetchCompanyFactsByTicker).toHaveBeenCalledWith('AAPL');
     });

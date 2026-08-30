@@ -230,10 +230,21 @@ function startBackgroundRefresh(ticker) {
 
       const normalized = normalizeCompanyFacts(facts, { fullHistory: true });
 
-      // Update IndexedDB (local cache) with normalized output
-      await edgarCache.setCompanyFacts(normalizedTicker, normalized, companyInfo.cik);
+      // Invalidate then write. Brief zero-cache window between the two awaits is
+      // acceptable for single-user browser; known ceiling if multi-tab is added.
+      try {
+        await edgarCache.invalidateCache(normalizedTicker);
+      } catch (invalidateError) {
+        devLog('warn', `Background refresh: invalidate failed for ${normalizedTicker}, proceeding to write`, invalidateError.message);
+      }
 
-      devLog('log', `Background refresh completed for ${normalizedTicker}`);
+      try {
+        // Update IndexedDB (local cache) with normalized output
+        await edgarCache.setCompanyFacts(normalizedTicker, normalized, companyInfo.cik);
+        devLog('log', `Background refresh completed for ${normalizedTicker}`);
+      } catch (writeError) {
+        devLog('warn', `Background refresh: cache empty for ${normalizedTicker} — write failed after invalidate`, writeError.message);
+      }
     } catch (error) {
       devLog('warn', `Background refresh failed for ${normalizedTicker}`, error.message);
     } finally {
@@ -465,7 +476,9 @@ async function _getCompanyDataInternal(normalizedTicker, options) {
 
     const normalized = normalizeCompanyFacts(facts, { fullHistory: true });
 
-    // Save normalized output to IndexedDB (local cache) - async, don't wait
+    // Save normalized output to IndexedDB (local cache) - async, don't wait.
+    // No prior invalidateCache needed: setCompanyFacts uses IDB put() which is
+    // a full upsert and overwrites any existing entry for this ticker.
     edgarCache.setCompanyFacts(normalizedTicker, normalized, companyInfo.cik)
       .catch(err => devLog('warn', 'Failed to save to IndexedDB', err.message));
 
