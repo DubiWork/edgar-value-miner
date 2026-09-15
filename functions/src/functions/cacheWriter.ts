@@ -1,15 +1,38 @@
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
-import type { CallableRequest } from 'firebase-functions/v2/https';
+import { HttpsError } from 'firebase-functions/v2/https';
+import type { CallableRequest, CallableOptions } from 'firebase-functions/v2/https';
 import { fetchFromSec } from './secProxy.js';
 
-function extractLatestFiledDate(companyFacts: Record<string, unknown>): string | null {
-  const usGaap = (companyFacts as any)?.facts?.['us-gaap'];
-  if (!usGaap) return null;
+export const CACHE_WRITER_OPTIONS: CallableOptions = {
+  memory: '512MiB',
+  timeoutSeconds: 60,
+};
+
+/**
+ * Extracts the maximum filing date across all taxonomies in companyFacts.facts
+ * (e.g. 'us-gaap', 'dei', 'ifrs-full', 'invest', etc.).
+ */
+export function extractLatestFiledDate(companyFacts: Record<string, unknown>): string | null {
+  const facts = (companyFacts as any)?.facts;
+  if (!facts || typeof facts !== 'object') return null;
+
   let max: string | null = null;
-  for (const tag of Object.values(usGaap) as any[]) {
-    for (const entries of Object.values(tag.units ?? {}) as any[]) {
-      for (const { filed } of entries) {
-        if (filed && (max === null || filed > max)) max = filed;
+  for (const taxonomy of Object.values(facts) as any[]) {
+    if (!taxonomy || typeof taxonomy !== 'object') continue;
+    for (const tag of Object.values(taxonomy) as any[]) {
+      if (!tag || typeof tag !== 'object') continue;
+      const units = tag.units;
+      if (!units || typeof units !== 'object') continue;
+      for (const entries of Object.values(units) as any[]) {
+        if (!Array.isArray(entries)) continue;
+        for (const entry of entries) {
+          const filed = entry?.filed;
+          if (typeof filed === 'string' && filed) {
+            if (max === null || filed > max) {
+              max = filed;
+            }
+          }
+        }
       }
     }
   }
@@ -18,12 +41,12 @@ function extractLatestFiledDate(companyFacts: Record<string, unknown>): string |
 
 const COLLECTION = 'edgarCache';
 
-interface CacheWriterData {
+export interface CacheWriterData {
   ticker: string;
-  cik: number;
+  cik?: number;
 }
 
-interface CacheWriterResult {
+export interface CacheWriterResult {
   ticker: string;
   latestFiledDate: string | null;
   updated: boolean;
@@ -34,10 +57,65 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 // Firestore document hard limit is 1 MB; reject blobs approaching it
 const MAX_BLOB_BYTES = 900_000;
 
+/**
+ * In-memory cache for the SEC company tickers directory.
+ *
+ * Caching strategy:
+ * Fetching company_tickers.json on every invocation of cacheWriter would add ~200-500ms
+ * network latency and risk exhausting the SEC rate limit (10 req/sec max).
+ * Since company ticker-to-CIK mappings change infrequently, we cache the parsed Map
+ * in memory for 24 hours (matching CACHE_DURATION_SECONDS in secProxy.ts).
+ */
+interface TickersCache {
+  map: Map<string, number>;
+  timestamp: number;
+}
+
+let memoryTickersCache: TickersCache | null = null;
+const TICKERS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+export function clearTickersCacheForTesting(): void {
+  memoryTickersCache = null;
+}
+
+export async function resolveCikFromTicker(ticker: string): Promise<number> {
+  const now = Date.now();
+  if (!memoryTickersCache || now - memoryTickersCache.timestamp > TICKERS_CACHE_TTL_MS) {
+    const rawData = (await fetchFromSec('tickers')) as Record<string, any>;
+    const map = new Map<string, number>();
+    if (rawData && typeof rawData === 'object') {
+      for (const entry of Object.values(rawData)) {
+        if (
+          entry &&
+          typeof entry === 'object' &&
+          entry.ticker &&
+          (entry.cik_str !== undefined || entry.cik !== undefined)
+        ) {
+          const t = String(entry.ticker).trim().toUpperCase();
+          const cikNum = Number(entry.cik_str ?? entry.cik);
+          if (Number.isInteger(cikNum) && cikNum >= 0) {
+            map.set(t, cikNum);
+          }
+        }
+      }
+    }
+    memoryTickersCache = { map, timestamp: now };
+  }
+
+  const cik = memoryTickersCache.map.get(ticker);
+  if (cik === undefined) {
+    throw new HttpsError('not-found', `Ticker '${ticker}' not found in SEC company directory.`);
+  }
+  return cik;
+}
+
 function assertBlobSize(companyFacts: Record<string, unknown>): void {
   const blobBytes = Buffer.byteLength(JSON.stringify(companyFacts), 'utf8');
   if (blobBytes > MAX_BLOB_BYTES) {
-    throw new Error(`companyFacts blob too large for Firestore (${blobBytes} bytes)`);
+    throw new HttpsError(
+      'resource-exhausted',
+      `companyFacts blob too large for Firestore (${blobBytes} bytes)`
+    );
   }
 }
 
@@ -52,67 +130,107 @@ export async function cacheWriterHandler(
 ): Promise<CacheWriterResult> {
   const data = req.data;
 
-  if (!data.ticker || typeof data.ticker !== 'string') {
-    throw new Error('ticker is required');
+  if (!data || typeof data !== 'object') {
+    throw new HttpsError('invalid-argument', 'Request data is required');
   }
-  if (!Number.isInteger(data.cik) || data.cik < 0) {
-    throw new Error('cik must be a non-negative integer');
+  if (!data.ticker || typeof data.ticker !== 'string' || !data.ticker.trim()) {
+    throw new HttpsError('invalid-argument', 'ticker is required and must be a non-empty string');
+  }
+  if (
+    data.cik !== undefined &&
+    (typeof data.cik !== 'number' || !Number.isInteger(data.cik) || data.cik < 0)
+  ) {
+    throw new HttpsError('invalid-argument', 'cik must be a non-negative integer when provided');
   }
 
   const ticker = data.ticker.trim().toUpperCase();
-  const paddedCik = String(data.cik).padStart(10, '0');
 
   const db = getFirestore();
   const docRef = db.collection(COLLECTION).doc(ticker);
   const snap = await docRef.get();
 
-  if (!snap.exists) {
-    const companyFacts = await fetchFromSec('companyFacts', data.cik) as Record<string, unknown>;
-    const latestFiledDate = extractLatestFiledDate(companyFacts);
+  // Tier 1 staleness check: if doc exists and is fresh (< 90 days), return immediately without calling SEC
+  if (snap.exists) {
+    const docData = snap.data() ?? {};
+    const storedLastUpdated = docData.lastUpdated instanceof Timestamp ? docData.lastUpdated : null;
+    const storedLatestFiledDate = typeof docData.latestFiledDate === 'string' ? docData.latestFiledDate : null;
 
+    if (!isStale(storedLastUpdated)) {
+      return { ticker, latestFiledDate: storedLatestFiledDate, updated: false };
+    }
+  }
+
+  // Resolve CIK if not provided
+  const cik = data.cik !== undefined ? data.cik : await resolveCikFromTicker(ticker);
+  const paddedCik = String(cik).padStart(10, '0');
+
+  // Tier 2 staleness check: doc missing or older than 90 days -> fetch from SEC
+  let companyFacts: Record<string, unknown>;
+  try {
+    companyFacts = (await fetchFromSec('companyFacts', cik)) as Record<string, unknown>;
+  } catch (err) {
+    const msg = (err as Error)?.message || '';
+    if (msg.includes('status 404')) {
+      throw new HttpsError('not-found', `Company with CIK ${paddedCik} not found in SEC database.`);
+    }
+    throw err;
+  }
+
+  const newLatestFiledDate = extractLatestFiledDate(companyFacts);
+  const companyName =
+    typeof (companyFacts as any)?.entityName === 'string' && (companyFacts as any).entityName.trim()
+      ? (companyFacts as any).entityName.trim()
+      : ticker;
+
+  if (snap.exists) {
+    const docData = snap.data() ?? {};
+    const storedLatestFiledDate = typeof docData.latestFiledDate === 'string' ? docData.latestFiledDate : null;
+
+    // Check if new SEC data has a newer filing date
+    const isNewer =
+      storedLatestFiledDate === null
+        ? newLatestFiledDate !== null
+        : newLatestFiledDate !== null && newLatestFiledDate > storedLatestFiledDate;
+
+    if (!isNewer) {
+      // Document exists and latestFiledDate matches or is not newer: update lastUpdated timestamp only
+      await docRef.update({ lastUpdated: FieldValue.serverTimestamp() });
+      return { ticker, latestFiledDate: storedLatestFiledDate, updated: false };
+    }
+
+    // Document exists but new filing arrived: overwrite full document
     assertBlobSize(companyFacts);
 
     await docRef.set({
       ticker,
       cik: paddedCik,
+      companyName,
       companyFacts,
-      latestFiledDate,
+      latestFiledDate: newLatestFiledDate,
+      rawVersion: 1,
+      version: 1,
       lastUpdated: FieldValue.serverTimestamp(),
       needsRefresh: false,
-      accessCount: 0,
-      version: 1,
+      accessCount: typeof docData.accessCount === 'number' ? docData.accessCount : 0,
     });
 
-    return { ticker, latestFiledDate, updated: true };
+    return { ticker, latestFiledDate: newLatestFiledDate, updated: true };
   }
 
-  const docData = snap.data() ?? {};
-  const storedLastUpdated = docData.lastUpdated instanceof Timestamp ? docData.lastUpdated : null;
-  const storedLatestFiledDate = typeof docData.latestFiledDate === 'string' ? docData.latestFiledDate : null;
-
-  if (!isStale(storedLastUpdated)) {
-    return { ticker, latestFiledDate: storedLatestFiledDate, updated: false };
-  }
-
-  const companyFacts = await fetchFromSec('companyFacts', data.cik) as Record<string, unknown>;
-  const newLatestFiledDate = extractLatestFiledDate(companyFacts);
-
-  if (newLatestFiledDate !== null && newLatestFiledDate === storedLatestFiledDate) {
-    await docRef.update({ lastUpdated: FieldValue.serverTimestamp() });
-    return { ticker, latestFiledDate: storedLatestFiledDate, updated: false };
-  }
-
+  // Document does not exist: fresh fetch
   assertBlobSize(companyFacts);
 
   await docRef.set({
     ticker,
     cik: paddedCik,
+    companyName,
     companyFacts,
     latestFiledDate: newLatestFiledDate,
+    rawVersion: 1,
+    version: 1,
     lastUpdated: FieldValue.serverTimestamp(),
     needsRefresh: false,
-    accessCount: docData.accessCount ?? 0,
-    version: 1,
+    accessCount: 0,
   });
 
   return { ticker, latestFiledDate: newLatestFiledDate, updated: true };
