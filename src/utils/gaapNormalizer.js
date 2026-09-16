@@ -618,9 +618,10 @@ export function findGaapTag(companyFacts, metricName) {
  */
 export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
   const {
-    maxPeriods = periodType === 'annual' ? ANNUAL_YEARS : QUARTERLY_PERIODS,
+    fullHistory = false,
+    maxPeriods = fullHistory ? Infinity : (periodType === 'annual' ? ANNUAL_YEARS : QUARTERLY_PERIODS),
     tagIndex = 0,
-  } = options;
+  } = options || {};
 
   if (!gaapTagData?.units) {
     return [];
@@ -715,12 +716,15 @@ export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
   });
 
   // Limit to requested number of periods
-  const limitedData = deduplicatedData.slice(0, maxPeriods);
+  const limitedData = (fullHistory || maxPeriods === Infinity)
+    ? deduplicatedData
+    : deduplicatedData.slice(0, maxPeriods);
 
   // Transform to standardized format
   const result = limitedData.map(item => ({
     value: item.val,
     period: item.frame || item.end,
+    frame: item.frame || null,
     fiscalYear: extractFiscalYear(item.end),
     fiscalQuarter: periodType === 'quarterly' ? extractFiscalQuarter(item.end) : null,
     filedDate: item.filed || null,
@@ -747,25 +751,66 @@ export function calculateFreeCashFlow(operatingCashFlow, capitalExpenditures) {
     return [];
   }
 
-  // Create a map of CapEx by fiscal year
-  const capexByYear = new Map();
+  // Detect whether inputs represent quarterly data
+  const isQuarterlyItem = (item) => {
+    if (!item) return false;
+    if (item.fiscalQuarter != null) return true;
+    if (item.fp && item.fp !== 'FY') return true;
+    if (item.form && item.form.includes('10-Q')) return true;
+    if (typeof item.frame === 'string' && /Q[1-4]/i.test(item.frame)) return true;
+    if (typeof item.period === 'string' && /Q[1-4]/i.test(item.period)) return true;
+    return false;
+  };
+
+  const hasDuplicateYears = (arr) => {
+    const seen = new Set();
+    for (const item of arr) {
+      if (item?.fiscalYear != null) {
+        if (seen.has(item.fiscalYear)) return true;
+        seen.add(item.fiscalYear);
+      }
+    }
+    return false;
+  };
+
+  const isQuarterly =
+    operatingCashFlow.some(isQuarterlyItem) ||
+    capitalExpenditures.some(isQuarterlyItem) ||
+    hasDuplicateYears(operatingCashFlow) ||
+    hasDuplicateYears(capitalExpenditures);
+
+  const getMatchKey = (item) => {
+    if (!item) return null;
+    if (isQuarterly) {
+      if (item.frame) return item.frame;
+      if (item.fiscalYear != null) {
+        const sub = item.fp || (item.fiscalQuarter != null ? `Q${item.fiscalQuarter}` : null) || item.end || item.period;
+        return sub ? `${item.fiscalYear}_${sub}` : String(item.fiscalYear);
+      }
+      return item.period || item.end || null;
+    }
+    return item.fiscalYear != null ? item.fiscalYear : (item.period || item.end || null);
+  };
+
+  // Create a map of CapEx by period key
+  const capexByKey = new Map();
   capitalExpenditures.forEach(item => {
-    if (item.fiscalYear && isValidNumber(item.value)) {
-      capexByYear.set(item.fiscalYear, item.value);
+    const key = getMatchKey(item);
+    if (key != null && isValidNumber(item.value)) {
+      capexByKey.set(key, item.value);
     }
   });
 
   // Calculate FCF for each OCF period
   return operatingCashFlow
     .filter(ocf => {
-      const capex = capexByYear.get(ocf.fiscalYear);
+      const key = getMatchKey(ocf);
+      const capex = key != null ? capexByKey.get(key) : undefined;
       return isValidNumber(ocf.value) && isValidNumber(capex);
     })
     .map(ocf => {
-      // CapEx is typically negative, so we add it (subtract the absolute value)
-      const capex = capexByYear.get(ocf.fiscalYear);
-      // If CapEx is already negative, adding gives FCF = OCF + (-CapEx) = OCF - CapEx
-      // If CapEx is positive (unusual), we still subtract: FCF = OCF - abs(CapEx)
+      const key = getMatchKey(ocf);
+      const capex = capexByKey.get(key);
       const fcf = ocf.value - Math.abs(capex);
 
       return {
@@ -888,22 +933,30 @@ export function getQuarterlyValues(metric, quarters = 8) {
  *   stitched is true when the primary tag was short and older era tags were scanned.
  */
 export function stitchTimeSeriesData(companyFacts, metricName, periodType, options = {}) {
-  const { maxPeriods = periodType === 'annual' ? ANNUAL_YEARS : QUARTERLY_PERIODS } = options;
+  const {
+    fullHistory = false,
+    maxPeriods = fullHistory ? Infinity : (periodType === 'annual' ? ANNUAL_YEARS : QUARTERLY_PERIODS),
+  } = options || {};
 
   const primaryTag = findGaapTag(companyFacts, metricName);
   if (!primaryTag) return { data: [], stitched: false };
 
   const primaryData = extractTimeSeriesData(primaryTag.data, periodType, {
+    ...options,
     tagIndex: primaryTag.index,
+    fullHistory: true,
     maxPeriods: Infinity,
   });
 
-  if (primaryData.length >= maxPeriods) {
+  if (!fullHistory && primaryData.length >= maxPeriods) {
     return { data: primaryData.slice(0, maxPeriods), stitched: false };
   }
 
   const usGaap = companyFacts?.facts?.['us-gaap'];
-  if (!usGaap) return { data: primaryData.slice(0, maxPeriods), stitched: true };
+  if (!usGaap) {
+    const data = (fullHistory || maxPeriods === Infinity) ? primaryData : primaryData.slice(0, maxPeriods);
+    return { data, stitched: false };
+  }
 
   const allTags = GAAP_TAG_MAP[metricName] || [];
   const coveredYears = new Set(primaryData.map(d => d.fiscalYear));
@@ -914,7 +967,12 @@ export function stitchTimeSeriesData(companyFacts, metricName, periodType, optio
     if (tag === primaryTag.tag) continue;
     if (!usGaap[tag]?.units) continue;
 
-    const extraData = extractTimeSeriesData(usGaap[tag], periodType, { tagIndex: i, maxPeriods: Infinity });
+    const extraData = extractTimeSeriesData(usGaap[tag], periodType, {
+      ...options,
+      tagIndex: i,
+      fullHistory: true,
+      maxPeriods: Infinity,
+    });
     for (const point of extraData) {
       if (!coveredYears.has(point.fiscalYear)) {
         merged.push(point);
@@ -922,11 +980,13 @@ export function stitchTimeSeriesData(companyFacts, metricName, periodType, optio
       }
     }
 
-    if (merged.length >= maxPeriods) break;
+    if (!fullHistory && merged.length >= maxPeriods) break;
   }
 
   merged.sort((a, b) => (b.fiscalYear ?? 0) - (a.fiscalYear ?? 0));
-  return { data: merged.slice(0, maxPeriods), stitched: true };
+  const data = (fullHistory || maxPeriods === Infinity) ? merged : merged.slice(0, maxPeriods);
+  const stitched = merged.length > primaryData.length;
+  return { data, stitched };
 }
 
 // =============================================================================
@@ -992,10 +1052,12 @@ export function detectFilingCurrency(companyFactsJson) {
  * console.log(normalized.metrics.netIncome.quarterly); // Last 20 quarters of net income
  * console.log(normalized.metrics.freeCashFlow.annual); // Calculated FCF
  */
-export function normalizeCompanyFacts(companyFactsJson, { fullHistory = false } = {}) {
+export function normalizeCompanyFacts(companyFactsJson, options = {}) {
   if (!companyFactsJson) {
     throw new Error('Company facts JSON is required');
   }
+
+  const fullHistory = options?.fullHistory === true;
 
   // Reject IFRS-only filers (also catches empty us-gaap object)
   const facts = companyFactsJson.facts ?? {};
@@ -1026,13 +1088,17 @@ export function normalizeCompanyFacts(companyFactsJson, { fullHistory = false } 
     if (tagResult) {
       // Extract time series for both annual and quarterly
       const { data: annual, stitched } = stitchTimeSeriesData(companyFactsJson, metricName, 'annual', {
+        ...options,
         tagIndex: tagResult.index,
-        maxPeriods: fullHistory ? Infinity : ANNUAL_YEARS,
+        fullHistory,
+        maxPeriods: fullHistory ? Infinity : (options?.maxPeriods ?? ANNUAL_YEARS),
       });
       if (stitched) anyStitched = true;
       const quarterly = extractTimeSeriesData(tagResult.data, 'quarterly', {
+        ...options,
         tagIndex: tagResult.index,
-        maxPeriods: fullHistory ? Infinity : QUARTERLY_PERIODS,
+        fullHistory,
+        maxPeriods: fullHistory ? Infinity : (options?.maxPeriods ?? QUARTERLY_PERIODS),
       });
 
       metrics[metricName] = {
