@@ -583,19 +583,12 @@ export async function invalidateGlobalCache(ticker) {
  * Calls the cacheWriter Cloud Function (sole writer to edgarCache)
  *
  * @param {string} ticker - The ticker symbol (e.g., "AAPL")
- * @param {number|string} [cik] - Optional CIK number (resolved internally by cacheWriter if omitted)
  * @returns {Promise<{ ticker: string, latestFiledDate: string|null, updated: boolean }>}
  */
-export async function callCacheWriter(ticker, cik) {
+export async function callCacheWriter(ticker) {
   const { getFunctions, httpsCallable } = await import('firebase/functions');
   const { default: app } = await import('../lib/firebase');
   const payload = { ticker: normalizeTicker(ticker) };
-  if (cik !== undefined && cik !== null) {
-    const numericCik = typeof cik === 'number' ? cik : parseInt(cik, 10);
-    if (!isNaN(numericCik)) {
-      payload.cik = numericCik;
-    }
-  }
   const functions = getFunctions(app);
   const cacheWriter = httpsCallable(functions, 'cacheWriter');
   const response = await cacheWriter(payload);

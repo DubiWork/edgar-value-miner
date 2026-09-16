@@ -51,23 +51,18 @@ import {
   clearTickersCacheForTesting,
 } from '../functions/cacheWriter.js';
 import { Timestamp } from 'firebase-admin/firestore';
+import { setupDocRefMock } from './testHelpers.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-function makeDocRef(exists: boolean, data: Record<string, unknown> = {}) {
-  const docRef = {
-    get: mockGet,
-    set: mockSet,
-    update: mockUpdate,
-  };
-  mockGet.mockResolvedValue({ exists, data: () => data });
-  mockSet.mockResolvedValue(undefined);
-  mockUpdate.mockResolvedValue(undefined);
-  mockDocFn.mockReturnValue(docRef);
-  mockCollectionFn.mockReturnValue({ doc: mockDocFn });
-  return docRef;
-}
+const makeDocRef = (exists: boolean, data: Record<string, unknown> = {}) =>
+  setupDocRefMock({ mockGet, mockSet, mockUpdate, mockDocFn, mockCollectionFn }, exists, data);
+
+const defaultTickersData = {
+  '0': { cik_str: 320193, ticker: 'AAPL', title: 'Apple Inc.' },
+  '1': { cik_str: 789019, ticker: 'MSFT', title: 'Microsoft Corp' },
+};
 
 function daysAgo(days: number): Timestamp {
   const d = new Date();
@@ -91,6 +86,14 @@ function makeCompanyFacts(filed = '2024-11-01', entityName = 'Apple Inc.') {
   };
 }
 
+function mockSecResponses(facts: any = makeCompanyFacts(), tickers: any = defaultTickersData) {
+  mockFetchFromSec.mockImplementation((endpoint: string) => {
+    if (endpoint === 'tickers') return Promise.resolve(tickers);
+    if (endpoint === 'companyFacts') return Promise.resolve(facts);
+    return Promise.resolve({});
+  });
+}
+
 function makeReq(data: unknown) {
   return { data } as any;
 }
@@ -102,15 +105,17 @@ describe('cacheWriterHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearTickersCacheForTesting();
+    mockSecResponses();
   });
 
   it('fetches SEC JSON and writes to Firestore with rawVersion: 1 and companyName when no doc exists', async () => {
     const facts = makeCompanyFacts('2024-11-01', 'Apple Inc.');
-    mockFetchFromSec.mockResolvedValue(facts);
+    mockSecResponses(facts);
     makeDocRef(false);
 
-    const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+    const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
 
+    expect(mockFetchFromSec).toHaveBeenCalledWith('tickers');
     expect(mockFetchFromSec).toHaveBeenCalledWith('companyFacts', 320193);
     expect(mockSet).toHaveBeenCalledOnce();
     const [writeData] = mockSet.mock.calls[0];
@@ -132,7 +137,7 @@ describe('cacheWriterHandler', () => {
   it('skips write and returns updated:false when doc already exists and is within 90 days', async () => {
     makeDocRef(true, { lastUpdated: daysAgo(1), latestFiledDate: '2024-11-01' });
 
-    const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+    const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
 
     expect(mockFetchFromSec).not.toHaveBeenCalled();
     expect(mockSet).not.toHaveBeenCalled();
@@ -142,10 +147,10 @@ describe('cacheWriterHandler', () => {
 
   it('normalizes ticker to uppercase', async () => {
     const facts = makeCompanyFacts();
-    mockFetchFromSec.mockResolvedValue(facts);
+    mockSecResponses(facts);
     makeDocRef(false);
 
-    const result = await cacheWriterHandler(makeReq({ ticker: 'aapl', cik: 320193 }));
+    const result = await cacheWriterHandler(makeReq({ ticker: 'aapl' }));
 
     expect(result.ticker).toBe('AAPL');
     const [writeData] = mockSet.mock.calls[0];
@@ -162,34 +167,33 @@ describe('cacheWriterHandler', () => {
 
   it('throws invalid-argument HttpsError when ticker is missing or empty', async () => {
     await expect(
-      cacheWriterHandler(makeReq({ cik: 320193 }))
+      cacheWriterHandler(makeReq({}))
     ).rejects.toThrow('ticker');
 
     await expect(
-      cacheWriterHandler(makeReq({ ticker: '   ', cik: 320193 }))
+      cacheWriterHandler(makeReq({ ticker: '   ' }))
     ).rejects.toMatchObject({
       code: 'invalid-argument',
     });
   });
 
-  it('throws invalid-argument HttpsError when cik is not a non-negative integer', async () => {
+  it('throws invalid-argument HttpsError when ticker is not a string', async () => {
     await expect(
-      cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 'notanumber' }))
-    ).rejects.toThrow('cik');
-
-    await expect(
-      cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: -5 }))
+      cacheWriterHandler(makeReq({ ticker: 12345 }))
     ).rejects.toMatchObject({
       code: 'invalid-argument',
     });
   });
 
   it('throws not-found HttpsError when SEC returns 404', async () => {
-    mockFetchFromSec.mockRejectedValue(new Error('SEC API returned status 404 for https://data.sec.gov/...'));
+    mockFetchFromSec.mockImplementation((endpoint: string) => {
+      if (endpoint === 'tickers') return Promise.resolve(defaultTickersData);
+      return Promise.reject(new Error('SEC API returned status 404 for https://data.sec.gov/...'));
+    });
     makeDocRef(false);
 
     await expect(
-      cacheWriterHandler(makeReq({ ticker: 'UNKNOWN', cik: 9999999 }))
+      cacheWriterHandler(makeReq({ ticker: 'AAPL' }))
     ).rejects.toMatchObject({
       code: 'not-found',
       message: expect.stringContaining('not found in SEC database'),
@@ -200,12 +204,12 @@ describe('cacheWriterHandler', () => {
 
   it('updates timestamp only when stale but latestFiledDate unchanged', async () => {
     const facts = makeCompanyFacts('2024-11-01');
-    mockFetchFromSec.mockResolvedValue(facts);
+    mockSecResponses(facts);
     makeDocRef(true, { lastUpdated: daysAgo(100), latestFiledDate: '2024-11-01' });
 
-    const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+    const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
 
-    expect(mockFetchFromSec).toHaveBeenCalledOnce();
+    expect(mockFetchFromSec).toHaveBeenCalledWith('companyFacts', 320193);
     expect(mockSet).not.toHaveBeenCalled();
     expect(mockUpdate).toHaveBeenCalledOnce();
     const [updateData] = mockUpdate.mock.calls[0];
@@ -216,16 +220,16 @@ describe('cacheWriterHandler', () => {
 
   it('replaces full blob with rawVersion: 1 and companyName when stale and latestFiledDate changed', async () => {
     const facts = makeCompanyFacts('2025-02-01', 'Apple Inc.');
-    mockFetchFromSec.mockResolvedValue(facts);
+    mockSecResponses(facts);
     makeDocRef(true, {
       lastUpdated: daysAgo(100),
       latestFiledDate: '2024-11-01',
       accessCount: 12,
     });
 
-    const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+    const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
 
-    expect(mockFetchFromSec).toHaveBeenCalledOnce();
+    expect(mockFetchFromSec).toHaveBeenCalledWith('companyFacts', 320193);
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(mockSet).toHaveBeenCalledOnce();
     const [writeData] = mockSet.mock.calls[0];
@@ -256,10 +260,10 @@ describe('cacheWriterHandler', () => {
         },
       },
     };
-    mockFetchFromSec.mockResolvedValue(factsWithoutEntity);
+    mockSecResponses(factsWithoutEntity);
     makeDocRef(false);
 
-    const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+    const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
 
     expect(result.updated).toBe(true);
     const [writeData] = mockSet.mock.calls[0];
@@ -268,11 +272,11 @@ describe('cacheWriterHandler', () => {
 
   it('throws resource-exhausted HttpsError when companyFacts blob exceeds Firestore size limit (>900KB)', async () => {
     const largeFacts = { facts: { 'us-gaap': { x: 'a'.repeat(950_000) } } };
-    mockFetchFromSec.mockResolvedValue(largeFacts);
+    mockSecResponses(largeFacts);
     makeDocRef(false);
 
     await expect(
-      cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }))
+      cacheWriterHandler(makeReq({ ticker: 'AAPL' }))
     ).rejects.toMatchObject({
       code: 'resource-exhausted',
       message: expect.stringContaining('too large for Firestore'),
@@ -301,10 +305,10 @@ describe('cacheWriterHandler', () => {
         },
       },
     };
-    mockFetchFromSec.mockResolvedValue(multiTaxonomyFacts);
+    mockSecResponses(multiTaxonomyFacts);
     makeDocRef(false);
 
-    const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+    const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
 
     expect(result.latestFiledDate).toBe('2024-11-15');
     const [writeData] = mockSet.mock.calls[0];

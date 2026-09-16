@@ -48,27 +48,32 @@ import {
   cacheWriterHandler,
   extractLatestFiledDate,
   CacheWriterResult,
+  MS_PER_DAY,
+  clearTickersCacheForTesting,
 } from '../functions/cacheWriter.js';
 import { Timestamp } from 'firebase-admin/firestore';
+import { setupDocRefMock } from './testHelpers.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-function makeDocRef(exists: boolean, data: Record<string, unknown> = {}) {
-  const docRef = {
-    get: mockGet,
-    set: mockSet,
-    update: mockUpdate,
-  };
-  mockGet.mockResolvedValue({ exists, data: () => data });
-  mockSet.mockResolvedValue(undefined);
-  mockUpdate.mockResolvedValue(undefined);
-  mockDocFn.mockReturnValue(docRef);
-  mockCollectionFn.mockReturnValue({ doc: mockDocFn });
-  return docRef;
-}
+const makeDocRef = (exists: boolean, data: Record<string, unknown> = {}) =>
+  setupDocRefMock({ mockGet, mockSet, mockUpdate, mockDocFn, mockCollectionFn }, exists, data);
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const defaultTickersData = {
+  '0': { cik_str: 320193, ticker: 'AAPL', title: 'Apple Inc.' },
+  '1': { cik_str: 789019, ticker: 'MSFT', title: 'Microsoft Corp' },
+  '2': { cik_str: 1840000, ticker: 'FFC', title: 'Foreign Filer Corp' },
+  '3': { cik_str: 0, ticker: 'ZERO', title: 'Zero Cik Corp' },
+};
+
+function mockSecResponses(facts: any = {}, tickers = defaultTickersData) {
+  mockFetchFromSec.mockImplementation((endpoint: string) => {
+    if (endpoint === 'tickers') return Promise.resolve(tickers);
+    if (endpoint === 'companyFacts') return Promise.resolve(facts);
+    return Promise.resolve({});
+  });
+}
 
 function timestampDaysAgo(days: number, extraMs = 0): Timestamp {
   const d = new Date(Date.now() - (days * MS_PER_DAY + extraMs));
@@ -85,6 +90,8 @@ function makeReq(data: unknown) {
 describe('cacheWriter Adversarial Challenge Suite', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearTickersCacheForTesting();
+    mockSecResponses();
   });
 
   // =========================================================================
@@ -113,11 +120,11 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
       expect(extractedDate).toBe('2024-10-25');
 
       // Now verify end-to-end execution in cacheWriterHandler
-      mockFetchFromSec.mockResolvedValue(deiOnlyFacts);
+      mockSecResponses(deiOnlyFacts);
       makeDocRef(false);
 
       const result: CacheWriterResult = await cacheWriterHandler(
-        makeReq({ ticker: 'AAPL', cik: 320193 })
+        makeReq({ ticker: 'AAPL' })
       );
 
       expect(result).toEqual({
@@ -151,10 +158,10 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
 
       expect(extractLatestFiledDate(ifrsOnlyFacts)).toBe('2024-03-31');
 
-      mockFetchFromSec.mockResolvedValue(ifrsOnlyFacts);
+      mockSecResponses(ifrsOnlyFacts);
       makeDocRef(false);
 
-      const result = await cacheWriterHandler(makeReq({ ticker: 'FFC', cik: 1840000 }));
+      const result = await cacheWriterHandler(makeReq({ ticker: 'FFC' }));
       expect(result.latestFiledDate).toBe('2024-03-31');
       expect(result.updated).toBe(true);
     });
@@ -206,10 +213,10 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
       const exact900k = generatePayloadOfSize(900_000);
       expect(Buffer.byteLength(JSON.stringify(exact900k), 'utf8')).toBe(900_000);
 
-      mockFetchFromSec.mockResolvedValue(exact900k);
+      mockSecResponses(exact900k);
       makeDocRef(false);
 
-      const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+      const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
       expect(result.updated).toBe(true);
       expect(mockSet).toHaveBeenCalledOnce();
     });
@@ -218,11 +225,11 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
       const over900k = generatePayloadOfSize(900_001);
       expect(Buffer.byteLength(JSON.stringify(over900k), 'utf8')).toBe(900_001);
 
-      mockFetchFromSec.mockResolvedValue(over900k);
+      mockSecResponses(over900k);
       makeDocRef(false);
 
       await expect(
-        cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }))
+        cacheWriterHandler(makeReq({ ticker: 'AAPL' }))
       ).rejects.toMatchObject({
         code: 'resource-exhausted',
         message: expect.stringContaining('(900001 bytes)'),
@@ -234,13 +241,13 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
     it('bypasses blob size check when doc is stale but filing date has NOT changed (timestamp-only update)', async () => {
       // Over 900KB blob returned by SEC, but latestFiledDate is unchanged ('2024-11-01')
       const over900k = generatePayloadOfSize(900_001);
-      mockFetchFromSec.mockResolvedValue(over900k);
+      mockSecResponses(over900k);
       makeDocRef(true, {
         lastUpdated: timestampDaysAgo(95),
         latestFiledDate: '2024-11-01',
       });
 
-      const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+      const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
 
       // Does NOT throw resource-exhausted because the blob is not written to Firestore!
       expect(result).toEqual({
@@ -263,7 +270,7 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
         latestFiledDate: '2024-11-01',
       });
 
-      const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+      const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
 
       expect(mockFetchFromSec).not.toHaveBeenCalled();
       expect(mockSet).not.toHaveBeenCalled();
@@ -281,14 +288,14 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
         latestFiledDate: '2024-11-01',
       });
 
-      const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+      const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
 
       expect(mockFetchFromSec).not.toHaveBeenCalled();
       expect(result.updated).toBe(false);
     });
 
     it('treats 90 days + 1 ms ago as stale, triggering Tier 2 SEC fetch', async () => {
-      mockFetchFromSec.mockResolvedValue({
+      mockSecResponses({
         cik: 320193,
         facts: { 'us-gaap': { Assets: { units: { USD: [{ filed: '2024-11-01', val: 10 }] } } } },
       });
@@ -297,15 +304,15 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
         latestFiledDate: '2024-11-01',
       });
 
-      const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+      const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
 
-      expect(mockFetchFromSec).toHaveBeenCalledOnce();
+      expect(mockFetchFromSec).toHaveBeenCalledWith('companyFacts', 320193);
       expect(mockUpdate).toHaveBeenCalledOnce();
       expect(result.updated).toBe(false);
     });
 
     it('treats 91 days ago as stale, triggering Tier 2 SEC fetch', async () => {
-      mockFetchFromSec.mockResolvedValue({
+      mockSecResponses({
         cik: 320193,
         facts: { 'us-gaap': { Assets: { units: { USD: [{ filed: '2024-11-01', val: 10 }] } } } },
       });
@@ -314,9 +321,9 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
         latestFiledDate: '2024-11-01',
       });
 
-      const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+      const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
 
-      expect(mockFetchFromSec).toHaveBeenCalledOnce();
+      expect(mockFetchFromSec).toHaveBeenCalledWith('companyFacts', 320193);
       expect(mockUpdate).toHaveBeenCalledOnce();
       expect(result.updated).toBe(false);
     });
@@ -329,7 +336,7 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
         latestFiledDate: '2024-11-01',
       });
 
-      const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+      const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
 
       expect(mockFetchFromSec).not.toHaveBeenCalled();
       expect(result.updated).toBe(false);
@@ -341,47 +348,59 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
   // =========================================================================
   describe('Challenge 4: SEC Status Code Handling', () => {
     it('maps SEC 404 to HttpsError not-found with human-readable message', async () => {
-      mockFetchFromSec.mockRejectedValue(
-        new Error('SEC API returned status 404 for https://data.sec.gov/api/xbrl/companyfacts/CIK0000999999.json')
-      );
+      mockFetchFromSec.mockImplementation((endpoint: string) => {
+        if (endpoint === 'tickers') return Promise.resolve(defaultTickersData);
+        return Promise.reject(
+          new Error('SEC API returned status 404 for https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json')
+        );
+      });
       makeDocRef(false);
 
       await expect(
-        cacheWriterHandler(makeReq({ ticker: 'NONEXISTENT', cik: 999999 }))
+        cacheWriterHandler(makeReq({ ticker: 'AAPL' }))
       ).rejects.toMatchObject({
         code: 'not-found',
-        message: 'Company with CIK 0000999999 not found in SEC database.',
+        message: 'Company with CIK 0000320193 not found in SEC database.',
       });
     });
 
     it('propagates SEC 500 internal server error for client fallback handling', async () => {
-      mockFetchFromSec.mockRejectedValue(
-        new Error('SEC API returned status 500 for https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json')
-      );
+      mockFetchFromSec.mockImplementation((endpoint: string) => {
+        if (endpoint === 'tickers') return Promise.resolve(defaultTickersData);
+        return Promise.reject(
+          new Error('SEC API returned status 500 for https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json')
+        );
+      });
       makeDocRef(false);
 
       await expect(
-        cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }))
+        cacheWriterHandler(makeReq({ ticker: 'AAPL' }))
       ).rejects.toThrow('SEC API returned status 500');
     });
 
     it('propagates SEC 429 rate limit exceeded error for client fallback handling', async () => {
-      mockFetchFromSec.mockRejectedValue(
-        new Error('SEC API returned status 429 for https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json')
-      );
+      mockFetchFromSec.mockImplementation((endpoint: string) => {
+        if (endpoint === 'tickers') return Promise.resolve(defaultTickersData);
+        return Promise.reject(
+          new Error('SEC API returned status 429 for https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json')
+        );
+      });
       makeDocRef(false);
 
       await expect(
-        cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }))
+        cacheWriterHandler(makeReq({ ticker: 'AAPL' }))
       ).rejects.toThrow('SEC API returned status 429');
     });
 
     it('propagates network connection reset/timeout errors', async () => {
-      mockFetchFromSec.mockRejectedValue(new Error('connect ETIMEDOUT 192.0.2.1:443'));
+      mockFetchFromSec.mockImplementation((endpoint: string) => {
+        if (endpoint === 'tickers') return Promise.resolve(defaultTickersData);
+        return Promise.reject(new Error('connect ETIMEDOUT 192.0.2.1:443'));
+      });
       makeDocRef(false);
 
       await expect(
-        cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }))
+        cacheWriterHandler(makeReq({ ticker: 'AAPL' }))
       ).rejects.toThrow('connect ETIMEDOUT');
     });
   });
@@ -391,13 +410,13 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
   // =========================================================================
   describe('Challenge 5: Ticker Normalization & Case Insensitivity', () => {
     it('normalizes lowercase ticker to uppercase in Firestore query, write, and return payload', async () => {
-      mockFetchFromSec.mockResolvedValue({
+      mockSecResponses({
         cik: 320193,
         facts: { 'us-gaap': { Assets: { units: { USD: [{ filed: '2024-11-01', val: 1 }] } } } },
       });
       makeDocRef(false);
 
-      const result = await cacheWriterHandler(makeReq({ ticker: 'aapl', cik: 320193 }));
+      const result = await cacheWriterHandler(makeReq({ ticker: 'aapl' }));
 
       expect(mockDocFn).toHaveBeenCalledWith('AAPL');
       expect(result.ticker).toBe('AAPL');
@@ -406,13 +425,13 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
     });
 
     it('trims leading and trailing whitespace while uppercasing', async () => {
-      mockFetchFromSec.mockResolvedValue({
-        cik: 320193,
+      mockSecResponses({
+        cik: 789019,
         facts: { 'us-gaap': { Assets: { units: { USD: [{ filed: '2024-11-01', val: 1 }] } } } },
       });
       makeDocRef(false);
 
-      const result = await cacheWriterHandler(makeReq({ ticker: '   msft   ', cik: 789019 }));
+      const result = await cacheWriterHandler(makeReq({ ticker: '   msft   ' }));
 
       expect(mockDocFn).toHaveBeenCalledWith('MSFT');
       expect(result.ticker).toBe('MSFT');
@@ -429,33 +448,33 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
         entityName: 'Apple Inc.',
         facts: { 'us-gaap': { Assets: { units: { USD: [{ filed: '2024-11-01', val: 1 }] } } } },
       };
-      mockFetchFromSec.mockResolvedValue(facts);
+      mockSecResponses(facts);
 
       // Path 1: Fresh doc creation
       makeDocRef(false);
-      const res1 = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+      const res1 = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
       expect(Object.keys(res1).sort()).toEqual(['latestFiledDate', 'ticker', 'updated']);
       expect(res1).toEqual({ ticker: 'AAPL', latestFiledDate: '2024-11-01', updated: true });
 
       // Path 2: Fresh doc hit (<90 days)
       makeDocRef(true, { lastUpdated: timestampDaysAgo(10), latestFiledDate: '2024-11-01' });
-      const res2 = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+      const res2 = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
       expect(Object.keys(res2).sort()).toEqual(['latestFiledDate', 'ticker', 'updated']);
       expect(res2).toEqual({ ticker: 'AAPL', latestFiledDate: '2024-11-01', updated: false });
 
       // Path 3: Stale doc hit (>90 days), SEC date unchanged
       makeDocRef(true, { lastUpdated: timestampDaysAgo(100), latestFiledDate: '2024-11-01' });
-      const res3 = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+      const res3 = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
       expect(Object.keys(res3).sort()).toEqual(['latestFiledDate', 'ticker', 'updated']);
       expect(res3).toEqual({ ticker: 'AAPL', latestFiledDate: '2024-11-01', updated: false });
 
       // Path 4: Stale doc hit (>90 days), SEC date newer
-      mockFetchFromSec.mockResolvedValue({
+      mockSecResponses({
         cik: 320193,
         facts: { 'us-gaap': { Assets: { units: { USD: [{ filed: '2025-01-15', val: 2 }] } } } },
       });
       makeDocRef(true, { lastUpdated: timestampDaysAgo(100), latestFiledDate: '2024-11-01' });
-      const res4 = await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+      const res4 = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
       expect(Object.keys(res4).sort()).toEqual(['latestFiledDate', 'ticker', 'updated']);
       expect(res4).toEqual({ ticker: 'AAPL', latestFiledDate: '2025-01-15', updated: true });
     });
@@ -466,10 +485,10 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
         entityName: 'Apple Inc.',
         facts: { 'us-gaap': { Assets: { units: { USD: [{ filed: '2024-11-01', val: 1 }] } } } },
       };
-      mockFetchFromSec.mockResolvedValue(facts);
+      mockSecResponses(facts);
       makeDocRef(false);
 
-      await cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193 }));
+      await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
 
       const [writtenDoc] = mockSet.mock.calls[0];
       expect(writtenDoc).toEqual({
@@ -492,24 +511,28 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
   // =========================================================================
   describe('Challenge 7: CIK Validation & Boundary Checks', () => {
     it('accepts cik: 0 and zero-pads to 10 zeros', async () => {
-      mockFetchFromSec.mockResolvedValue({ cik: 0, facts: {} });
+      mockSecResponses({ cik: 0, facts: {} });
       makeDocRef(false);
 
-      const res = await cacheWriterHandler(makeReq({ ticker: 'ZERO', cik: 0 }));
+      const res = await cacheWriterHandler(makeReq({ ticker: 'ZERO' }));
       expect(res.updated).toBe(true);
       const [writtenDoc] = mockSet.mock.calls[0];
       expect(writtenDoc.cik).toBe('0000000000');
     });
 
-    it('rejects negative CIK', async () => {
+    it('rejects missing or empty ticker', async () => {
       await expect(
-        cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: -1 }))
+        cacheWriterHandler(makeReq({}))
+      ).rejects.toMatchObject({ code: 'invalid-argument' });
+
+      await expect(
+        cacheWriterHandler(makeReq({ ticker: '   ' }))
       ).rejects.toMatchObject({ code: 'invalid-argument' });
     });
 
-    it('rejects floating point CIK', async () => {
+    it('rejects non-string ticker', async () => {
       await expect(
-        cacheWriterHandler(makeReq({ ticker: 'AAPL', cik: 320193.75 }))
+        cacheWriterHandler(makeReq({ ticker: 320193 }))
       ).rejects.toMatchObject({ code: 'invalid-argument' });
     });
   });

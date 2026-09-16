@@ -41,9 +41,10 @@ export function extractLatestFiledDate(companyFacts: Record<string, unknown>): s
 
 const COLLECTION = 'edgarCache';
 
+export type PaddedCik = string;
+
 export interface CacheWriterData {
   ticker: string;
-  cik?: number;
 }
 
 export interface CacheWriterResult {
@@ -52,10 +53,10 @@ export interface CacheWriterResult {
   updated: boolean;
 }
 
-const STALENESS_DAYS = 90;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+export const STALENESS_DAYS = 90;
+export const MS_PER_DAY = 24 * 60 * 60 * 1000;
 // Firestore document hard limit is 1 MB; reject blobs approaching it
-const MAX_BLOB_BYTES = 900_000;
+export const MAX_BLOB_BYTES = 900_000;
 
 /**
  * In-memory cache for the SEC company tickers directory.
@@ -78,7 +79,7 @@ export function clearTickersCacheForTesting(): void {
   memoryTickersCache = null;
 }
 
-export async function resolveCikFromTicker(ticker: string): Promise<number> {
+async function resolveCikFromTicker(ticker: string): Promise<number> {
   const now = Date.now();
   if (!memoryTickersCache || now - memoryTickersCache.timestamp > TICKERS_CACHE_TTL_MS) {
     const rawData = (await fetchFromSec('tickers')) as Record<string, any>;
@@ -125,6 +126,28 @@ function isStale(lastUpdated: Timestamp | null): boolean {
   return ageMs > STALENESS_DAYS * MS_PER_DAY;
 }
 
+function buildDocPayload(
+  ticker: string,
+  paddedCik: PaddedCik,
+  companyName: string,
+  companyFacts: Record<string, unknown>,
+  latestFiledDate: string | null,
+  accessCount = 0
+) {
+  return {
+    ticker,
+    cik: paddedCik,
+    companyName,
+    companyFacts,
+    latestFiledDate,
+    rawVersion: 1,
+    version: 1,
+    lastUpdated: FieldValue.serverTimestamp(),
+    needsRefresh: false,
+    accessCount,
+  };
+}
+
 export async function cacheWriterHandler(
   req: CallableRequest<CacheWriterData>
 ): Promise<CacheWriterResult> {
@@ -135,12 +158,6 @@ export async function cacheWriterHandler(
   }
   if (!data.ticker || typeof data.ticker !== 'string' || !data.ticker.trim()) {
     throw new HttpsError('invalid-argument', 'ticker is required and must be a non-empty string');
-  }
-  if (
-    data.cik !== undefined &&
-    (typeof data.cik !== 'number' || !Number.isInteger(data.cik) || data.cik < 0)
-  ) {
-    throw new HttpsError('invalid-argument', 'cik must be a non-negative integer when provided');
   }
 
   const ticker = data.ticker.trim().toUpperCase();
@@ -160,9 +177,9 @@ export async function cacheWriterHandler(
     }
   }
 
-  // Resolve CIK if not provided
-  const cik = data.cik !== undefined ? data.cik : await resolveCikFromTicker(ticker);
-  const paddedCik = String(cik).padStart(10, '0');
+  // Resolve CIK internally from SEC tickers directory
+  const cik = await resolveCikFromTicker(ticker);
+  const paddedCik: PaddedCik = String(cik).padStart(10, '0');
 
   // Tier 2 staleness check: doc missing or older than 90 days -> fetch from SEC
   let companyFacts: Record<string, unknown>;
@@ -201,18 +218,10 @@ export async function cacheWriterHandler(
     // Document exists but new filing arrived: overwrite full document
     assertBlobSize(companyFacts);
 
-    await docRef.set({
-      ticker,
-      cik: paddedCik,
-      companyName,
-      companyFacts,
-      latestFiledDate: newLatestFiledDate,
-      rawVersion: 1,
-      version: 1,
-      lastUpdated: FieldValue.serverTimestamp(),
-      needsRefresh: false,
-      accessCount: typeof docData.accessCount === 'number' ? docData.accessCount : 0,
-    });
+    const accessCount = typeof docData.accessCount === 'number' ? docData.accessCount : 0;
+    await docRef.set(
+      buildDocPayload(ticker, paddedCik, companyName, companyFacts, newLatestFiledDate, accessCount)
+    );
 
     return { ticker, latestFiledDate: newLatestFiledDate, updated: true };
   }
@@ -220,18 +229,9 @@ export async function cacheWriterHandler(
   // Document does not exist: fresh fetch
   assertBlobSize(companyFacts);
 
-  await docRef.set({
-    ticker,
-    cik: paddedCik,
-    companyName,
-    companyFacts,
-    latestFiledDate: newLatestFiledDate,
-    rawVersion: 1,
-    version: 1,
-    lastUpdated: FieldValue.serverTimestamp(),
-    needsRefresh: false,
-    accessCount: 0,
-  });
+  await docRef.set(
+    buildDocPayload(ticker, paddedCik, companyName, companyFacts, newLatestFiledDate, 0)
+  );
 
   return { ticker, latestFiledDate: newLatestFiledDate, updated: true };
 }

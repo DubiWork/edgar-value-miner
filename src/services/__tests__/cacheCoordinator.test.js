@@ -239,9 +239,8 @@ describe('cacheCoordinator', () => {
       expect(result.metadata.cacheHit).toBe(false);
       expect(result.data.companyName).toBe('Apple Inc.');
 
-      // CIK mapped and cacheWriter invoked with integer CIK
-      expect(edgarApi.mapTickerToCik).toHaveBeenCalledWith('AAPL');
-      expect(mockCacheWriterCallable).toHaveBeenCalledWith({ ticker: 'AAPL', cik: 320193 });
+      // cacheWriter invoked with ticker only
+      expect(mockCacheWriterCallable).toHaveBeenCalledWith({ ticker: 'AAPL' });
 
       // Firestore read called twice (initial check + re-read after cacheWriter)
       expect(firestoreCache.getCompanyFactsFromFirestore).toHaveBeenCalledTimes(2);
@@ -467,7 +466,7 @@ describe('cacheCoordinator', () => {
       // Wait for non-blocking background task
       await new Promise(resolve => setTimeout(resolve, 50));
 
-      expect(mockCacheWriterCallable).toHaveBeenCalledWith({ ticker: 'AAPL', cik: 320193 });
+      expect(mockCacheWriterCallable).toHaveBeenCalledWith({ ticker: 'AAPL' });
       expect(edgarCache.invalidateCache).toHaveBeenCalledWith('AAPL');
     });
 
@@ -493,7 +492,7 @@ describe('cacheCoordinator', () => {
 
       await new Promise(resolve => setTimeout(resolve, 50));
 
-      expect(mockCacheWriterCallable).toHaveBeenCalledWith({ ticker: 'AAPL', cik: 320193 });
+      expect(mockCacheWriterCallable).toHaveBeenCalledWith({ ticker: 'AAPL' });
       // Should NOT invalidate if cacheWriter reports no updates
       expect(edgarCache.invalidateCache).not.toHaveBeenCalled();
     });
@@ -572,7 +571,7 @@ describe('cacheCoordinator', () => {
       expect(mockCacheWriterCallable).toHaveBeenCalled();
     });
 
-    it('should resolve CIK from ticker mapping during background refresh if not present in cached entry', async () => {
+    it('should invoke cacheWriter with ticker during background refresh when CIK is null in cached entry', async () => {
       const ninetyOneDaysAgo = Date.now() - 91 * 24 * 60 * 60 * 1000;
       edgarCache.getCompanyFacts.mockResolvedValue({
         data: mockNormalizedData,
@@ -581,16 +580,10 @@ describe('cacheCoordinator', () => {
         lastUpdated: ninetyOneDaysAgo,
       });
 
-      edgarApi.mapTickerToCik.mockResolvedValue({
-        cik: '0000320193',
-        name: 'Apple Inc.',
-      });
-
       await getCompanyData('AAPL', { backgroundRefresh: true });
       await new Promise(resolve => setTimeout(resolve, 50));
 
-      expect(edgarApi.mapTickerToCik).toHaveBeenCalledWith('AAPL');
-      expect(mockCacheWriterCallable).toHaveBeenCalledWith({ ticker: 'AAPL', cik: 320193 });
+      expect(mockCacheWriterCallable).toHaveBeenCalledWith({ ticker: 'AAPL' });
     });
   });
 
@@ -613,7 +606,7 @@ describe('cacheCoordinator', () => {
 
       await new Promise(resolve => setTimeout(resolve, 50));
 
-      expect(mockCacheWriterCallable).toHaveBeenCalledWith({ ticker: 'AAPL', cik: 320193 });
+      expect(mockCacheWriterCallable).toHaveBeenCalledWith({ ticker: 'AAPL' });
     });
 
     it('should NOT start refresh for fresh cache', async () => {
