@@ -38,7 +38,7 @@ const QUARTERLY_PERIODS = 20;
  * Forms used for annual filings
  * @constant {string[]}
  */
-const ANNUAL_FORMS = ['10-K', '10-K/A'];
+export const ANNUAL_FORMS = ['10-K', '10-K/A', '40-F', '40-F/A'];
 
 const GAAP_NAMESPACE = 'us-gaap';
 const IFRS_NAMESPACE = 'ifrs-full';
@@ -695,16 +695,17 @@ export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
   });
 
   // Deduplicate by period (keep most recent filing for each period)
-  // For annual data: key on fiscal year (item.fy or year from end date) so that
+  // For annual data: key on calendar/fiscal year from frame or end date so that
   // restatements with off-by-one-day end dates (e.g. 2023-09-30 vs 2023-10-01)
-  // that lack a frame field still collapse to one row per fiscal year.
+  // still collapse to one row per year, while multiple comparative years in the
+  // same filing (which share the same filing item.fy) are preserved.
   // For quarterly data: keep existing frame/end keying so Q1-Q4 are not collapsed.
   const seenPeriods = new Set();
   const deduplicatedData = sortedData.filter(item => {
     let period;
     if (periodType === 'annual') {
-      // Prefer the SEC XBRL fy field; fall back to year extracted from end date
-      period = item.fy != null ? String(item.fy) : (item.end ? String(item.end).slice(0, 4) : (item.frame || item.end));
+      const frameMatch = typeof item.frame === 'string' ? item.frame.match(/^CY(\d{4})/) : null;
+      period = frameMatch ? frameMatch[1] : (item.end ? String(item.end).slice(0, 4) : (item.fy != null ? String(item.fy) : item.frame));
     } else {
       period = item.frame || item.end;
     }

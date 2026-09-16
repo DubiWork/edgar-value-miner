@@ -18,12 +18,14 @@ import {
   findGaapTag,
   detectFilingCurrency,
   NORMALIZATION_VERSION,
+  ANNUAL_FORMS,
 } from '../../utils/gaapNormalizer.js';
 import { calculateMargins } from '../../utils/calculateMargins.js';
 import { calculateYoY } from '../../utils/calculateYoY.js';
 import msftFacts from '../../__fixtures__/msftCompanyFacts.json';
 import sofiFacts from '../../__fixtures__/sofiCompanyFacts.json';
 import aaplFacts from '../../__fixtures__/aaplCompanyFacts.json';
+import shopFacts from '../../__fixtures__/shopCompanyFacts.json';
 
 // =============================================================================
 // Mock Data Helpers
@@ -1677,5 +1679,116 @@ describe('Derived metrics compatibility across 45 annual years and 90 quarters',
     expect(fcf[1].value).toBe(320); // 400 - abs(80)
   });
 });
+
+// =============================================================================
+// Issue #278: 40-F Support in Normalizer & SHOP Historical Revenue
+// =============================================================================
+
+describe('Issue #278: 40-F filing support and SHOP revenue history', () => {
+  it('ANNUAL_FORMS includes 40-F and 40-F/A', () => {
+    expect(ANNUAL_FORMS).toContain('40-F');
+    expect(ANNUAL_FORMS).toContain('40-F/A');
+    expect(ANNUAL_FORMS).toContain('10-K');
+    expect(ANNUAL_FORMS).toContain('10-K/A');
+  });
+
+  it('normalizes SHOP 40-F annual revenue back to 2017 with fullHistory: true', () => {
+    const result = normalizeCompanyFacts(shopFacts, { fullHistory: true });
+
+    expect(result).toBeDefined();
+    expect(result.companyName).toBe('Shopify Inc.');
+    const annualRevenue = result.metrics.revenue.annual;
+    expect(annualRevenue.length).toBeGreaterThanOrEqual(7);
+
+    // Verify years 2017 to 2023 exist
+    const years = annualRevenue.map((r) => r.fiscalYear);
+    expect(years).toContain(2017);
+    expect(years).toContain(2018);
+    expect(years).toContain(2019);
+    expect(years).toContain(2020);
+    expect(years).toContain(2021);
+    expect(years).toContain(2022);
+    expect(years).toContain(2023);
+
+    // Verify 2017 value is ~$673M and 2023 is ~$7.06B
+    const rev2017 = annualRevenue.find((r) => r.fiscalYear === 2017);
+    const rev2023 = annualRevenue.find((r) => r.fiscalYear === 2023);
+
+    expect(rev2017.value).toBe(673304000);
+    expect(rev2017.form).toBe('40-F');
+
+    expect(rev2023.value).toBe(7060000000);
+
+    // Verify sorted descending
+    for (let i = 0; i < annualRevenue.length - 1; i++) {
+      expect(annualRevenue[i].fiscalYear).toBeGreaterThan(annualRevenue[i + 1].fiscalYear);
+    }
+  });
+
+  it('normalizes SHOP with default 5-year cap (2021-2025)', () => {
+    const result = normalizeCompanyFacts(shopFacts);
+
+    const annualRevenue = result.metrics.revenue.annual;
+    expect(annualRevenue).toHaveLength(5);
+    expect(annualRevenue[0].fiscalYear).toBe(2025);
+    expect(annualRevenue[4].fiscalYear).toBe(2021);
+  });
+
+  it('extractTimeSeriesData processes 40-F filings directly from companyConcept response', () => {
+    const conceptResponse = {
+      cik: 1594805,
+      taxonomy: 'us-gaap',
+      tag: 'RevenueFromContractWithCustomerExcludingAssessedTax',
+      label: 'Revenue from Contract with Customer, Excluding Assessed Tax',
+      entityName: 'Shopify Inc.',
+      units: {
+        USD: [
+          {
+            end: '2017-12-31',
+            val: 673304000,
+            fy: 2017,
+            fp: 'FY',
+            form: '40-F',
+            filed: '2018-02-15',
+            frame: 'CY2017',
+          },
+          {
+            end: '2018-12-31',
+            val: 1073229000,
+            fy: 2018,
+            fp: 'FY',
+            form: '40-F',
+            filed: '2019-02-12',
+            frame: 'CY2018',
+          },
+        ],
+      },
+    };
+
+    const series = extractTimeSeriesData(conceptResponse, 'annual', { fullHistory: true });
+    expect(series).toHaveLength(2);
+    expect(series[0].fiscalYear).toBe(2018);
+    expect(series[0].value).toBe(1073229000);
+    expect(series[0].form).toBe('40-F');
+    expect(series[1].fiscalYear).toBe(2017);
+    expect(series[1].value).toBe(673304000);
+    expect(series[1].form).toBe('40-F');
+  });
+
+  it('does not regress on 10-K only companies (AAPL, MSFT, SOFI)', () => {
+    const aapl = normalizeCompanyFacts(aaplFacts);
+    expect(aapl.metrics.revenue.annual.length).toBeGreaterThan(0);
+    expect(aapl.metrics.revenue.annual.every((r) => r.form.startsWith('10-K'))).toBe(true);
+
+    const msft = normalizeCompanyFacts(msftFacts);
+    expect(msft.metrics.revenue.annual.length).toBeGreaterThan(0);
+    expect(msft.metrics.revenue.annual.every((r) => r.form.startsWith('10-K'))).toBe(true);
+
+    const sofi = normalizeCompanyFacts(sofiFacts);
+    expect(sofi.metrics.revenue.annual.length).toBeGreaterThan(0);
+    expect(sofi.metrics.revenue.annual.every((r) => r.form.startsWith('10-K'))).toBe(true);
+  });
+});
+
 
 
