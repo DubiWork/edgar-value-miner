@@ -134,6 +134,7 @@ function buildDocPayload(
   latestFiledDate: string | null,
   accessCount = 0
 ) {
+  assertBlobSize(companyFacts);
   return {
     ticker,
     cik: paddedCik,
@@ -216,8 +217,6 @@ export async function cacheWriterHandler(
     }
 
     // Document exists but new filing arrived: overwrite full document
-    assertBlobSize(companyFacts);
-
     const accessCount = typeof docData.accessCount === 'number' ? docData.accessCount : 0;
     await docRef.set(
       buildDocPayload(ticker, paddedCik, companyName, companyFacts, newLatestFiledDate, accessCount)
@@ -227,8 +226,6 @@ export async function cacheWriterHandler(
   }
 
   // Document does not exist: fresh fetch
-  assertBlobSize(companyFacts);
-
   await docRef.set(
     buildDocPayload(ticker, paddedCik, companyName, companyFacts, newLatestFiledDate, 0)
   );
