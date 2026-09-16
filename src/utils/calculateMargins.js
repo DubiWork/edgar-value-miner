@@ -100,9 +100,38 @@ export function calculateMargins(metrics, options = {}) {
     return [];
   }
 
-  const maxYears = (options && typeof options.maxYears === 'number' && options.maxYears > 0)
-    ? options.maxYears
-    : DEFAULT_MAX_YEARS;
+  const fullHistory = options?.fullHistory === true;
+  const maxYears = fullHistory
+    ? Infinity
+    : (options && typeof options.maxYears === 'number' && options.maxYears > 0)
+      ? options.maxYears
+      : DEFAULT_MAX_YEARS;
+
+  // Build lookup maps for O(1) matching per fiscal year
+  const grossMap = new Map();
+  if (Array.isArray(grossProfit)) {
+    for (const entry of grossProfit) {
+      if (entry && entry.fiscalYear != null && !grossMap.has(entry.fiscalYear)) {
+        grossMap.set(entry.fiscalYear, entry);
+      }
+    }
+  }
+  const operatingMap = new Map();
+  if (Array.isArray(operatingIncome)) {
+    for (const entry of operatingIncome) {
+      if (entry && entry.fiscalYear != null && !operatingMap.has(entry.fiscalYear)) {
+        operatingMap.set(entry.fiscalYear, entry);
+      }
+    }
+  }
+  const netMap = new Map();
+  if (Array.isArray(netIncome)) {
+    for (const entry of netIncome) {
+      if (entry && entry.fiscalYear != null && !netMap.has(entry.fiscalYear)) {
+        netMap.set(entry.fiscalYear, entry);
+      }
+    }
+  }
 
   // Build results anchored on revenue entries
   const results = [];
@@ -117,11 +146,11 @@ export function calculateMargins(metrics, options = {}) {
     const revenueIsValid =
       typeof revenueValue === 'number' &&
       isFinite(revenueValue) &&
-      revenueValue !== 0;
+      revenueValue > 0;
 
-    const grossEntry = findByYear(grossProfit, fiscalYear);
-    const operatingEntry = findByYear(operatingIncome, fiscalYear);
-    const netEntry = findByYear(netIncome, fiscalYear);
+    const grossEntry = grossMap.get(fiscalYear);
+    const operatingEntry = operatingMap.get(fiscalYear);
+    const netEntry = netMap.get(fiscalYear);
 
     results.push({
       fiscalYear,
@@ -140,7 +169,7 @@ export function calculateMargins(metrics, options = {}) {
   });
 
   // Limit to maxYears (take the most recent N after sorting)
-  if (results.length > maxYears) {
+  if (!fullHistory && maxYears !== Infinity && results.length > maxYears) {
     return results.slice(results.length - maxYears);
   }
 

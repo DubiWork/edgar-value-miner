@@ -123,7 +123,12 @@ function mockSecError(statusCode: number): void {
 // ---------------------------------------------------------------------------
 // Import handlers AFTER mocks are in place
 // ---------------------------------------------------------------------------
-import { secTickersHandler, secCompanyFactsHandler, fetchFromSec } from '../functions/secProxy.js';
+import {
+  secTickersHandler,
+  secCompanyFactsHandler,
+  secCompanyConceptHandler,
+  fetchFromSec,
+} from '../functions/secProxy.js';
 
 // ---------------------------------------------------------------------------
 // Tests: fetchFromSec is SSRF-safe by construction (#215)
@@ -155,6 +160,24 @@ describe('fetchFromSec SSRF-safe endpoint API', () => {
     NaN,
   ])('rejects a non-integer/negative CIK (%s) without calling https.get', async (badCik) => {
     await expect(fetchFromSec('companyFacts', badCik as number)).rejects.toThrow();
+    expect(mockGet).not.toHaveBeenCalled();
+  });
+
+  it('builds the companyConcept URL from numeric CIK, namespace, and tag', () => {
+    fetchFromSec('companyConcept', 1594805, 'us-gaap', 'Revenues').catch(() => {});
+    expect(mockGet).toHaveBeenCalled();
+    const calledUrl = mockGet.mock.calls[0][0] as string;
+    expect(calledUrl).toBe('https://data.sec.gov/api/xbrl/companyconcept/CIK0001594805/us-gaap/Revenues.json');
+  });
+
+  it.each([
+    ['invalid namespace with slash', 1594805, 'us/gaap', 'Revenues'],
+    ['namespace path traversal', 1594805, '../evil', 'Revenues'],
+    ['invalid tag with slash', 1594805, 'us-gaap', 'Revenues/extra'],
+    ['tag path traversal', 1594805, 'us-gaap', '../../secret'],
+    ['empty tag', 1594805, 'us-gaap', ''],
+  ])('rejects malicious or invalid concept input: %s', async (_name, cik, ns, tag) => {
+    await expect(fetchFromSec('companyConcept', cik, ns, tag)).rejects.toThrow();
     expect(mockGet).not.toHaveBeenCalled();
   });
 });
@@ -381,3 +404,192 @@ describe('secCompanyFactsHandler', () => {
     expect(calledUrl).toContain('CIK0000320193.json');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tests: secCompanyConceptHandler
+// ---------------------------------------------------------------------------
+describe('secCompanyConceptHandler', () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+  });
+
+  it('returns 405 for non-GET methods', async () => {
+    const req = makeReq('POST');
+    const res = makeRes();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await secCompanyConceptHandler(req as any, res as any);
+
+    expect(res.statusCode).toBe(405);
+    expect(res.body).toMatchObject({ error: 'Method Not Allowed' });
+  });
+
+  it('responds to OPTIONS preflight with 204', async () => {
+    const req = makeReq('OPTIONS');
+    const res = makeRes();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await secCompanyConceptHandler(req as any, res as any);
+
+    expect(res.statusCode).toBe(204);
+  });
+
+  it('sets CORS headers on every response', async () => {
+    const req = makeReq('OPTIONS');
+    const res = makeRes();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await secCompanyConceptHandler(req as any, res as any);
+
+    expect(res.headers['Access-Control-Allow-Origin']).toBe('*');
+  });
+
+  it('returns 400 when cik query param is missing', async () => {
+    const req = makeReq('GET', { tag: 'Revenues' });
+    const res = makeRes();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await secCompanyConceptHandler(req as any, res as any);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toMatchObject({ error: expect.stringContaining('numeric CIK') });
+  });
+
+  it.each(['abc', '-1', '12.34', '   '])(
+    'returns 400 when cik query param is non-numeric (%s)',
+    async (badCik) => {
+      const req = makeReq('GET', { cik: badCik, tag: 'Revenues' });
+      const res = makeRes();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await secCompanyConceptHandler(req as any, res as any);
+
+      expect(res.statusCode).toBe(400);
+    }
+  );
+
+  it('returns 400 when namespace contains invalid characters', async () => {
+    const req = makeReq('GET', { cik: '1594805', namespace: '../bad/ns', tag: 'Revenues' });
+    const res = makeRes();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await secCompanyConceptHandler(req as any, res as any);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toMatchObject({ error: expect.stringContaining('Invalid "namespace"') });
+  });
+
+  it('returns 400 when tag query param is missing', async () => {
+    const req = makeReq('GET', { cik: '1594805', namespace: 'us-gaap' });
+    const res = makeRes();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await secCompanyConceptHandler(req as any, res as any);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toMatchObject({ error: expect.stringContaining('Missing or invalid "tag"') });
+  });
+
+  it.each(['', '   ', '../evil', 'tag/slash', 'tag.json'])(
+    'returns 400 when tag is invalid (%s)',
+    async (badTag) => {
+      const req = makeReq('GET', { cik: '1594805', namespace: 'us-gaap', tag: badTag });
+      const res = makeRes();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await secCompanyConceptHandler(req as any, res as any);
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body).toMatchObject({ error: expect.stringContaining('tag') });
+    }
+  );
+
+  it('defaults namespace to us-gaap when namespace param is omitted', async () => {
+    const payload = { tag: 'Revenues', units: {} };
+    mockSecSuccess(payload);
+
+    const req = makeReq('GET', { cik: '1594805', tag: 'Revenues' });
+    const res = makeRes();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await secCompanyConceptHandler(req as any, res as any);
+
+    expect(res.statusCode).toBe(200);
+    expect(mockGet).toHaveBeenCalledOnce();
+    const calledUrl = mockGet.mock.calls[0][0] as string;
+    expect(calledUrl).toBe('https://data.sec.gov/api/xbrl/companyconcept/CIK0001594805/us-gaap/Revenues.json');
+  });
+
+  it('pads CIK to 10 digits in outbound SEC request', async () => {
+    const payload = { tag: 'Revenues' };
+    mockSecSuccess(payload);
+
+    const req = makeReq('GET', { cik: '320193', namespace: 'us-gaap', tag: 'Revenues' });
+    const res = makeRes();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await secCompanyConceptHandler(req as any, res as any);
+
+    expect(res.statusCode).toBe(200);
+    const calledUrl = mockGet.mock.calls[0][0] as string;
+    expect(calledUrl).toContain('CIK0000320193/us-gaap/Revenues.json');
+  });
+
+  it('returns 200 with company concept data on success', async () => {
+    const payload = { entityName: 'Shopify Inc.', tag: 'RevenueFromContractWithCustomerExcludingAssessedTax', units: {} };
+    mockSecSuccess(payload);
+
+    const req = makeReq('GET', {
+      cik: '1594805',
+      namespace: 'us-gaap',
+      tag: 'RevenueFromContractWithCustomerExcludingAssessedTax',
+    });
+    const res = makeRes();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await secCompanyConceptHandler(req as any, res as any);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual(payload);
+  });
+
+  it('sets Cache-Control header for 24 hours on success', async () => {
+    const payload = { tag: 'Revenues' };
+    mockSecSuccess(payload);
+
+    const req = makeReq('GET', { cik: '1594805', tag: 'Revenues' });
+    const res = makeRes();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await secCompanyConceptHandler(req as any, res as any);
+
+    expect(res.headers['Cache-Control']).toContain('max-age=86400');
+  });
+
+  it('returns 404 when SEC returns 404 for unknown concept or CIK', async () => {
+    mockSecError(404);
+
+    const req = makeReq('GET', { cik: '1594805', namespace: 'us-gaap', tag: 'NonExistentTag' });
+    const res = makeRes();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await secCompanyConceptHandler(req as any, res as any);
+
+    expect(res.statusCode).toBe(404);
+    expect(res.body).toMatchObject({ error: expect.stringContaining('not found') });
+  });
+
+  it('returns 502 when SEC returns a server error', async () => {
+    mockSecError(500);
+
+    const req = makeReq('GET', { cik: '1594805', tag: 'Revenues' });
+    const res = makeRes();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await secCompanyConceptHandler(req as any, res as any);
+
+    expect(res.statusCode).toBe(502);
+    expect(res.body).toMatchObject({ error: expect.stringContaining('Failed to fetch SEC company concept') });
+  });
+});
+

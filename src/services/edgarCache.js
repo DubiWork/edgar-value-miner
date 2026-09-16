@@ -24,8 +24,8 @@
 const DB_CONFIG = {
   /** Database name */
   DB_NAME: 'edgar-value-miner',
-  /** Database version */
-  DB_VERSION: 1,
+  /** Database version — v2: stores normalized output instead of raw SEC JSON */
+  DB_VERSION: 2,
   /** Object store names */
   STORES: {
     COMPANY_FACTS: 'companyFacts',
@@ -176,6 +176,12 @@ function openDatabase() {
 
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
+        const oldVersion = event.oldVersion;
+
+        // v1→v2: schema changed from raw SEC JSON to normalized output — clear stale entries
+        if (oldVersion < 2 && db.objectStoreNames.contains(DB_CONFIG.STORES.COMPANY_FACTS)) {
+          db.deleteObjectStore(DB_CONFIG.STORES.COMPANY_FACTS);
+        }
 
         // Create companyFacts object store
         if (!db.objectStoreNames.contains(DB_CONFIG.STORES.COMPANY_FACTS)) {
@@ -297,10 +303,12 @@ function isExpired(entry) {
 
 /**
  * Validates the structure of a cache entry to detect corruption.
- * Checks for required fields in the cached company facts data.
+ * Also acts as a migration gate: v1 entries (raw SEC JSON with `.facts`) are
+ * intentionally rejected here — #260 cacheCoordinator will re-fetch and re-store
+ * in the v2 normalized shape on the next read.
  *
  * @param {Object} entry - Cache entry to validate
- * @returns {boolean} True if the entry has a valid structure
+ * @returns {boolean} True if the entry has a valid v2 normalized structure
  * @private
  */
 function isValidCacheEntry(entry) {
@@ -309,8 +317,12 @@ function isValidCacheEntry(entry) {
     return false;
   }
 
-  // Data must have facts object (core SEC data structure)
-  if (!entry.data.facts || typeof entry.data.facts !== 'object') {
+  // Data must be normalized output (metrics object + metadata.normalized flag)
+  if (!entry.data.metrics || typeof entry.data.metrics !== 'object') {
+    return false;
+  }
+
+  if (!entry.data.metadata || entry.data.metadata.normalized !== true) {
     return false;
   }
 

@@ -27,6 +27,9 @@
 import edgarApi from './edgarApi';
 import edgarCache from './edgarCache';
 import firestoreCache from './firestoreCache';
+import { normalizeCompanyFacts } from '../utils/gaapNormalizer.js';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import app from '../lib/firebase';
 
 // =============================================================================
 // Configuration
@@ -43,8 +46,8 @@ const COORDINATOR_CONFIG = {
   FIRESTORE_TIMEOUT_MS: 5000,
   /** Maximum concurrent prefetch operations */
   MAX_CONCURRENT_PREFETCH: 3,
-  /** Default TTL check threshold (1 day in milliseconds) */
-  STALE_THRESHOLD_MS: 24 * 60 * 60 * 1000,
+  /** Default TTL check threshold (90 days in milliseconds) */
+  STALE_THRESHOLD_MS: 90 * 24 * 60 * 60 * 1000,
 };
 
 /**
@@ -181,6 +184,26 @@ function devLog(level, message, data = undefined) {
   }
 }
 
+/**
+ * Checks if a cache entry is stale (> 90 days or needsRefresh flag set)
+ * @param {Object} entry - Cached entry
+ * @returns {boolean} True if stale
+ * @private
+ */
+function isEntryStale(entry) {
+  if (!entry) return false;
+  if (entry.needsRefresh === true) return true;
+  if (entry.lastUpdated) {
+    const lastUpdatedMs = typeof entry.lastUpdated === 'number'
+      ? entry.lastUpdated
+      : new Date(entry.lastUpdated).getTime();
+    if (!isNaN(lastUpdatedMs) && (Date.now() - lastUpdatedMs > COORDINATOR_CONFIG.STALE_THRESHOLD_MS)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // =============================================================================
 // Background Refresh
 // =============================================================================
@@ -202,8 +225,9 @@ const activeRefreshes = new Set();
 const inFlightRequests = new Map();
 
 /**
- * Performs a background refresh for stale cache data
- * Fire and forget - updates all cache layers when complete
+ * Performs a non-blocking background staleness check for cache data.
+ * Invokes the cacheWriter Cloud Function with { ticker }.
+ * If cacheWriter reports updated: true, invalidates IndexedDB cache.
  *
  * @param {string} ticker - The ticker symbol
  * @returns {void}
@@ -219,18 +243,24 @@ function startBackgroundRefresh(ticker) {
   }
 
   activeRefreshes.add(normalizedTicker);
-  devLog('log', `Starting background refresh for ${normalizedTicker}`);
+  devLog('log', `Starting background staleness check for ${normalizedTicker}`);
 
   // Fire and forget - don't await
   (async () => {
     try {
-      // Fetch fresh data from SEC API
-      const { facts, companyInfo } = await edgarApi.fetchCompanyFactsByTicker(normalizedTicker);
+      const functions = getFunctions(app);
+      const cacheWriter = httpsCallable(functions, 'cacheWriter');
+      const response = await cacheWriter({ ticker: normalizedTicker });
+      const result = response?.data ?? response;
 
-      // Update IndexedDB (local cache)
-      await edgarCache.setCompanyFacts(normalizedTicker, facts, companyInfo.cik);
-
-      devLog('log', `Background refresh completed for ${normalizedTicker}`);
+      if (result && result.updated === true) {
+        devLog('log', `Background refresh: cacheWriter reported update for ${normalizedTicker}, invalidating IndexedDB`);
+        try {
+          await edgarCache.invalidateCache(normalizedTicker);
+        } catch (invalidateError) {
+          devLog('warn', `Background refresh: invalidate failed for ${normalizedTicker}`, invalidateError.message);
+        }
+      }
     } catch (error) {
       devLog('warn', `Background refresh failed for ${normalizedTicker}`, error.message);
     } finally {
@@ -366,28 +396,29 @@ async function _getCompanyDataInternal(normalizedTicker, options) {
       const indexedDbResult = await edgarCache.getCompanyFacts(normalizedTicker);
 
       if (indexedDbResult && indexedDbResult.data) {
+        const isStale = isEntryStale(indexedDbResult);
         devLog('log', `L1 (IndexedDB) hit for ${normalizedTicker}`, {
-          needsRefresh: indexedDbResult.needsRefresh,
+          needsRefresh: isStale,
         });
 
-        // Start background refresh if data is stale
-        if (indexedDbResult.needsRefresh && backgroundRefresh) {
+        // Non-blocking background staleness check if older than 90 days
+        if (isStale && backgroundRefresh) {
           startBackgroundRefresh(normalizedTicker);
         }
 
-        // Return immediately with cached data
+        // Return immediately with cached data without waiting
         return {
           success: true,
           data: {
             ticker: normalizedTicker,
-            cik: indexedDbResult.cik || '',
-            companyName: indexedDbResult.data?.entityName || '',
+            cik: indexedDbResult.cik || indexedDbResult.data?.cik || '',
+            companyName: indexedDbResult.data?.companyName || indexedDbResult.data?.entityName || '',
             companyFacts: indexedDbResult.data,
           },
           metadata: includeMetadata ? {
             source: CACHE_SOURCES.INDEXEDDB,
             cacheHit: true,
-            needsRefresh: indexedDbResult.needsRefresh,
+            needsRefresh: isStale,
             lastUpdated: indexedDbResult.lastUpdated ? new Date(indexedDbResult.lastUpdated) : null,
             costSaved: COORDINATOR_CONFIG.COST_PER_SEC_LOOKUP,
           } : null,
@@ -396,30 +427,44 @@ async function _getCompanyDataInternal(normalizedTicker, options) {
       }
     } catch (error) {
       devLog('warn', `L1 (IndexedDB) error for ${normalizedTicker}`, error.message);
-      // Continue to next layer
+      // Fallback: Proceed to next layer (in-memory normalization)
     }
 
     // ==========================================================================
     // LAYER 2: Firestore (Global Cache)
     // ==========================================================================
+    let firestoreResult = null;
     try {
-      const firestoreResult = await withTimeout(
+      firestoreResult = await withTimeout(
         firestoreCache.getCompanyFactsFromFirestore(normalizedTicker),
         COORDINATOR_CONFIG.FIRESTORE_TIMEOUT_MS,
         'Firestore read'
       );
+    } catch (error) {
+      devLog('warn', `L2 (Firestore) error for ${normalizedTicker}`, error.message);
+      // Fall through to next layer / fallback
+    }
 
-      if (firestoreResult && firestoreResult.data) {
+    const rawBlob = firestoreResult?.companyFacts || firestoreResult?.data;
+
+    if (firestoreResult && rawBlob) {
+      try {
         devLog('log', `L2 (Firestore) hit for ${normalizedTicker}`, {
           needsRefresh: firestoreResult.needsRefresh,
         });
 
-        // Save to IndexedDB for faster future access (async, don't wait)
-        edgarCache.setCompanyFacts(
-          normalizedTicker,
-          firestoreResult.data,
-          firestoreResult.cik
-        ).catch(err => devLog('warn', 'Failed to save to IndexedDB', err.message));
+        const normalized = normalizeCompanyFacts(rawBlob, { fullHistory: true });
+
+        // Save normalized output to IndexedDB (caught so storage quota/private browsing does not throw)
+        try {
+          await edgarCache.setCompanyFacts(
+            normalizedTicker,
+            normalized,
+            firestoreResult.cik
+          );
+        } catch (err) {
+          devLog('warn', 'Failed to save to IndexedDB from Firestore hit', err.message);
+        }
 
         // Start background refresh if data is stale
         if (firestoreResult.needsRefresh && backgroundRefresh) {
@@ -431,8 +476,8 @@ async function _getCompanyDataInternal(normalizedTicker, options) {
           data: {
             ticker: normalizedTicker,
             cik: firestoreResult.cik || '',
-            companyName: firestoreResult.companyName || firestoreResult.data?.entityName || '',
-            companyFacts: firestoreResult.data,
+            companyName: normalized.companyName || normalized.entityName || firestoreResult.companyName || '',
+            companyFacts: normalized,
           },
           metadata: includeMetadata ? {
             source: CACHE_SOURCES.FIRESTORE,
@@ -443,46 +488,108 @@ async function _getCompanyDataInternal(normalizedTicker, options) {
           } : null,
           error: null,
         };
+      } catch (normError) {
+        devLog('warn', `Failed to normalize L2 Firestore data for ${normalizedTicker}`, normError.message);
+        // Fall through to next layer / direct SEC fetch
       }
-    } catch (error) {
-      devLog('warn', `L2 (Firestore) error for ${normalizedTicker}`, error.message);
-      // Continue to next layer
+    }
+
+    // ==========================================================================
+    // LAYER 3: Firestore Miss -> Cloud Function (cacheWriter)
+    // ==========================================================================
+    if (!firestoreResult) {
+      try {
+        devLog('log', `Firestore miss for ${normalizedTicker}, invoking cacheWriter Cloud Function`);
+
+        const functions = getFunctions(app);
+        const cacheWriter = httpsCallable(functions, 'cacheWriter');
+        await cacheWriter({ ticker: normalizedTicker });
+
+        // Re-read newly written raw doc from Firestore
+        const freshDoc = await withTimeout(
+          firestoreCache.getCompanyFactsFromFirestore(normalizedTicker),
+          COORDINATOR_CONFIG.FIRESTORE_TIMEOUT_MS,
+          'Firestore re-read after cacheWriter'
+        );
+
+        const freshBlob = freshDoc?.companyFacts || freshDoc?.data;
+        if (freshDoc && freshBlob) {
+          const normalized = normalizeCompanyFacts(freshBlob, { fullHistory: true });
+          const cik = freshDoc.cik || '';
+
+          try {
+            await edgarCache.setCompanyFacts(
+              normalizedTicker,
+              normalized,
+              cik
+            );
+          } catch (err) {
+            devLog('warn', 'Failed to save to IndexedDB after cacheWriter', err.message);
+          }
+
+          return {
+            success: true,
+            data: {
+              ticker: normalizedTicker,
+              cik,
+              companyName: normalized.companyName || normalized.entityName || freshDoc.companyName || '',
+              companyFacts: normalized,
+            },
+            metadata: includeMetadata ? {
+              source: CACHE_SOURCES.FIRESTORE,
+              cacheHit: false,
+              needsRefresh: false,
+              lastUpdated: freshDoc.lastUpdated || new Date(),
+              costSaved: COORDINATOR_CONFIG.COST_PER_SEC_LOOKUP,
+            } : null,
+            error: null,
+          };
+        }
+      } catch (cwError) {
+        devLog('warn', `cacheWriter or Firestore re-read failed for ${normalizedTicker}, falling back to direct SEC fetch`, cwError.message);
+        // Fall through to SEC API direct fetch below
+      }
     }
   }
 
   // ==========================================================================
-  // LAYER 3: SEC API (Source of Truth)
+  // RESILIENCE FALLBACK / DIRECT: SEC API (Source of Truth)
   // ==========================================================================
   try {
-    devLog('log', `L3 (SEC API) fetching ${normalizedTicker}`);
+    devLog('log', `Direct SEC fetch for ${normalizedTicker}`);
 
     const { facts, companyInfo } = await edgarApi.fetchCompanyFactsByTicker(normalizedTicker);
 
-    // Save to IndexedDB (local cache) - async, don't wait
-    edgarCache.setCompanyFacts(normalizedTicker, facts, companyInfo.cik)
-      .catch(err => devLog('warn', 'Failed to save to IndexedDB', err.message));
+    const normalized = normalizeCompanyFacts(facts, { fullHistory: true });
 
-    devLog('log', `L3 (SEC API) success for ${normalizedTicker}`);
+    // Write normalized result to IndexedDB only (skipping Firestore)
+    try {
+      await edgarCache.setCompanyFacts(normalizedTicker, normalized, companyInfo.cik);
+    } catch (err) {
+      devLog('warn', 'Failed to save to IndexedDB from direct SEC fetch', err.message);
+    }
+
+    devLog('log', `SEC API fetch success for ${normalizedTicker}`);
 
     return {
       success: true,
       data: {
         ticker: normalizedTicker,
         cik: companyInfo.cik,
-        companyName: companyInfo.name,
-        companyFacts: facts,
+        companyName: normalized.companyName || normalized.entityName || companyInfo.name || '',
+        companyFacts: normalized,
       },
       metadata: includeMetadata ? {
         source: CACHE_SOURCES.SEC_API,
         cacheHit: false,
         needsRefresh: false,
         lastUpdated: new Date(),
-        costSaved: 0, // No savings - fresh fetch
+        costSaved: 0,
       } : null,
       error: null,
     };
   } catch (error) {
-    devLog('error', `L3 (SEC API) error for ${normalizedTicker}`, error);
+    devLog('error', `SEC API error for ${normalizedTicker}`, error);
 
     return {
       success: false,
@@ -770,7 +877,7 @@ export async function refreshStaleCache(ticker) {
       };
     }
 
-    if (cached.needsRefresh) {
+    if (isEntryStale(cached)) {
       startBackgroundRefresh(normalizedTicker);
       return {
         started: true,
@@ -793,6 +900,11 @@ export async function refreshStaleCache(ticker) {
   }
 }
 
+/**
+ * Alias for getCompanyData
+ */
+export const getCompanyFacts = getCompanyData;
+
 // =============================================================================
 // Default Export
 // =============================================================================
@@ -804,6 +916,7 @@ export async function refreshStaleCache(ticker) {
 export default {
   // Main API
   getCompanyData,
+  getCompanyFacts,
 
   // Cache management
   invalidateCache,

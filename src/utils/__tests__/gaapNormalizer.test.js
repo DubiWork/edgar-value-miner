@@ -13,13 +13,19 @@ import { describe, it, expect } from 'vitest';
 import {
   normalizeCompanyFacts,
   extractTimeSeriesData,
+  stitchTimeSeriesData,
+  calculateFreeCashFlow,
   findGaapTag,
   detectFilingCurrency,
   NORMALIZATION_VERSION,
+  ANNUAL_FORMS,
 } from '../../utils/gaapNormalizer.js';
+import { calculateMargins } from '../../utils/calculateMargins.js';
+import { calculateYoY } from '../../utils/calculateYoY.js';
 import msftFacts from '../../__fixtures__/msftCompanyFacts.json';
 import sofiFacts from '../../__fixtures__/sofiCompanyFacts.json';
 import aaplFacts from '../../__fixtures__/aaplCompanyFacts.json';
+import shopFacts from '../../__fixtures__/shopCompanyFacts.json';
 
 // =============================================================================
 // Mock Data Helpers
@@ -1330,4 +1336,459 @@ describe('normalizeCompanyFacts — fullHistory flag (#253)', () => {
     expect(a.metrics.revenue.annual.length).toBe(b.metrics.revenue.annual.length);
   });
 });
+
+describe('extractTimeSeriesData — fullHistory option', () => {
+  it('extractTimeSeriesData(data, "annual") retains 5 annual periods', () => {
+    const entries = [];
+    for (let y = 2010; y <= 2023; y++) {
+      entries.push(createUnitEntry({
+        end: `${y}-12-31`,
+        val: y * 1000,
+        frame: `CY${y}`,
+        form: '10-K',
+        filed: `${y + 1}-02-15`,
+      }));
+    }
+    const tagData = { units: { USD: entries } };
+    const result = extractTimeSeriesData(tagData, 'annual');
+    expect(result).toHaveLength(5);
+  });
+
+  it('extractTimeSeriesData(data, "annual", { fullHistory: true }) returns all annual periods uncapped', () => {
+    const entries = [];
+    for (let y = 1980; y <= 2024; y++) {
+      entries.push(createUnitEntry({
+        end: `${y}-12-31`,
+        val: y * 1000,
+        frame: `CY${y}`,
+        form: '10-K',
+        filed: `${y + 1}-02-15`,
+      }));
+    }
+    const tagData = { units: { USD: entries } };
+    const result = extractTimeSeriesData(tagData, 'annual', { fullHistory: true });
+    expect(result).toHaveLength(45);
+    expect(result[0].fiscalYear).toBe(2024);
+    expect(result[44].fiscalYear).toBe(1980);
+  });
+
+  it('extractTimeSeriesData(data, "quarterly") retains 20 quarterly periods', () => {
+    const entries = [];
+    for (let y = 2014; y <= 2023; y++) {
+      const quarters = [
+        { q: 1, end: `${y}-03-31`, frame: `CY${y}Q1` },
+        { q: 2, end: `${y}-06-30`, frame: `CY${y}Q2` },
+        { q: 3, end: `${y}-09-30`, frame: `CY${y}Q3` },
+        { q: 4, end: `${y}-12-31`, frame: `CY${y}Q4` },
+      ];
+      for (const { end, frame } of quarters) {
+        entries.push(createUnitEntry({
+          end,
+          val: y * 100,
+          frame,
+          form: '10-Q',
+          filed: `${y}-11-01`,
+        }));
+      }
+    }
+    const tagData = { units: { USD: entries } };
+    const result = extractTimeSeriesData(tagData, 'quarterly');
+    expect(result).toHaveLength(20);
+  });
+
+  it('extractTimeSeriesData(data, "quarterly", { fullHistory: true }) returns all quarterly periods uncapped', () => {
+    const entries = [];
+    let count = 0;
+    for (let y = 2002; count < 90; y++) {
+      const quarters = [
+        { q: 1, end: `${y}-03-31`, frame: `CY${y}Q1` },
+        { q: 2, end: `${y}-06-30`, frame: `CY${y}Q2` },
+        { q: 3, end: `${y}-09-30`, frame: `CY${y}Q3` },
+        { q: 4, end: `${y}-12-31`, frame: `CY${y}Q4` },
+      ];
+      for (const { end, frame } of quarters) {
+        if (count >= 90) break;
+        entries.push(createUnitEntry({
+          end,
+          val: count * 100,
+          frame,
+          form: '10-Q',
+          filed: `${y}-11-01`,
+        }));
+        count++;
+      }
+    }
+    const tagData = { units: { USD: entries } };
+    const result = extractTimeSeriesData(tagData, 'quarterly', { fullHistory: true });
+    expect(result).toHaveLength(90);
+  });
+});
+
+describe('normalizeCompanyFacts — fullHistory retention & uncapped', () => {
+  const annualEntries = [];
+  for (let y = 1980; y <= 2024; y++) {
+    annualEntries.push(createUnitEntry({
+      end: `${y}-12-31`,
+      val: y * 1000000,
+      frame: `CY${y}`,
+      form: '10-K',
+      filed: `${y + 1}-02-15`,
+    }));
+  }
+
+  const quarterlyEntries = [];
+  let qCount = 0;
+  for (let y = 2002; qCount < 90; y++) {
+    for (let q = 1; q <= 4 && qCount < 90; q++) {
+      const month = String(q * 3).padStart(2, '0');
+      const day = q === 1 || q === 4 ? '31' : '30';
+      quarterlyEntries.push(createUnitEntry({
+        end: `${y}-${month}-${day}`,
+        val: (y * 1000) + q,
+        frame: `CY${y}Q${q}`,
+        form: '10-Q',
+        filed: `${y}-${month}-15`,
+      }));
+      qCount++;
+    }
+  }
+
+  const richFacts = createCompanyFactsWithMetrics({
+    Revenues: [...annualEntries, ...quarterlyEntries],
+    NetIncomeLoss: [...annualEntries, ...quarterlyEntries],
+    GrossProfit: [...annualEntries, ...quarterlyEntries],
+    OperatingIncomeLoss: [...annualEntries, ...quarterlyEntries],
+    NetCashProvidedByUsedInOperatingActivities: [...annualEntries, ...quarterlyEntries],
+    PaymentsToAcquirePropertyPlantAndEquipment: annualEntries.map(e => ({ ...e, val: -Math.round(e.val * 0.1) }))
+      .concat(quarterlyEntries.map(e => ({ ...e, val: -Math.round(e.val * 0.1) }))),
+  });
+
+  it('normalizeCompanyFacts(facts, { fullHistory: true }) returns all annual and quarterly periods without 5/20 capping', () => {
+    const result = normalizeCompanyFacts(richFacts, { fullHistory: true });
+    expect(result.metrics.revenue.annual).toHaveLength(45);
+    expect(result.metrics.revenue.quarterly).toHaveLength(90);
+    expect(result.metrics.freeCashFlow.annual).toHaveLength(45);
+    expect(result.metrics.freeCashFlow.quarterly).toHaveLength(90);
+  });
+
+  it('normalizeCompanyFacts(facts) without options retains 5 annual / 20 quarterly periods', () => {
+    const result = normalizeCompanyFacts(richFacts);
+    expect(result.metrics.revenue.annual).toHaveLength(5);
+    expect(result.metrics.revenue.quarterly).toHaveLength(20);
+    expect(result.metrics.freeCashFlow.annual).toHaveLength(5);
+    expect(result.metrics.freeCashFlow.quarterly).toHaveLength(20);
+  });
+
+  it('normalizeCompanyFacts(facts, { fullHistory: false }) retains 5 annual / 20 quarterly periods', () => {
+    const result = normalizeCompanyFacts(richFacts, { fullHistory: false });
+    expect(result.metrics.revenue.annual).toHaveLength(5);
+    expect(result.metrics.revenue.quarterly).toHaveLength(20);
+    expect(result.metrics.freeCashFlow.annual).toHaveLength(5);
+    expect(result.metrics.freeCashFlow.quarterly).toHaveLength(20);
+  });
+});
+
+describe('stitchTimeSeriesData — fullHistory behavior', () => {
+  it('stitches all historical periods from older tags when fullHistory: true', () => {
+    const modernEntries = [2020, 2021, 2022, 2023].map(y =>
+      createUnitEntry({ end: `${y}-12-31`, val: y * 100, frame: `CY${y}`, form: '10-K', filed: `${y + 1}-02-15` })
+    );
+    const olderEntries = [];
+    for (let y = 2000; y <= 2019; y++) {
+      olderEntries.push(createUnitEntry({ end: `${y}-12-31`, val: y * 90, frame: `CY${y}`, form: '10-K', filed: `${y + 1}-02-15` }));
+    }
+
+    const facts = createCompanyFactsWithMetrics({
+      Revenues: modernEntries,
+      SalesRevenueNet: olderEntries,
+    });
+
+    const capped = stitchTimeSeriesData(facts, 'revenue', 'annual');
+    expect(capped.data).toHaveLength(5);
+    expect(capped.stitched).toBe(true);
+
+    const full = stitchTimeSeriesData(facts, 'revenue', 'annual', { fullHistory: true });
+    expect(full.data).toHaveLength(24);
+    expect(full.stitched).toBe(true);
+    expect(full.data[0].fiscalYear).toBe(2023);
+    expect(full.data[23].fiscalYear).toBe(2000);
+  });
+
+  it('sets stitched: false when fullHistory: true and primary tag covers everything', () => {
+    const entries = [];
+    for (let y = 2000; y <= 2023; y++) {
+      entries.push(createUnitEntry({ end: `${y}-12-31`, val: y * 100, frame: `CY${y}`, form: '10-K', filed: `${y + 1}-02-15` }));
+    }
+    const facts = createCompanyFactsWithMetrics({
+      Revenues: entries,
+    });
+
+    const full = stitchTimeSeriesData(facts, 'revenue', 'annual', { fullHistory: true });
+    expect(full.data).toHaveLength(24);
+    expect(full.stitched).toBe(false);
+  });
+});
+
+describe('Derived metrics compatibility across 45 annual years and 90 quarters', () => {
+  it('calculateMargins computes across 45 annual years without index errors, NaN, or crashes', () => {
+    const revenue = [];
+    const grossProfit = [];
+    const operatingIncome = [];
+    const netIncome = [];
+
+    for (let y = 1980; y <= 2024; y++) {
+      const rev = 100000 + (y - 1980) * 5000;
+      revenue.push({ fiscalYear: y, value: rev });
+      grossProfit.push({ fiscalYear: y, value: rev * 0.6 });
+      operatingIncome.push({ fiscalYear: y, value: rev * 0.3 });
+      netIncome.push({ fiscalYear: y, value: rev * 0.2 });
+    }
+
+    // Default call: 5 years
+    const defaultMargins = calculateMargins({ revenue, grossProfit, operatingIncome, netIncome });
+    expect(defaultMargins).toHaveLength(5);
+    expect(defaultMargins[0].fiscalYear).toBe(2020);
+    expect(defaultMargins[4].fiscalYear).toBe(2024);
+
+    // fullHistory call: 45 years
+    const fullMargins = calculateMargins({ revenue, grossProfit, operatingIncome, netIncome }, { fullHistory: true });
+    expect(fullMargins).toHaveLength(45);
+    expect(fullMargins[0].fiscalYear).toBe(1980);
+    expect(fullMargins[44].fiscalYear).toBe(2024);
+
+    for (const m of fullMargins) {
+      expect(typeof m.grossMargin).toBe('number');
+      expect(typeof m.operatingMargin).toBe('number');
+      expect(typeof m.netMargin).toBe('number');
+      expect(Number.isNaN(m.grossMargin)).toBe(false);
+      expect(Number.isNaN(m.operatingMargin)).toBe(false);
+      expect(Number.isNaN(m.netMargin)).toBe(false);
+      expect(m.grossMargin).toBe(60);
+      expect(m.operatingMargin).toBe(30);
+      expect(m.netMargin).toBe(20);
+    }
+  });
+
+  it('calculateYoY computes across 45 annual years without index errors or NaN', () => {
+    const revenue = [];
+    for (let y = 1980; y <= 2024; y++) {
+      revenue.push({ fiscalYear: y, value: 100000 + (y - 1980) * 5000 });
+    }
+
+    for (let i = 0; i < revenue.length - 1; i++) {
+      const yoy = calculateYoY(revenue[i + 1].value, revenue[i].value);
+      expect(typeof yoy.percentage).toBe('number');
+      expect(Number.isNaN(yoy.percentage)).toBe(false);
+      expect(yoy.formatted).toMatch(/^[+-]?\d+\.\d+%/);
+    }
+  });
+
+  it('calculateFreeCashFlow matches all 90 quarters accurately using composite keys without collision', () => {
+    const quarterlyOCF = [];
+    const quarterlyCapEx = [];
+
+    // 90 quarters: Q1 to Q4 for each year
+    let qCount = 0;
+    for (let y = 2002; qCount < 90; y++) {
+      for (let q = 1; q <= 4 && qCount < 90; q++) {
+        const frame = `CY${y}Q${q}`;
+        const end = `${y}-${String(q * 3).padStart(2, '0')}-30`;
+        const ocfVal = 1000 + q * 100;
+        const capexVal = -(100 + q * 10); // distinct CapEx per quarter
+
+        quarterlyOCF.push({
+          value: ocfVal,
+          period: frame,
+          frame,
+          fiscalYear: y,
+          fiscalQuarter: q,
+          end,
+          form: '10-Q',
+        });
+
+        quarterlyCapEx.push({
+          value: capexVal,
+          period: frame,
+          frame,
+          fiscalYear: y,
+          fiscalQuarter: q,
+          end,
+          form: '10-Q',
+        });
+
+        qCount++;
+      }
+    }
+
+    const fcf = calculateFreeCashFlow(quarterlyOCF, quarterlyCapEx);
+    expect(fcf).toHaveLength(90);
+
+    for (const entry of fcf) {
+      const q = entry.fiscalQuarter;
+      const expectedOcf = 1000 + q * 100;
+      const expectedCapex = 100 + q * 10;
+      const expectedFcf = expectedOcf - expectedCapex;
+
+      expect(entry.value).toBe(expectedFcf);
+      expect(entry.components.operatingCashFlow).toBe(expectedOcf);
+      expect(entry.components.capitalExpenditures).toBe(expectedCapex);
+      expect(Number.isNaN(entry.value)).toBe(false);
+    }
+  });
+
+  it('calculateFreeCashFlow handles mismatched OCF / CapEx periods safely', () => {
+    const ocf = [
+      { fiscalYear: 2023, fiscalQuarter: 1, period: 'CY2023Q1', frame: 'CY2023Q1', value: 100 },
+      { fiscalYear: 2023, fiscalQuarter: 2, period: 'CY2023Q2', frame: 'CY2023Q2', value: 120 },
+      { fiscalYear: 2023, fiscalQuarter: 3, period: 'CY2023Q3', frame: 'CY2023Q3', value: 140 }, // Missing in CapEx
+      { fiscalYear: 2022, period: 'CY2022', value: null }, // Invalid OCF value
+    ];
+
+    const capex = [
+      { fiscalYear: 2023, fiscalQuarter: 1, period: 'CY2023Q1', frame: 'CY2023Q1', value: -20 },
+      { fiscalYear: 2023, fiscalQuarter: 2, period: 'CY2023Q2', frame: 'CY2023Q2', value: 'invalid' }, // Invalid CapEx value
+      { fiscalYear: 2023, fiscalQuarter: 4, period: 'CY2023Q4', frame: 'CY2023Q4', value: -30 }, // Missing in OCF
+    ];
+
+    const fcf = calculateFreeCashFlow(ocf, capex);
+    // Only 2023 Q1 has both valid OCF and valid CapEx
+    expect(fcf).toHaveLength(1);
+    expect(fcf[0].period).toBe('CY2023Q1');
+    expect(fcf[0].value).toBe(80); // 100 - 20
+    expect(fcf[0].components.operatingCashFlow).toBe(100);
+    expect(fcf[0].components.capitalExpenditures).toBe(20);
+  });
+
+  it('calculateFreeCashFlow handles annual mismatched periods and positive CapEx safely', () => {
+    const annualOcf = [
+      { fiscalYear: 2023, value: 500 },
+      { fiscalYear: 2022, value: 400 },
+      { fiscalYear: 2021, value: 300 }, // missing in capex
+    ];
+    const annualCapex = [
+      { fiscalYear: 2023, value: -100 }, // standard negative
+      { fiscalYear: 2022, value: 80 },   // positive CapEx representation
+      { fiscalYear: 2020, value: -50 },  // missing in ocf
+    ];
+
+    const fcf = calculateFreeCashFlow(annualOcf, annualCapex);
+    expect(fcf).toHaveLength(2);
+    expect(fcf[0].fiscalYear).toBe(2023);
+    expect(fcf[0].value).toBe(400); // 500 - 100
+    expect(fcf[1].fiscalYear).toBe(2022);
+    expect(fcf[1].value).toBe(320); // 400 - abs(80)
+  });
+});
+
+// =============================================================================
+// Issue #278: 40-F Support in Normalizer & SHOP Historical Revenue
+// =============================================================================
+
+describe('Issue #278: 40-F filing support and SHOP revenue history', () => {
+  it('ANNUAL_FORMS includes 40-F and 40-F/A', () => {
+    expect(ANNUAL_FORMS).toContain('40-F');
+    expect(ANNUAL_FORMS).toContain('40-F/A');
+    expect(ANNUAL_FORMS).toContain('10-K');
+    expect(ANNUAL_FORMS).toContain('10-K/A');
+  });
+
+  it('normalizes SHOP 40-F annual revenue back to 2017 with fullHistory: true', () => {
+    const result = normalizeCompanyFacts(shopFacts, { fullHistory: true });
+
+    expect(result).toBeDefined();
+    expect(result.companyName).toBe('Shopify Inc.');
+    const annualRevenue = result.metrics.revenue.annual;
+    expect(annualRevenue.length).toBeGreaterThanOrEqual(7);
+
+    // Verify years 2017 to 2023 exist
+    const years = annualRevenue.map((r) => r.fiscalYear);
+    expect(years).toContain(2017);
+    expect(years).toContain(2018);
+    expect(years).toContain(2019);
+    expect(years).toContain(2020);
+    expect(years).toContain(2021);
+    expect(years).toContain(2022);
+    expect(years).toContain(2023);
+
+    // Verify 2017 value is ~$673M and 2023 is ~$7.06B
+    const rev2017 = annualRevenue.find((r) => r.fiscalYear === 2017);
+    const rev2023 = annualRevenue.find((r) => r.fiscalYear === 2023);
+
+    expect(rev2017.value).toBe(673304000);
+    expect(rev2017.form).toBe('40-F');
+
+    expect(rev2023.value).toBe(7060000000);
+
+    // Verify sorted descending
+    for (let i = 0; i < annualRevenue.length - 1; i++) {
+      expect(annualRevenue[i].fiscalYear).toBeGreaterThan(annualRevenue[i + 1].fiscalYear);
+    }
+  });
+
+  it('normalizes SHOP with default 5-year cap (2021-2025)', () => {
+    const result = normalizeCompanyFacts(shopFacts);
+
+    const annualRevenue = result.metrics.revenue.annual;
+    expect(annualRevenue).toHaveLength(5);
+    expect(annualRevenue[0].fiscalYear).toBe(2025);
+    expect(annualRevenue[4].fiscalYear).toBe(2021);
+  });
+
+  it('extractTimeSeriesData processes 40-F filings directly from companyConcept response', () => {
+    const conceptResponse = {
+      cik: 1594805,
+      taxonomy: 'us-gaap',
+      tag: 'RevenueFromContractWithCustomerExcludingAssessedTax',
+      label: 'Revenue from Contract with Customer, Excluding Assessed Tax',
+      entityName: 'Shopify Inc.',
+      units: {
+        USD: [
+          {
+            end: '2017-12-31',
+            val: 673304000,
+            fy: 2017,
+            fp: 'FY',
+            form: '40-F',
+            filed: '2018-02-15',
+            frame: 'CY2017',
+          },
+          {
+            end: '2018-12-31',
+            val: 1073229000,
+            fy: 2018,
+            fp: 'FY',
+            form: '40-F',
+            filed: '2019-02-12',
+            frame: 'CY2018',
+          },
+        ],
+      },
+    };
+
+    const series = extractTimeSeriesData(conceptResponse, 'annual', { fullHistory: true });
+    expect(series).toHaveLength(2);
+    expect(series[0].fiscalYear).toBe(2018);
+    expect(series[0].value).toBe(1073229000);
+    expect(series[0].form).toBe('40-F');
+    expect(series[1].fiscalYear).toBe(2017);
+    expect(series[1].value).toBe(673304000);
+    expect(series[1].form).toBe('40-F');
+  });
+
+  it('does not regress on 10-K only companies (AAPL, MSFT, SOFI)', () => {
+    const aapl = normalizeCompanyFacts(aaplFacts);
+    expect(aapl.metrics.revenue.annual.length).toBeGreaterThan(0);
+    expect(aapl.metrics.revenue.annual.every((r) => r.form.startsWith('10-K'))).toBe(true);
+
+    const msft = normalizeCompanyFacts(msftFacts);
+    expect(msft.metrics.revenue.annual.length).toBeGreaterThan(0);
+    expect(msft.metrics.revenue.annual.every((r) => r.form.startsWith('10-K'))).toBe(true);
+
+    const sofi = normalizeCompanyFacts(sofiFacts);
+    expect(sofi.metrics.revenue.annual.length).toBeGreaterThan(0);
+    expect(sofi.metrics.revenue.annual.every((r) => r.form.startsWith('10-K'))).toBe(true);
+  });
+});
+
+
 

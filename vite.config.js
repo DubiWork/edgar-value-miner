@@ -20,6 +20,13 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace('/api/sec-company-facts', '/api/xbrl/companyfacts'),
       },
+      // Proxy SEC company concept API to avoid CORS issues in development
+      // Forwards /api/sec-company-concept/CIK{paddedCIK}/{namespace}/{tag}.json -> data.sec.gov
+      '/api/sec-company-concept': {
+        target: 'https://data.sec.gov',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/sec-company-concept', '/api/xbrl/companyconcept'),
+      },
     },
   },
 })
