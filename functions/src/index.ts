@@ -3,8 +3,7 @@ initializeApp();
 
 import * as functions from 'firebase-functions';
 import { https } from 'firebase-functions/v2';
-import { secTickersHandler } from './functions/secProxy';
-import { secCompanyFactsHandler } from './functions/secProxy';
+import { secTickersHandler, secCompanyFactsHandler, secCompanyConceptHandler } from './functions/secProxy';
 import { cacheWriterHandler, CACHE_WRITER_OPTIONS } from './functions/cacheWriter';
 
 /**
@@ -18,6 +17,13 @@ export const secTickers = functions.https.onRequest(secTickersHandler);
  * Usage: GET /secCompanyFacts?cik=320193
  */
 export const secCompanyFacts = functions.https.onRequest(secCompanyFactsHandler);
+
+/**
+ * secCompanyConcept — GET proxy for https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/{namespace}/{tag}.json
+ *
+ * Usage: GET /secCompanyConcept?cik=1594805&namespace=us-gaap&tag=Revenues
+ */
+export const secCompanyConcept = functions.https.onRequest(secCompanyConceptHandler);
 
 /**
  * cacheWriter — HTTPS callable: fetch SEC companyfacts and write to edgarCache.

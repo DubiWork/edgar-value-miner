@@ -19,6 +19,7 @@ import {
   mapTickerToCik,
   fetchCompanyFacts,
   fetchCompanyFactsByTicker,
+  fetchCompanyConcept,
   getRateLimiterStatus,
   clearTickersCache,
   EdgarApiError,
@@ -85,6 +86,27 @@ const mockCompanyFactsResponse = {
         },
       },
     },
+  },
+};
+
+const mockCompanyConceptResponse = {
+  cik: 1594805,
+  taxonomy: 'us-gaap',
+  tag: 'RevenueFromContractWithCustomerExcludingAssessedTax',
+  label: 'Revenue from Contract with Customer, Excluding Assessed Tax',
+  description: 'Amount, excluding tax collected from customer, of revenue from operations.',
+  entityName: 'Shopify Inc.',
+  units: {
+    USD: [
+      {
+        end: '2021-12-31',
+        val: 4611856000,
+        fy: 2021,
+        fp: 'FY',
+        form: '40-F',
+        filed: '2022-02-16',
+      },
+    ],
   },
 };
 
@@ -440,6 +462,117 @@ describe('edgarApi', () => {
 
       // Only 3 calls: 1 for tickers (cached), 2 for facts
       expect(global.fetch).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  describe('fetchCompanyConcept', () => {
+    beforeEach(() => {
+      global.fetch = vi.fn(() => {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(mockCompanyConceptResponse),
+        });
+      });
+    });
+
+    it('should fetch company concept with explicit namespace and tag', async () => {
+      const result = await fetchCompanyConcept(
+        '1594805',
+        'us-gaap',
+        'RevenueFromContractWithCustomerExcludingAssessedTax'
+      );
+
+      expect(result).toBeDefined();
+      expect(result.entityName).toBe('Shopify Inc.');
+      expect(result.tag).toBe('RevenueFromContractWithCustomerExcludingAssessedTax');
+      expect(result.units.USD).toHaveLength(1);
+
+      const calledUrl = global.fetch.mock.calls[0][0];
+      expect(calledUrl).toMatch(/0001594805/);
+      expect(calledUrl).toMatch(/us-gaap/);
+      expect(calledUrl).toMatch(/RevenueFromContractWithCustomerExcludingAssessedTax/);
+    });
+
+    it('should default namespace to us-gaap when 2 arguments are provided', async () => {
+      await fetchCompanyConcept(1594805, 'Revenues');
+
+      const calledUrl = global.fetch.mock.calls[0][0];
+      expect(calledUrl).toMatch(/0001594805/);
+      expect(calledUrl).toMatch(/us-gaap/);
+      expect(calledUrl).toMatch(/Revenues/);
+    });
+
+    it('should pad numeric CIK to 10 digits before fetching', async () => {
+      await fetchCompanyConcept(320193, 'us-gaap', 'Revenues');
+
+      const calledUrl = global.fetch.mock.calls[0][0];
+      expect(calledUrl).toMatch(/0000320193/);
+    });
+
+    it('should throw EdgarApiError for invalid CIK', async () => {
+      await expect(fetchCompanyConcept('abc', 'Revenues')).rejects.toThrow(EdgarApiError);
+      await expect(fetchCompanyConcept('', 'Revenues')).rejects.toThrow(EdgarApiError);
+    });
+
+    it('should throw EdgarApiError for invalid namespace', async () => {
+      await expect(
+        fetchCompanyConcept(1594805, '../invalid/ns', 'Revenues')
+      ).rejects.toThrow(EdgarApiError);
+    });
+
+    it('should throw EdgarApiError for invalid tag', async () => {
+      await expect(
+        fetchCompanyConcept(1594805, 'us-gaap', '../invalid/tag')
+      ).rejects.toThrow(EdgarApiError);
+      await expect(
+        fetchCompanyConcept(1594805, 'us-gaap', '')
+      ).rejects.toThrow(EdgarApiError);
+    });
+
+    it('should enhance 404 error with CIK and concept context', async () => {
+      global.fetch = vi.fn(() => {
+        return Promise.resolve({
+          ok: false,
+          status: 404,
+        });
+      });
+
+      try {
+        await fetchCompanyConcept(
+          1594805,
+          'us-gaap',
+          'RevenueFromContractWithCustomerExcludingAssessedTax'
+        );
+        expect.fail('Should have thrown error');
+      } catch (error) {
+        expect(error.statusCode).toBe(404);
+        expect(error.code).toBe(EDGAR_ERROR_CODES.INVALID_CONCEPT);
+        expect(error.message).toContain('0001594805');
+        expect(error.message).toContain('RevenueFromContractWithCustomerExcludingAssessedTax');
+      }
+    });
+
+    it('should retry on transient 500 error and succeed', async () => {
+      let callCount = 0;
+      global.fetch = vi.fn(() => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve({
+            ok: false,
+            status: 500,
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(mockCompanyConceptResponse),
+        });
+      });
+
+      const result = await fetchCompanyConcept(1594805, 'Revenues');
+      expect(result).toBeDefined();
+      expect(callCount).toBe(2);
     });
   });
 

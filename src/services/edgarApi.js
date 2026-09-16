@@ -35,6 +35,14 @@ const SEC_CONFIG = {
     ? '/api/sec-company-facts'
     : `${FUNCTIONS_BASE_URL}/secCompanyFacts`,
   /**
+   * Base URL for Company Concept API.
+   * In development, Vite proxies /api/sec-company-concept to SEC to avoid CORS.
+   * In production, requests go through the secCompanyConcept Cloud Function to avoid CORS.
+   */
+  COMPANY_CONCEPT_BASE_URL: import.meta.env.DEV
+    ? '/api/sec-company-concept'
+    : `${FUNCTIONS_BASE_URL}/secCompanyConcept`,
+  /**
    * URL for Company Tickers list.
    * In development, Vite proxies /api/sec-tickers to SEC to avoid CORS.
    * In production, requests go through the secTickers Cloud Function to avoid CORS.
@@ -102,6 +110,7 @@ export class EdgarApiError extends Error {
 export const EDGAR_ERROR_CODES = {
   INVALID_TICKER: 'INVALID_TICKER',
   INVALID_CIK: 'INVALID_CIK',
+  INVALID_CONCEPT: 'INVALID_CONCEPT',
   RATE_LIMITED: 'RATE_LIMITED',
   NETWORK_ERROR: 'NETWORK_ERROR',
   SERVER_ERROR: 'SERVER_ERROR',
@@ -330,6 +339,58 @@ function validateTicker(ticker) {
   }
 
   return cleanTicker;
+}
+
+/**
+ * Validates taxonomy namespace format
+ *
+ * @param {string} namespace - The taxonomy namespace to validate
+ * @returns {string} The validated namespace
+ * @throws {EdgarApiError} If namespace is invalid
+ */
+function validateNamespace(namespace) {
+  if (!namespace || typeof namespace !== 'string') {
+    throw new EdgarApiError(
+      'Taxonomy namespace is required and must be a string',
+      EDGAR_ERROR_CODES.INVALID_CONCEPT
+    );
+  }
+
+  const cleanNamespace = namespace.trim();
+  if (!/^[a-zA-Z0-9_-]+$/.test(cleanNamespace)) {
+    throw new EdgarApiError(
+      `Invalid namespace "${namespace}": Namespace must contain only alphanumeric characters, dashes, or underscores`,
+      EDGAR_ERROR_CODES.INVALID_CONCEPT
+    );
+  }
+
+  return cleanNamespace;
+}
+
+/**
+ * Validates XBRL concept tag format
+ *
+ * @param {string} tag - The XBRL concept tag to validate
+ * @returns {string} The validated tag
+ * @throws {EdgarApiError} If tag is invalid
+ */
+function validateConceptTag(tag) {
+  if (!tag || typeof tag !== 'string') {
+    throw new EdgarApiError(
+      'Concept tag is required and must be a string',
+      EDGAR_ERROR_CODES.INVALID_CONCEPT
+    );
+  }
+
+  const cleanTag = tag.trim();
+  if (!/^[a-zA-Z0-9_]+$/.test(cleanTag)) {
+    throw new EdgarApiError(
+      `Invalid concept tag "${tag}": Tag must contain only alphanumeric characters or underscores`,
+      EDGAR_ERROR_CODES.INVALID_CONCEPT
+    );
+  }
+
+  return cleanTag;
 }
 
 // =============================================================================
@@ -636,6 +697,64 @@ export async function fetchCompanyFactsByTicker(ticker) {
 }
 
 /**
+ * Fetches company concept data from SEC EDGAR API
+ *
+ * Concept data includes historical XBRL-tagged facts for a single financial concept
+ * across all filing types (including foreign forms like 40-F).
+ *
+ * @param {string|number} cik - The CIK number (will be padded automatically)
+ * @param {string} [namespace='us-gaap'] - Taxonomy namespace (e.g., 'us-gaap', 'dei', 'ifrs-full')
+ * @param {string} tag - The XBRL concept tag (e.g., 'RevenueFromContractWithCustomerExcludingAssessedTax')
+ * @returns {Promise<Object>} Company concept JSON data
+ * @throws {EdgarApiError} If CIK, namespace, or tag is invalid or concept not found
+ *
+ * @example
+ * const data = await fetchCompanyConcept('0001594805', 'us-gaap', 'RevenueFromContractWithCustomerExcludingAssessedTax');
+ * // Or with default namespace:
+ * const data = await fetchCompanyConcept('0001594805', 'Revenues');
+ */
+export async function fetchCompanyConcept(cik, namespace = 'us-gaap', tag) {
+  let resolvedNamespace = namespace;
+  let resolvedTag = tag;
+
+  // Support 2-argument signature: fetchCompanyConcept(cik, 'Revenues')
+  if (resolvedTag === undefined && typeof resolvedNamespace === 'string') {
+    resolvedTag = resolvedNamespace;
+    resolvedNamespace = 'us-gaap';
+  } else if (!resolvedNamespace) {
+    resolvedNamespace = 'us-gaap';
+  }
+
+  const paddedCik = padCik(cik);
+  const cleanNamespace = validateNamespace(resolvedNamespace);
+  const cleanTag = validateConceptTag(resolvedTag);
+
+  // In development Vite proxy forwards /api/sec-company-concept/<path> directly to data.sec.gov
+  // In production Cloud Function accepts query parameters
+  const url = import.meta.env.DEV
+    ? `${SEC_CONFIG.COMPANY_CONCEPT_BASE_URL}/CIK${paddedCik}/${cleanNamespace}/${cleanTag}.json`
+    : `${SEC_CONFIG.COMPANY_CONCEPT_BASE_URL}?cik=${paddedCik}&namespace=${encodeURIComponent(cleanNamespace)}&tag=${encodeURIComponent(cleanTag)}`;
+
+  try {
+    const data = await fetchWithRateLimitAndRetry(
+      url,
+      `fetching company concept ${cleanNamespace}:${cleanTag} for CIK ${paddedCik}`
+    );
+    return data;
+  } catch (error) {
+    if (error.statusCode === 404) {
+      throw new EdgarApiError(
+        `Concept "${cleanNamespace}:${cleanTag}" for CIK ${paddedCik} not found. The CIK or concept tag may be invalid, or the company may not have reported this concept.`,
+        EDGAR_ERROR_CODES.INVALID_CONCEPT,
+        404,
+        error
+      );
+    }
+    throw error;
+  }
+}
+
+/**
  * Gets the current status of the rate limiter
  *
  * Useful for debugging or displaying rate limit status to users.
@@ -680,6 +799,7 @@ export default {
   fetchCompanyFacts,
   fetchCompanyFactsByTicker,
   fetchCompanyTickers,
+  fetchCompanyConcept,
   mapTickerToCik,
 
   // Rate limiter
