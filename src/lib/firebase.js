@@ -20,6 +20,10 @@
  * - VITE_USE_FIREBASE_EMULATOR (set to 'true' for local development)
  */
 
+import { initializeApp } from 'firebase/app';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+
 // Check required environment variables
 const requiredEnvVars = [
   'VITE_FIREBASE_API_KEY',
@@ -55,10 +59,6 @@ if (missingVars.length > 0) {
   }
 } else {
   try {
-    const { initializeApp } = await import('firebase/app');
-    const { getAuth, connectAuthEmulator } = await import('firebase/auth');
-    const { getFirestore, connectFirestoreEmulator } = await import('firebase/firestore');
-
     const firebaseConfig = {
       apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
       authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,

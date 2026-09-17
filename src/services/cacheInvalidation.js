@@ -513,17 +513,6 @@ export async function triggerBackgroundRefresh(ticker) {
     // Update IndexedDB (local cache)
     await edgarCache.setCompanyFacts(normalizedTicker, facts, companyInfo.cik);
 
-    // Attempt to update Firestore (will fail on client, handled by Cloud Function)
-    await firestoreCache.setCompanyFactsToFirestore(
-      normalizedTicker,
-      facts,
-      companyInfo.cik,
-      companyInfo.name
-    ).catch(err => {
-      // Expected to fail on client
-      devLog('log', `Firestore write skipped (expected on client): ${err.message}`);
-    });
-
     devLog('log', `Background refresh completed for ${normalizedTicker}`);
   } catch (error) {
     devLog('error', `Background refresh failed for ${normalizedTicker}`, error);

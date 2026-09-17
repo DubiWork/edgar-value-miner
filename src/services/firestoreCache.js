@@ -9,7 +9,7 @@
  * Security Model:
  * - Read: Anyone can read (client-side reads allowed)
  * - Write: Only Cloud Functions can write (security rules block client writes)
- * - Write functions are provided for use by Cloud Functions (Sub-task #8)
+ * - Write functions are provided for use by Cloud Functions (#254)
  *
  * Features:
  * - Global shared cache across all users
@@ -262,6 +262,7 @@ export async function getCompanyFactsFromFirestore(ticker) {
 
     return {
       data: data.companyFacts,
+      companyFacts: data.companyFacts,
       ticker: data.ticker,
       cik: data.cik,
       companyName: data.companyName,
@@ -270,6 +271,8 @@ export async function getCompanyFactsFromFirestore(ticker) {
       accessCount: data.accessCount || 0,
       needsRefresh,
       version: data.version || 1,
+      latestFiledDate: data.latestFiledDate || null,
+      rawVersion: data.rawVersion || 1,
     };
   } catch (error) {
     const errorCode = classifyError(error);
@@ -426,8 +429,9 @@ export async function getGlobalCacheStats() {
 /**
  * Saves company facts to Firestore global cache
  *
- * NOTE: This function is intended for use by Cloud Functions.
- * Client-side calls will fail due to Firestore security rules.
+ * @deprecated Client-side writes are forbidden by Firestore security rules.
+ * All writes to edgarCache must go through the cacheWriter Cloud Function (#248).
+ * This function remains only for server-side environments or testing.
  *
  * @param {string} ticker - The ticker symbol (e.g., "AAPL")
  * @param {Object} companyFacts - The SEC Company Facts JSON data
@@ -531,7 +535,7 @@ export async function updateAccessCount(ticker) {
  * Users will see old data while fresh data is fetched.
  *
  * NOTE: This function is intended for use by Cloud Functions
- * (event-triggered invalidation from Sub-task #8).
+ * (event-triggered invalidation, see #254).
  *
  * @param {string} ticker - The ticker symbol (e.g., "AAPL")
  * @returns {Promise<boolean>} True if invalidation was successful
@@ -569,6 +573,26 @@ export async function invalidateGlobalCache(ticker) {
     devLog('error', `Error invalidating ${normalizedTicker}`, error);
     return false;
   }
+}
+
+// =============================================================================
+// Cloud Function Invocation (Serverless Raw Cache Writer)
+// =============================================================================
+
+/**
+ * Calls the cacheWriter Cloud Function (sole writer to edgarCache)
+ *
+ * @param {string} ticker - The ticker symbol (e.g., "AAPL")
+ * @returns {Promise<{ ticker: string, latestFiledDate: string|null, updated: boolean }>}
+ */
+export async function callCacheWriter(ticker) {
+  const { getFunctions, httpsCallable } = await import('firebase/functions');
+  const { default: app } = await import('../lib/firebase');
+  const payload = { ticker: normalizeTicker(ticker) };
+  const functions = getFunctions(app);
+  const cacheWriter = httpsCallable(functions, 'cacheWriter');
+  const response = await cacheWriter(payload);
+  return response?.data ?? response;
 }
 
 // =============================================================================
@@ -617,6 +641,9 @@ export default {
   getCompanyFactsFromFirestore,
   checkIfCached,
   getGlobalCacheStats,
+
+  // Serverless Writer
+  callCacheWriter,
 
   // Write operations (for Cloud Functions)
   setCompanyFactsToFirestore,
