@@ -297,10 +297,13 @@ export function useCompanySearch() {
         );
       }
 
-      // Normalize the company facts
-      const normalizedData = gaapNormalizer.normalizeCompanyFacts(
-        result.data.companyFacts
-      );
+      // Use already normalized data from cache coordinator, or normalize if raw
+      const normalizedData = result.data.companyFacts?.metadata?.normalized === true
+        ? result.data.companyFacts
+        : gaapNormalizer.normalizeCompanyFacts(
+            result.data.companyFacts,
+            { fullHistory: true }
+          );
 
       // Only update state if component is still mounted
       if (isMountedRef.current) {

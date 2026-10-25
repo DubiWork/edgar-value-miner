@@ -230,7 +230,7 @@ function App() {
 
         {/* Loading State */}
         {loading && !data && (
-          <DashboardSkeleton data-testid="loading-state" />
+          <DashboardSkeleton heroChartHeight={400} secondaryChartHeight={400} data-testid="loading-state" />
         )}
 
         {/* Error State */}
@@ -269,7 +269,7 @@ function App() {
               />
             ))}
             heroChart={
-              <ChartContainer title="Revenue" loading={false}>
+              <ChartContainer title="Revenue (YoY Growth)" loading={false} height={400}>
                 <RevenueChart
                   data={data?.metrics?.revenue?.annual}
                   animationDisabled={prefersReducedMotion}
@@ -277,20 +277,20 @@ function App() {
               </ChartContainer>
             }
             secondaryCharts={[
-              <ChartContainer key="fcf-chart" title="Free Cash Flow" loading={false}>
+              <ChartContainer key="fcf-chart" title="Free Cash Flow (YoY Growth)" loading={false} height={400}>
                 <FCFChart
                   data={data?.metrics?.freeCashFlow?.annual}
                   animationDisabled={prefersReducedMotion}
                 />
               </ChartContainer>,
-              <ChartContainer key="margins-chart" title="Margins" loading={false}>
+              <ChartContainer key="margins-chart" title="Margins" loading={false} height={400}>
                 <MarginsChart
                   data={calculateMargins({
                     revenue: data?.metrics?.revenue?.annual,
                     grossProfit: data?.metrics?.grossProfit?.annual,
                     operatingIncome: data?.metrics?.operatingIncome?.annual,
                     netIncome: data?.metrics?.netIncome?.annual,
-                  })}
+                  }, { fullHistory: true })}
                   animationDisabled={prefersReducedMotion}
                 />
               </ChartContainer>,

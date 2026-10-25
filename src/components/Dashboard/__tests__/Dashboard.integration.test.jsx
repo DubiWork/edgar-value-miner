@@ -558,8 +558,8 @@ describe('Dashboard Integration Tests', () => {
       const chartTitles = chartContainers.map(
         (c) => c.querySelector('h3')?.textContent,
       );
-      expect(chartTitles).toContain('Revenue');
-      expect(chartTitles).toContain('Free Cash Flow');
+      expect(chartTitles).toContain('Revenue (YoY Growth)');
+      expect(chartTitles).toContain('Free Cash Flow (YoY Growth)');
       expect(chartTitles).toContain('Margins');
     });
 

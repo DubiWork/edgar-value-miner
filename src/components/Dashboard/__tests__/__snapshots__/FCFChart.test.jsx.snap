@@ -8,15 +8,15 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
 >
   <div
     class="recharts-responsive-container"
-    style="width: 100%; height: 300px; min-width: 0px;"
+    style="width: 100%; height: 400px; min-width: 0px;"
   >
     <div
       style="width: 0px; overflow-x: visible;"
     >
       <div
         class="recharts-wrapper"
-        height="300"
-        style="position: relative; cursor: default; width: 600px; height: 300px;"
+        height="400"
+        style="position: relative; cursor: default; width: 600px; height: 400px;"
         width="600"
       >
         <div
@@ -27,11 +27,11 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
         />
         <svg
           class="recharts-surface"
-          height="300"
+          height="400"
           role="application"
           style="width: 100%; height: 100%; display: block;"
           tabindex="0"
-          viewBox="0 0 600 300"
+          viewBox="0 0 600 400"
           width="600"
         >
           <title />
@@ -47,7 +47,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
               >
                 <line
                   fill="none"
-                  height="242"
+                  height="342"
                   stroke="#e2e8f0"
                   stroke-dasharray="3 3"
                   width="516"
@@ -55,12 +55,12 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   x1="68"
                   x2="584"
                   y="24"
-                  y1="266"
-                  y2="266"
+                  y1="366"
+                  y2="366"
                 />
                 <line
                   fill="none"
-                  height="242"
+                  height="342"
                   stroke="#e2e8f0"
                   stroke-dasharray="3 3"
                   width="516"
@@ -68,12 +68,12 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   x1="68"
                   x2="584"
                   y="24"
-                  y1="205.5"
-                  y2="205.5"
+                  y1="280.5"
+                  y2="280.5"
                 />
                 <line
                   fill="none"
-                  height="242"
+                  height="342"
                   stroke="#e2e8f0"
                   stroke-dasharray="3 3"
                   width="516"
@@ -81,12 +81,12 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   x1="68"
                   x2="584"
                   y="24"
-                  y1="145"
-                  y2="145"
+                  y1="195"
+                  y2="195"
                 />
                 <line
                   fill="none"
-                  height="242"
+                  height="342"
                   stroke="#e2e8f0"
                   stroke-dasharray="3 3"
                   width="516"
@@ -94,12 +94,12 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   x1="68"
                   x2="584"
                   y="24"
-                  y1="84.5"
-                  y2="84.5"
+                  y1="109.5"
+                  y2="109.5"
                 />
                 <line
                   fill="none"
-                  height="242"
+                  height="342"
                   stroke="#e2e8f0"
                   stroke-dasharray="3 3"
                   width="516"
@@ -118,10 +118,10 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
           />
           <defs>
             <clippath
-              id="recharts275-clip"
+              id="recharts281-clip"
             >
               <rect
-                height="242"
+                height="342"
                 width="516"
                 x="68"
                 y="24"
@@ -139,7 +139,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
           >
             <g
               class="recharts-layer recharts-bar"
-              id="recharts-bar-_r_2p_"
+              id="recharts-bar-_r_2r_"
             >
               <g
                 class="recharts-layer recharts-bar-rectangles"
@@ -152,15 +152,15 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   >
                     <path
                       d="
-    M82.32,78.54478333333333
-    L156.32,78.54478333333333
-    Q160.32,78.54478333333333 160.32,82.54478333333333
-    L160.32,266
-    Q160.32,266 160.32,266
-    L78.32,266
-    Q78.32,266 78.32,266
-    L78.32,82.54478333333333
-    Q78.32,78.54478333333333 82.32,78.54478333333333
+    M82.32,101.08394999999999
+    L156.32,101.08394999999999
+    Q160.32,101.08394999999999 160.32,105.08394999999999
+    L160.32,366
+    Q160.32,366 160.32,366
+    L78.32,366
+    Q78.32,366 78.32,366
+    L78.32,105.08394999999999
+    Q78.32,101.08394999999999 82.32,101.08394999999999
     Z
   "
                       fill="#16a34a"
@@ -171,15 +171,15 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   >
                     <path
                       d="
-    M185.51999999999998,118.04725
-    L259.52,118.04725
-    Q263.52,118.04725 263.52,122.04725
-    L263.52,266
-    Q263.52,266 263.52,266
-    L181.51999999999998,266
-    Q181.51999999999998,266 181.51999999999998,266
-    L181.51999999999998,122.04725
-    Q181.51999999999998,118.04725 185.51999999999998,118.04725
+    M185.51999999999998,156.90975
+    L259.52,156.90975
+    Q263.52,156.90975 263.52,160.90975
+    L263.52,366
+    Q263.52,366 263.52,366
+    L181.51999999999998,366
+    Q181.51999999999998,366 181.51999999999998,366
+    L181.51999999999998,160.90975
+    Q181.51999999999998,156.90975 185.51999999999998,156.90975
     Z
   "
                       fill="#16a34a"
@@ -190,15 +190,15 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   >
                     <path
                       d="
-    M288.71999999999997,78.54478333333333
-    L362.71999999999997,78.54478333333333
-    Q366.71999999999997,78.54478333333333 366.71999999999997,82.54478333333333
-    L366.71999999999997,266
-    Q366.71999999999997,266 366.71999999999997,266
-    L284.71999999999997,266
-    Q284.71999999999997,266 284.71999999999997,266
-    L284.71999999999997,82.54478333333333
-    Q284.71999999999997,78.54478333333333 288.71999999999997,78.54478333333333
+    M288.71999999999997,101.08394999999999
+    L362.71999999999997,101.08394999999999
+    Q366.71999999999997,101.08394999999999 366.71999999999997,105.08394999999999
+    L366.71999999999997,366
+    Q366.71999999999997,366 366.71999999999997,366
+    L284.71999999999997,366
+    Q284.71999999999997,366 284.71999999999997,366
+    L284.71999999999997,105.08394999999999
+    Q284.71999999999997,101.08394999999999 288.71999999999997,101.08394999999999
     Z
   "
                       fill="#16a34a"
@@ -209,15 +209,15 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   >
                     <path
                       d="
-    M391.92,41.25661666666666
-    L465.92,41.25661666666666
-    Q469.92,41.25661666666666 469.92,45.25661666666666
-    L469.92,266
-    Q469.92,266 469.92,266
-    L387.92,266
-    Q387.92,266 387.92,266
-    L387.92,45.25661666666666
-    Q387.92,41.25661666666666 391.92,41.25661666666666
+    M391.92,48.387449999999994
+    L465.92,48.387449999999994
+    Q469.92,48.387449999999994 469.92,52.387449999999994
+    L469.92,366
+    Q469.92,366 469.92,366
+    L387.92,366
+    Q387.92,366 387.92,366
+    L387.92,52.387449999999994
+    Q387.92,48.387449999999994 391.92,48.387449999999994
     Z
   "
                       fill="#16a34a"
@@ -228,15 +228,15 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   >
                     <path
                       d="
-    M495.12,43.07161666666667
-    L569.12,43.07161666666667
-    Q573.12,43.07161666666667 573.12,47.07161666666667
-    L573.12,266
-    Q573.12,266 573.12,266
-    L491.12,266
-    Q491.12,266 491.12,266
-    L491.12,47.07161666666667
-    Q491.12,43.07161666666667 495.12,43.07161666666667
+    M495.12,50.95245000000001
+    L569.12,50.95245000000001
+    Q573.12,50.95245000000001 573.12,54.95245000000001
+    L573.12,366
+    Q573.12,366 573.12,366
+    L491.12,366
+    Q491.12,366 491.12,366
+    L491.12,54.95245000000001
+    Q491.12,50.95245000000001 495.12,50.95245000000001
     Z
   "
                       fill="#16a34a"
@@ -266,9 +266,9 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                 x="68"
                 x1="68"
                 x2="584"
-                y="266"
-                y1="266"
-                y2="266"
+                y="366"
+                y1="366"
+                y2="366"
               />
               <g
                 class="recharts-cartesian-axis-ticks recharts-xAxis-ticks"
@@ -353,7 +353,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   text-anchor="middle"
                   width="516"
                   x="119.6"
-                  y="274"
+                  y="374"
                 >
                   <tspan
                     dy="0.71em"
@@ -376,7 +376,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   text-anchor="middle"
                   width="516"
                   x="222.79999999999998"
-                  y="274"
+                  y="374"
                 >
                   <tspan
                     dy="0.71em"
@@ -399,7 +399,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   text-anchor="middle"
                   width="516"
                   x="326"
-                  y="274"
+                  y="374"
                 >
                   <tspan
                     dy="0.71em"
@@ -422,7 +422,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   text-anchor="middle"
                   width="516"
                   x="429.20000000000005"
-                  y="274"
+                  y="374"
                 >
                   <tspan
                     dy="0.71em"
@@ -445,7 +445,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   text-anchor="middle"
                   width="516"
                   x="532.4"
-                  y="274"
+                  y="374"
                 >
                   <tspan
                     dy="0.71em"
@@ -466,13 +466,13 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   class="recharts-text recharts-cartesian-axis-tick-value"
                   fill="#94a3b8"
                   font-size="12"
-                  height="242"
+                  height="342"
                   orientation="left"
                   stroke="none"
                   text-anchor="end"
                   width="60"
                   x="60"
-                  y="266"
+                  y="366"
                 >
                   <tspan
                     dy="0.355em"
@@ -489,13 +489,13 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   class="recharts-text recharts-cartesian-axis-tick-value"
                   fill="#94a3b8"
                   font-size="12"
-                  height="242"
+                  height="342"
                   orientation="left"
                   stroke="none"
                   text-anchor="end"
                   width="60"
                   x="60"
-                  y="205.5"
+                  y="280.5"
                 >
                   <tspan
                     dy="0.355em"
@@ -512,13 +512,13 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   class="recharts-text recharts-cartesian-axis-tick-value"
                   fill="#94a3b8"
                   font-size="12"
-                  height="242"
+                  height="342"
                   orientation="left"
                   stroke="none"
                   text-anchor="end"
                   width="60"
                   x="60"
-                  y="145"
+                  y="195"
                 >
                   <tspan
                     dy="0.355em"
@@ -535,13 +535,13 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   class="recharts-text recharts-cartesian-axis-tick-value"
                   fill="#94a3b8"
                   font-size="12"
-                  height="242"
+                  height="342"
                   orientation="left"
                   stroke="none"
                   text-anchor="end"
                   width="60"
                   x="60"
-                  y="84.5"
+                  y="109.5"
                 >
                   <tspan
                     dy="0.355em"
@@ -558,7 +558,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                   class="recharts-text recharts-cartesian-axis-tick-value"
                   fill="#94a3b8"
                   font-size="12"
-                  height="242"
+                  height="342"
                   orientation="left"
                   stroke="none"
                   text-anchor="end"
@@ -583,7 +583,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                 data-testid="yoy-label"
                 text-anchor="middle"
                 x="222.51999999999998"
-                y="110.04725"
+                y="148.90975"
               >
                 -21.1%
               </text>
@@ -592,7 +592,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                 data-testid="yoy-label"
                 text-anchor="middle"
                 x="325.71999999999997"
-                y="70.54478333333333"
+                y="93.08394999999999"
               >
                 +26.7%
               </text>
@@ -601,7 +601,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                 data-testid="yoy-label"
                 text-anchor="middle"
                 x="428.92"
-                y="33.25661666666666"
+                y="40.387449999999994"
               >
                 +19.9%
               </text>
@@ -610,7 +610,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for 5-year positive data 1
                 data-testid="yoy-label"
                 text-anchor="middle"
                 x="532.12"
-                y="35.07161666666667"
+                y="42.95245000000001"
               >
                 -0.8%
               </text>
@@ -794,15 +794,15 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
 >
   <div
     class="recharts-responsive-container"
-    style="width: 100%; height: 300px; min-width: 0px;"
+    style="width: 100%; height: 400px; min-width: 0px;"
   >
     <div
       style="width: 0px; overflow-x: visible;"
     >
       <div
         class="recharts-wrapper"
-        height="300"
-        style="position: relative; cursor: default; width: 600px; height: 300px;"
+        height="400"
+        style="position: relative; cursor: default; width: 600px; height: 400px;"
         width="600"
       >
         <div
@@ -813,11 +813,11 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
         />
         <svg
           class="recharts-surface"
-          height="300"
+          height="400"
           role="application"
           style="width: 100%; height: 100%; display: block;"
           tabindex="0"
-          viewBox="0 0 600 300"
+          viewBox="0 0 600 400"
           width="600"
         >
           <title />
@@ -833,7 +833,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
               >
                 <line
                   fill="none"
-                  height="242"
+                  height="342"
                   stroke="#e2e8f0"
                   stroke-dasharray="3 3"
                   width="516"
@@ -841,12 +841,12 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   x1="68"
                   x2="584"
                   y="24"
-                  y1="266"
-                  y2="266"
+                  y1="366"
+                  y2="366"
                 />
                 <line
                   fill="none"
-                  height="242"
+                  height="342"
                   stroke="#e2e8f0"
                   stroke-dasharray="3 3"
                   width="516"
@@ -854,12 +854,12 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   x1="68"
                   x2="584"
                   y="24"
-                  y1="205.5"
-                  y2="205.5"
+                  y1="280.5"
+                  y2="280.5"
                 />
                 <line
                   fill="none"
-                  height="242"
+                  height="342"
                   stroke="#e2e8f0"
                   stroke-dasharray="3 3"
                   width="516"
@@ -867,12 +867,12 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   x1="68"
                   x2="584"
                   y="24"
-                  y1="145"
-                  y2="145"
+                  y1="195"
+                  y2="195"
                 />
                 <line
                   fill="none"
-                  height="242"
+                  height="342"
                   stroke="#e2e8f0"
                   stroke-dasharray="3 3"
                   width="516"
@@ -880,12 +880,12 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   x1="68"
                   x2="584"
                   y="24"
-                  y1="84.5"
-                  y2="84.5"
+                  y1="109.5"
+                  y2="109.5"
                 />
                 <line
                   fill="none"
-                  height="242"
+                  height="342"
                   stroke="#e2e8f0"
                   stroke-dasharray="3 3"
                   width="516"
@@ -904,10 +904,10 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
           />
           <defs>
             <clippath
-              id="recharts278-clip"
+              id="recharts284-clip"
             >
               <rect
-                height="242"
+                height="342"
                 width="516"
                 x="68"
                 y="24"
@@ -925,7 +925,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
           >
             <g
               class="recharts-layer recharts-bar"
-              id="recharts-bar-_r_2q_"
+              id="recharts-bar-_r_2s_"
             >
               <g
                 class="recharts-layer recharts-bar-rectangles"
@@ -938,15 +938,15 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   >
                     <path
                       d="
-    M78.32,266
-    L160.32,266
-    Q160.32,266 160.32,266
-    L160.32,322.5
-    Q160.32,326.5 156.32,326.5
-    L82.32,326.5
-    Q78.32,326.5 78.32,322.5
-    L78.32,266
-    Q78.32,266 78.32,266
+    M78.32,366
+    L160.32,366
+    Q160.32,366 160.32,366
+    L160.32,447.5
+    Q160.32,451.5 156.32,451.5
+    L82.32,451.5
+    Q78.32,451.5 78.32,447.5
+    L78.32,366
+    Q78.32,366 78.32,366
     Z
   "
                       fill="#dc2626"
@@ -957,15 +957,15 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   >
                     <path
                       d="
-    M185.51999999999998,173.23333333333332
-    L259.52,173.23333333333332
-    Q263.52,173.23333333333332 263.52,177.23333333333332
-    L263.52,205.5
-    Q263.52,205.5 263.52,205.5
-    L181.51999999999998,205.5
-    Q181.51999999999998,205.5 181.51999999999998,205.5
-    L181.51999999999998,177.23333333333332
-    Q181.51999999999998,173.23333333333332 185.51999999999998,173.23333333333332
+    M185.51999999999998,234.9
+    L259.52,234.9
+    Q263.52,234.9 263.52,238.9
+    L263.52,280.5
+    Q263.52,280.5 263.52,280.5
+    L181.51999999999998,280.5
+    Q181.51999999999998,280.5 181.51999999999998,280.5
+    L181.51999999999998,238.9
+    Q181.51999999999998,234.9 185.51999999999998,234.9
     Z
   "
                       fill="#16a34a"
@@ -976,15 +976,15 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   >
                     <path
                       d="
-    M284.71999999999997,217.60000000000002
-    L366.71999999999997,217.60000000000002
-    Q366.71999999999997,217.60000000000002 366.71999999999997,217.60000000000002
-    L366.71999999999997,225.70000000000005
-    Q366.71999999999997,229.70000000000005 362.71999999999997,229.70000000000005
-    L288.71999999999997,229.70000000000005
-    Q284.71999999999997,229.70000000000005 284.71999999999997,225.70000000000005
-    L284.71999999999997,217.60000000000002
-    Q284.71999999999997,217.60000000000002 284.71999999999997,217.60000000000002
+    M284.71999999999997,297.6
+    L366.71999999999997,297.6
+    Q366.71999999999997,297.6 366.71999999999997,297.6
+    L366.71999999999997,310.70000000000005
+    Q366.71999999999997,314.70000000000005 362.71999999999997,314.70000000000005
+    L288.71999999999997,314.70000000000005
+    Q284.71999999999997,314.70000000000005 284.71999999999997,310.70000000000005
+    L284.71999999999997,297.6
+    Q284.71999999999997,297.6 284.71999999999997,297.6
     Z
   "
                       fill="#dc2626"
@@ -995,15 +995,15 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   >
                     <path
                       d="
-    M391.92,104.66666666666667
-    L465.92,104.66666666666667
-    Q469.92,104.66666666666667 469.92,108.66666666666667
-    L469.92,205.5
-    Q469.92,205.5 469.92,205.5
-    L387.92,205.5
-    Q387.92,205.5 387.92,205.5
-    L387.92,108.66666666666667
-    Q387.92,104.66666666666667 391.92,104.66666666666667
+    M391.92,138
+    L465.92,138
+    Q469.92,138 469.92,142
+    L469.92,280.5
+    Q469.92,280.5 469.92,280.5
+    L387.92,280.5
+    Q387.92,280.5 387.92,280.5
+    L387.92,142
+    Q387.92,138 391.92,138
     Z
   "
                       fill="#16a34a"
@@ -1014,15 +1014,15 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   >
                     <path
                       d="
-    M495.12,36.10000000000001
-    L569.12,36.10000000000001
-    Q573.12,36.10000000000001 573.12,40.10000000000001
-    L573.12,205.5
-    Q573.12,205.5 573.12,205.5
-    L491.12,205.5
-    Q491.12,205.5 491.12,205.5
-    L491.12,40.10000000000001
-    Q491.12,36.10000000000001 495.12,36.10000000000001
+    M495.12,41.10000000000001
+    L569.12,41.10000000000001
+    Q573.12,41.10000000000001 573.12,45.10000000000001
+    L573.12,280.5
+    Q573.12,280.5 573.12,280.5
+    L491.12,280.5
+    Q491.12,280.5 491.12,280.5
+    L491.12,45.10000000000001
+    Q491.12,41.10000000000001 495.12,41.10000000000001
     Z
   "
                       fill="#16a34a"
@@ -1049,8 +1049,8 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                 x1="68"
                 x2="584"
                 y="0"
-                y1="205.5"
-                y2="205.5"
+                y1="280.5"
+                y2="280.5"
               />
             </g>
           </g>
@@ -1071,9 +1071,9 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                 x="68"
                 x1="68"
                 x2="584"
-                y="266"
-                y1="266"
-                y2="266"
+                y="366"
+                y1="366"
+                y2="366"
               />
               <g
                 class="recharts-cartesian-axis-ticks recharts-xAxis-ticks"
@@ -1158,7 +1158,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   text-anchor="middle"
                   width="516"
                   x="119.6"
-                  y="274"
+                  y="374"
                 >
                   <tspan
                     dy="0.71em"
@@ -1181,7 +1181,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   text-anchor="middle"
                   width="516"
                   x="222.79999999999998"
-                  y="274"
+                  y="374"
                 >
                   <tspan
                     dy="0.71em"
@@ -1204,7 +1204,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   text-anchor="middle"
                   width="516"
                   x="326"
-                  y="274"
+                  y="374"
                 >
                   <tspan
                     dy="0.71em"
@@ -1227,7 +1227,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   text-anchor="middle"
                   width="516"
                   x="429.20000000000005"
-                  y="274"
+                  y="374"
                 >
                   <tspan
                     dy="0.71em"
@@ -1250,7 +1250,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   text-anchor="middle"
                   width="516"
                   x="532.4"
-                  y="274"
+                  y="374"
                 >
                   <tspan
                     dy="0.71em"
@@ -1271,13 +1271,13 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   class="recharts-text recharts-cartesian-axis-tick-value"
                   fill="#94a3b8"
                   font-size="12"
-                  height="242"
+                  height="342"
                   orientation="left"
                   stroke="none"
                   text-anchor="end"
                   width="60"
                   x="60"
-                  y="266"
+                  y="366"
                 >
                   <tspan
                     dy="0.355em"
@@ -1294,13 +1294,13 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   class="recharts-text recharts-cartesian-axis-tick-value"
                   fill="#94a3b8"
                   font-size="12"
-                  height="242"
+                  height="342"
                   orientation="left"
                   stroke="none"
                   text-anchor="end"
                   width="60"
                   x="60"
-                  y="205.5"
+                  y="280.5"
                 >
                   <tspan
                     dy="0.355em"
@@ -1317,13 +1317,13 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   class="recharts-text recharts-cartesian-axis-tick-value"
                   fill="#94a3b8"
                   font-size="12"
-                  height="242"
+                  height="342"
                   orientation="left"
                   stroke="none"
                   text-anchor="end"
                   width="60"
                   x="60"
-                  y="145"
+                  y="195"
                 >
                   <tspan
                     dy="0.355em"
@@ -1340,13 +1340,13 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   class="recharts-text recharts-cartesian-axis-tick-value"
                   fill="#94a3b8"
                   font-size="12"
-                  height="242"
+                  height="342"
                   orientation="left"
                   stroke="none"
                   text-anchor="end"
                   width="60"
                   x="60"
-                  y="84.5"
+                  y="109.5"
                 >
                   <tspan
                     dy="0.355em"
@@ -1363,7 +1363,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                   class="recharts-text recharts-cartesian-axis-tick-value"
                   fill="#94a3b8"
                   font-size="12"
-                  height="242"
+                  height="342"
                   orientation="left"
                   stroke="none"
                   text-anchor="end"
@@ -1388,7 +1388,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                 data-testid="yoy-label"
                 text-anchor="middle"
                 x="222.51999999999998"
-                y="165.23333333333332"
+                y="226.9"
               >
                 N/A
               </text>
@@ -1397,7 +1397,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                 data-testid="yoy-label"
                 text-anchor="middle"
                 x="325.71999999999997"
-                y="209.60000000000002"
+                y="289.6"
               >
                 N/A
               </text>
@@ -1406,7 +1406,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                 data-testid="yoy-label"
                 text-anchor="middle"
                 x="428.92"
-                y="96.66666666666667"
+                y="130"
               >
                 N/A
               </text>
@@ -1415,7 +1415,7 @@ exports[`FCFChart > Snapshot tests > matches snapshot for mixed positive/negativ
                 data-testid="yoy-label"
                 text-anchor="middle"
                 x="532.12"
-                y="28.10000000000001"
+                y="33.10000000000001"
               >
                 +68.0%
               </text>

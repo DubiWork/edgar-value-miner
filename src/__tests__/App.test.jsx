@@ -509,14 +509,14 @@ describe('App', () => {
       render(<App />);
 
       expect(screen.getByTestId('dashboard-hero-chart')).toBeTruthy();
-      expect(screen.getByTestId('chart-container-Revenue')).toBeTruthy();
+      expect(screen.getByTestId('chart-container-Revenue (YoY Growth)')).toBeTruthy();
     });
 
     it('renders secondary chart containers', () => {
       render(<App />);
 
       expect(screen.getByTestId('dashboard-secondary-charts')).toBeTruthy();
-      expect(screen.getByTestId('chart-container-Free Cash Flow')).toBeTruthy();
+      expect(screen.getByTestId('chart-container-Free Cash Flow (YoY Growth)')).toBeTruthy();
       expect(screen.getByTestId('chart-container-Margins')).toBeTruthy();
     });
 
