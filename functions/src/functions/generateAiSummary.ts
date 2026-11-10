@@ -211,7 +211,7 @@ export async function generateAiSummaryHandler(
     );
   }
 
-  const prompt = data.prompt.trim();
+  const prompt = (data.prompt ?? '').trim();
   const project =
     process.env.GCLOUD_PROJECT ||
     process.env.GOOGLE_CLOUD_PROJECT ||
