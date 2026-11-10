@@ -107,17 +107,28 @@ vi.mock('../../../components/ErrorBoundary', () => ({
 // Helpers
 // =============================================================================
 
+function passTriageGatekeeperIfPresent() {
+  const continueBtn = screen.queryByRole('button', {
+    name: /I understand how this company makes money - Continue/i,
+  });
+  if (continueBtn) {
+    fireEvent.click(continueBtn);
+  }
+}
+
 /**
  * Renders App wrapped in ThemeProvider for integration tests.
  * FCFChart (and other chart components) require ThemeProvider context
  * for useChartTheme hook.
  */
 function renderApp() {
-  return render(
+  const result = render(
     <ThemeProvider>
       <App />
     </ThemeProvider>
   );
+  passTriageGatekeeperIfPresent();
+  return result;
 }
 
 /**
@@ -125,11 +136,13 @@ function renderApp() {
  * Used with rerender from RTL when testing state transitions.
  */
 function rerenderApp(rerender) {
-  return rerender(
+  const result = rerender(
     <ThemeProvider>
       <App />
     </ThemeProvider>
   );
+  passTriageGatekeeperIfPresent();
+  return result;
 }
 
 function setHookState(overrides) {

@@ -250,7 +250,8 @@ export function useCompanySearch() {
     if (
       loadingRef.current &&
       lastSearchedTickerRef.current === normalizedTicker &&
-      !options.forceRefresh
+      !options.forceRefresh &&
+      !options.refreshGlobalCache
     ) {
       console.log(`[useCompanySearch] Skipping duplicate request for ${normalizedTicker}`);
       return;
@@ -279,6 +280,7 @@ export function useCompanySearch() {
         normalizedTicker,
         {
           forceRefresh: options.forceRefresh || false,
+          refreshGlobalCache: options.refreshGlobalCache || false,
           backgroundRefresh: options.backgroundRefresh !== false, // Default true
           includeMetadata: options.includeMetadata !== false, // Default true
         }

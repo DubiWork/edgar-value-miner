@@ -45,12 +45,26 @@ export type PaddedCik = string;
 
 export interface CacheWriterData {
   ticker: string;
+  forceRefresh?: boolean;
 }
 
 export interface CacheWriterResult {
   ticker: string;
   latestFiledDate: string | null;
   updated: boolean;
+}
+
+const DEFAULT_ADMIN_EMAILS = ['dubigreenfeld@gmail.com'];
+
+export function isAuthorizedAdmin(req: CallableRequest<CacheWriterData>): boolean {
+  const email = req.auth?.token?.email;
+  if (!email || typeof email !== 'string') return false;
+  const envEmails = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const allowed = new Set([...DEFAULT_ADMIN_EMAILS, ...envEmails]);
+  return allowed.has(email.trim().toLowerCase());
 }
 
 export const STALENESS_DAYS = 90;
@@ -162,13 +176,22 @@ export async function cacheWriterHandler(
   }
 
   const ticker = data.ticker.trim().toUpperCase();
+  const forceRefresh = data.forceRefresh === true;
+
+  if (forceRefresh && !isAuthorizedAdmin(req)) {
+    throw new HttpsError(
+      'permission-denied',
+      'Admin privileges are required to force refresh the global cache.'
+    );
+  }
 
   const db = getFirestore();
   const docRef = db.collection(COLLECTION).doc(ticker);
   const snap = await docRef.get();
 
   // Tier 1 staleness check: if doc exists and is fresh (< 90 days), return immediately without calling SEC
-  if (snap.exists) {
+  // (Skipped when an authorized admin passes forceRefresh: true)
+  if (snap.exists && !forceRefresh) {
     const docData = snap.data() ?? {};
     const storedLastUpdated = docData.lastUpdated instanceof Timestamp ? docData.lastUpdated : null;
     const storedLatestFiledDate = typeof docData.latestFiledDate === 'string' ? docData.latestFiledDate : null;
@@ -182,7 +205,7 @@ export async function cacheWriterHandler(
   const cik = await resolveCikFromTicker(ticker);
   const paddedCik: PaddedCik = String(cik).padStart(10, '0');
 
-  // Tier 2 staleness check: doc missing or older than 90 days -> fetch from SEC
+  // Tier 2 staleness check: doc missing, older than 90 days, or forceRefresh -> fetch from SEC
   let companyFacts: Record<string, unknown>;
   try {
     companyFacts = (await fetchFromSec('companyFacts', cik)) as Record<string, unknown>;
@@ -210,13 +233,13 @@ export async function cacheWriterHandler(
         ? newLatestFiledDate !== null
         : newLatestFiledDate !== null && newLatestFiledDate > storedLatestFiledDate;
 
-    if (!isNewer) {
+    if (!isNewer && !forceRefresh) {
       // Document exists and latestFiledDate matches or is not newer: update lastUpdated timestamp only
       await docRef.update({ lastUpdated: FieldValue.serverTimestamp() });
       return { ticker, latestFiledDate: storedLatestFiledDate, updated: false };
     }
 
-    // Document exists but new filing arrived: overwrite full document
+    // Document exists and either new filing arrived or admin requested forceRefresh: overwrite full document
     const accessCount = typeof docData.accessCount === 'number' ? docData.accessCount : 0;
     await docRef.set(
       buildDocPayload(ticker, paddedCik, companyName, companyFacts, newLatestFiledDate, accessCount)
