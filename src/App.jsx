@@ -1,7 +1,9 @@
-import { TrendingUp, DollarSign, BarChart3, Gem } from 'lucide-react'
+import { useState } from 'react'
+import { TrendingUp, DollarSign, BarChart3, Gem, LogIn, LogOut, ShieldCheck } from 'lucide-react'
 import { TickerSearch } from './components/TickerSearch'
 import { ThemeToggle } from './components/ThemeToggle'
 import { ErrorFallback } from './components/ErrorBoundary'
+import { Step1Triage } from './components/Stepper'
 import {
   DashboardLayout,
   CompanyBanner,
@@ -19,11 +21,14 @@ import { useStockQuote } from './hooks/useStockQuote'
 import { useKeyMetrics } from './hooks/useKeyMetrics'
 import { useWatchlist } from './hooks/useWatchlist'
 import { useReducedMotion } from './hooks/useReducedMotion'
+import { useAdminAuth } from './hooks/useAdminAuth'
 import gaapNormalizer from './utils/gaapNormalizer'
 import { calculateMargins } from './utils/calculateMargins'
 
 function App() {
+  const [currentStep, setCurrentStep] = useState(1)
   const { data, loading, error, metadata, searchCompany, clearError } = useCompanySearch()
+  const { user, isAdmin, signInWithGoogle, signOutUser, isFirebaseAvailable } = useAdminAuth()
 
   // Fetch live stock quote from FMP API when company data is available
   const { data: stockQuote, loading: priceLoading } = useStockQuote(data?.ticker)
@@ -35,6 +40,7 @@ function App() {
   const prefersReducedMotion = useReducedMotion()
 
   const handleSearch = (ticker) => {
+    setCurrentStep(1)
     searchCompany(ticker)
   }
 
@@ -95,8 +101,53 @@ function App() {
               />
             )}
 
-            {/* Theme Toggle */}
-            <ThemeToggle />
+            {/* Auth & Theme Controls */}
+            <div className="flex items-center gap-3">
+              {isFirebaseAvailable && (
+                user ? (
+                  <div className="flex items-center gap-2" data-testid="header-user-info">
+                    {isAdmin && (
+                      <span
+                        data-testid="header-admin-badge"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30"
+                        title={`Admin: ${user.email}`}
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>Admin</span>
+                      </span>
+                    )}
+                    <span
+                      className="hidden sm:inline text-xs font-medium truncate max-w-[140px]"
+                      style={{ color: 'var(--color-text-secondary)' }}
+                      title={user.email || user.displayName || ''}
+                    >
+                      {user.displayName || user.email}
+                    </span>
+                    <button
+                      type="button"
+                      data-testid="header-signout-btn"
+                      onClick={signOutUser}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                      title="התנתק"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">התנתק</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="header-signin-btn"
+                    onClick={signInWithGoogle}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                  >
+                    <LogIn className="w-3.5 h-3.5" />
+                    <span>התחברות</span>
+                  </button>
+                )
+              )}
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </header>
@@ -127,8 +178,21 @@ function App() {
               onSearch={handleSearch}
               isSearching={loading}
               autoFocus
-              className="mb-12"
+              className="mb-6"
             />
+
+            {/* Quick Demo Pill for MSFT Triage testing */}
+            <div className="flex items-center justify-center gap-2 mb-12">
+              <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">Quick Demo:</span>
+              <button
+                type="button"
+                onClick={() => handleSearch('MSFT')}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 border border-sky-500/30 hover:bg-sky-100 dark:hover:bg-sky-900/40 cursor-pointer transition-colors"
+              >
+                <span>MSFT (Microsoft)</span>
+                <span className="text-[10px] text-sky-400 font-normal">&rarr; 10s Triage</span>
+              </button>
+            </div>
 
             {/* Watchlist Panel (shown when user has watchlist items) */}
             {watchlist.length > 0 && (
@@ -230,7 +294,7 @@ function App() {
 
         {/* Loading State */}
         {loading && !data && (
-          <DashboardSkeleton data-testid="loading-state" />
+          <DashboardSkeleton heroChartHeight={400} secondaryChartHeight={400} data-testid="loading-state" />
         )}
 
         {/* Error State */}
@@ -246,8 +310,28 @@ function App() {
           </div>
         )}
 
-        {/* Dashboard State (data loaded) */}
-        {data && !loading && (
+        {/* Step 1 Triage (Stock Simplifier 10-Second UX Gatekeeper) */}
+        {data && !loading && currentStep === 1 && (
+          <Step1Triage
+            company={{
+              ticker: data.ticker || 'MSFT',
+              name: data.companyName || 'Microsoft Corporation',
+            }}
+            companyFacts={data}
+            isAdmin={isAdmin}
+            cacheMetadata={metadata}
+            isRefreshingCompany={loading}
+            onForceRefreshCompany={(ticker) =>
+              searchCompany(ticker || data.ticker, { refreshGlobalCache: true })
+            }
+            onContinue={() => {
+              setCurrentStep(2)
+            }}
+          />
+        )}
+
+        {/* Step 2+ Dashboard State (data loaded & Gatekeeper passed) */}
+        {data && !loading && currentStep >= 2 && (
           <DashboardLayout
             banner={
               <CompanyBanner
@@ -269,7 +353,7 @@ function App() {
               />
             ))}
             heroChart={
-              <ChartContainer title="Revenue" loading={false}>
+              <ChartContainer title="Revenue (YoY Growth)" loading={false} height={400}>
                 <RevenueChart
                   data={data?.metrics?.revenue?.annual}
                   animationDisabled={prefersReducedMotion}
@@ -277,20 +361,20 @@ function App() {
               </ChartContainer>
             }
             secondaryCharts={[
-              <ChartContainer key="fcf-chart" title="Free Cash Flow" loading={false}>
+              <ChartContainer key="fcf-chart" title="Free Cash Flow (YoY Growth)" loading={false} height={400}>
                 <FCFChart
                   data={data?.metrics?.freeCashFlow?.annual}
                   animationDisabled={prefersReducedMotion}
                 />
               </ChartContainer>,
-              <ChartContainer key="margins-chart" title="Margins" loading={false}>
+              <ChartContainer key="margins-chart" title="Margins" loading={false} height={400}>
                 <MarginsChart
                   data={calculateMargins({
                     revenue: data?.metrics?.revenue?.annual,
                     grossProfit: data?.metrics?.grossProfit?.annual,
                     operatingIncome: data?.metrics?.operatingIncome?.annual,
                     netIncome: data?.metrics?.netIncome?.annual,
-                  })}
+                  }, { fullHistory: true })}
                   animationDisabled={prefersReducedMotion}
                 />
               </ChartContainer>,

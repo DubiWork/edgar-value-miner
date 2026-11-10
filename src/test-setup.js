@@ -4,9 +4,30 @@
  * Global test configuration, mocks, and setup for all test files.
  */
 
-import { afterEach, beforeEach, vi } from 'vitest';
+import { afterEach, beforeEach, expect, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
+
+expect.extend({
+  toBeInTheDocument(received) {
+    const pass = received !== null && received !== undefined && document.body.contains(received);
+    return {
+      pass,
+      message: () =>
+        `expected element ${this.isNot ? 'not ' : ''}to be in the document`,
+    };
+  },
+  toHaveTextContent(received, expected) {
+    const text = received?.textContent ?? '';
+    const pass =
+      expected instanceof RegExp ? expected.test(text) : text.includes(String(expected));
+    return {
+      pass,
+      message: () =>
+        `expected element text "${text}" ${this.isNot ? 'not ' : ''}to match "${expected}"`,
+    };
+  },
+});
 
 // =============================================================================
 // Node.js 25+ localStorage Fix
@@ -174,6 +195,10 @@ beforeEach(() => {
 
 // Mock Firebase completely to avoid initialization errors
 vi.mock('./lib/firebase', () => ({
+  default: null,
+  auth: null,
+  functions: null,
+  firebaseAvailable: false,
   db: {
     collection: vi.fn(() => ({
       doc: vi.fn(() => ({

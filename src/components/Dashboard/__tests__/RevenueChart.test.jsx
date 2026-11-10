@@ -259,24 +259,24 @@ describe('RevenueChart', () => {
   // EC-04, EC-05: Data Slicing (max 5 years)
   // =========================================================================
 
-  describe('Data slicing', () => {
-    it('EC-05: slices data to most recent 5 years when more than 5 provided', () => {
+  describe('Full history retention', () => {
+    it('displays all years without 5-year capping when more than 5 provided', () => {
       renderChart({ data: MOCK_REVENUE_7Y });
       const container = screen.getByTestId('revenue-chart');
       const table = container.querySelector('table');
       expect(table).toBeTruthy();
       const rows = table.querySelectorAll('tbody tr');
-      expect(rows.length).toBe(5);
+      expect(rows.length).toBe(7);
     });
 
-    it('EC-05: includes the most recent 5 years, not oldest 5', () => {
+    it('renders all years in chronological order from oldest to newest', () => {
       renderChart({ data: MOCK_REVENUE_7Y });
       const container = screen.getByTestId('revenue-chart');
       const rows = getTableRows(container);
-      // Most recent 5 from [2025,2024,2023,2022,2021,2020,2019] = [2025,2024,2023,2022,2021]
-      // Reversed to chronological: 2021,2022,2023,2024,2025
-      expect(getYearFromRow(rows, 0)).toBe('FY2021');
-      expect(getYearFromRow(rows, 4)).toBe('FY2025');
+      // All 7 from [2025,2024,2023,2022,2021,2020,2019]
+      // Reversed to chronological: 2019, 2020, 2021, 2022, 2023, 2024, 2025
+      expect(getYearFromRow(rows, 0)).toBe('FY2019');
+      expect(getYearFromRow(rows, 6)).toBe('FY2025');
     });
 
     it('EC-04: displays all years when exactly 5 provided', () => {

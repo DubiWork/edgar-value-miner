@@ -18,7 +18,7 @@ import './MarginsChart.css';
 // =============================================================================
 
 /** Default chart height in pixels */
-const DEFAULT_HEIGHT = 300;
+const DEFAULT_HEIGHT = 400;
 
 /** Line animation duration in milliseconds */
 const ANIMATION_DURATION = 600;
@@ -338,7 +338,7 @@ AccessibleDataTable.propTypes = {
  * @param {Object} props
  * @param {Array} props.data - Margin data from calculateMargins()
  * @param {string} [props.className] - Additional CSS classes
- * @param {number} [props.height=300] - Chart height in pixels
+ * @param {number} [props.height=400] - Chart height in pixels
  * @param {boolean} [props.animationDisabled] - Disable line animations
  */
 export function MarginsChart({
@@ -521,7 +521,7 @@ MarginsChart.propTypes = {
       netMargin: PropTypes.number,
     })
   ),
-  /** Chart height in pixels (default 300, mobile 250 via CSS) */
+  /** Chart height in pixels (default 400, mobile 250 via CSS) */
   height: PropTypes.number,
   /** Disable line entrance animations (useful for tests and reduced motion) */
   animationDisabled: PropTypes.bool,

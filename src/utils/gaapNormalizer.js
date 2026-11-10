@@ -1058,6 +1058,10 @@ export function normalizeCompanyFacts(companyFactsJson, options = {}) {
     throw new Error('Company facts JSON is required');
   }
 
+  if (companyFactsJson.metadata?.normalized === true) {
+    return companyFactsJson;
+  }
+
   const fullHistory = options?.fullHistory === true;
 
   // Reject IFRS-only filers (also catches empty us-gaap object)

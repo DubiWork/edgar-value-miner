@@ -21,11 +21,14 @@ import './FCFChart.css';
 // Constants
 // =============================================================================
 
-/** Maximum number of years to display */
-const MAX_YEARS = 5;
+
+
 
 /** Default chart height in pixels */
-const DEFAULT_HEIGHT = 300;
+const DEFAULT_HEIGHT = 400;
+
+/** Maximum number of data points to display YoY labels above bars */
+const MAX_YOY_LABEL_COUNT = 15;
 
 /** Bar animation duration in milliseconds */
 const ANIMATION_DURATION = 600;
@@ -68,9 +71,9 @@ function hasSignChange(current, previous) {
  *
  * Steps:
  * 1. Filter invalid entries (NaN, Infinity, null, non-objects)
- * 2. Slice to most recent MAX_YEARS entries
- * 3. Reverse to chronological order (oldest first)
- * 4. Calculate YoY growth for each entry
+
+ * 2. Reverse to chronological order (oldest first)
+ * 3. Calculate YoY growth for each entry
  *
  * @param {Array} rawData - Array of { value, fiscalYear, period, calculated, components }
  * @returns {Array} Chart-ready data with yoyFormatted and xLabel fields
@@ -80,10 +83,10 @@ function processData(rawData) {
     return [];
   }
 
-  // Filter invalid entries, take most recent MAX_YEARS, then reverse to chronological
+  // Filter invalid entries, then reverse to chronological
   const valid = rawData.filter(isValidEntry);
-  const sliced = valid.slice(0, MAX_YEARS);
-  const chronological = [...sliced].reverse();
+
+  const chronological = [...valid].reverse();
 
   return chronological.map((entry, index) => {
     const prevEntry = index > 0 ? chronological[index - 1] : null;
@@ -347,7 +350,7 @@ AccessibleDataTable.propTypes = {
  * @param {Object} props
  * @param {Array} props.data - FCF data from gaapNormalizer.calculateFreeCashFlow()
  * @param {string} [props.className] - Additional CSS classes
- * @param {number} [props.height=300] - Chart height in pixels
+ * @param {number} [props.height=400] - Chart height in pixels
  * @param {boolean} [props.animationDisabled] - Disable bar animations
  */
 export function FCFChart({
@@ -442,10 +445,12 @@ export function FCFChart({
                 fill={entry.value >= 0 ? theme.successColor : theme.dangerColor}
               />
             ))}
+            {chartData.length <= MAX_YOY_LABEL_COUNT && (
             <LabelList
               dataKey="yoyFormatted"
               content={renderYoYLabel}
             />
+            )}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
@@ -471,7 +476,7 @@ FCFChart.propTypes = {
   ),
   /** Additional CSS classes for the container */
   className: PropTypes.string,
-  /** Chart height in pixels (default 300, mobile 250 via CSS) */
+  /** Chart height in pixels (default 400, mobile 250 via CSS) */
   height: PropTypes.number,
   /** Disable bar entrance animations (useful for tests and reduced motion) */
   animationDisabled: PropTypes.bool,

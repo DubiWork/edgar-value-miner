@@ -25,7 +25,7 @@ const DB_CONFIG = {
   /** Database name */
   DB_NAME: 'edgar-value-miner',
   /** Database version — v2: stores normalized output instead of raw SEC JSON */
-  DB_VERSION: 2,
+  DB_VERSION: 3,
   /** Object store names */
   STORES: {
     COMPANY_FACTS: 'companyFacts',
@@ -179,7 +179,7 @@ function openDatabase() {
         const oldVersion = event.oldVersion;
 
         // v1→v2: schema changed from raw SEC JSON to normalized output — clear stale entries
-        if (oldVersion < 2 && db.objectStoreNames.contains(DB_CONFIG.STORES.COMPANY_FACTS)) {
+        if (oldVersion < 3 && db.objectStoreNames.contains(DB_CONFIG.STORES.COMPANY_FACTS)) {
           db.deleteObjectStore(DB_CONFIG.STORES.COMPANY_FACTS);
         }
 

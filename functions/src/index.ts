@@ -5,6 +5,7 @@ import * as functions from 'firebase-functions';
 import { https } from 'firebase-functions/v2';
 import { secTickersHandler, secCompanyFactsHandler, secCompanyConceptHandler } from './functions/secProxy';
 import { cacheWriterHandler, CACHE_WRITER_OPTIONS } from './functions/cacheWriter';
+import { generateAiSummaryHandler, GENERATE_AI_SUMMARY_OPTIONS } from './functions/generateAiSummary';
 
 /**
  * secTickers — GET proxy for https://www.sec.gov/files/company_tickers.json
@@ -33,3 +34,11 @@ export const secCompanyConcept = functions.https.onRequest(secCompanyConceptHand
  * Returns { ticker, latestFiledDate, updated }.
  */
 export const cacheWriter = https.onCall(CACHE_WRITER_OPTIONS, cacheWriterHandler);
+
+/**
+ * generateAiSummary — HTTPS callable: generate AI summary text via Vertex AI Gemini.
+ *
+ * Usage: call with { prompt: '...' }
+ * Returns { text }.
+ */
+export const generateAiSummary = https.onCall(GENERATE_AI_SUMMARY_OPTIONS, generateAiSummaryHandler);

@@ -387,6 +387,39 @@ describe('cacheWriterHandler', () => {
       expect(mockFetchFromSec).not.toHaveBeenCalled();
       expect(result).toEqual({ ticker: 'AAPL', latestFiledDate: '2024-11-01', updated: false });
     });
+
+    it('rejects forceRefresh when caller is not an authorized admin', async () => {
+      makeDocRef(true, { lastUpdated: daysAgo(1), latestFiledDate: '2024-11-01' });
+
+      await expect(
+        cacheWriterHandler({
+          data: { ticker: 'AAPL', forceRefresh: true },
+          auth: { token: { email: 'randomuser@example.com' } },
+        } as any)
+      ).rejects.toMatchObject({
+        code: 'permission-denied',
+      });
+      expect(mockFetchFromSec).not.toHaveBeenCalled();
+    });
+
+    it('bypasses freshness check and overwrites Firestore doc when admin passes forceRefresh: true', async () => {
+      const facts = makeCompanyFacts('2024-11-01', 'Apple Inc.');
+      mockSecResponses(facts);
+      makeDocRef(true, {
+        lastUpdated: daysAgo(1),
+        latestFiledDate: '2024-11-01',
+        accessCount: 7,
+      });
+
+      const result = await cacheWriterHandler({
+        data: { ticker: 'AAPL', forceRefresh: true },
+        auth: { token: { email: 'dubigreenfeld@gmail.com' } },
+      } as any);
+
+      expect(mockFetchFromSec).toHaveBeenCalledWith('companyFacts', 320193);
+      expect(mockSet).toHaveBeenCalledOnce();
+      expect(result).toEqual({ ticker: 'AAPL', latestFiledDate: '2024-11-01', updated: true });
+    });
   });
 });
 

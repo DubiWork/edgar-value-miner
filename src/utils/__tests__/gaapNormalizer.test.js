@@ -1335,6 +1335,12 @@ describe('normalizeCompanyFacts — fullHistory flag (#253)', () => {
     const b = normalizeCompanyFacts(aaplFacts, {});
     expect(a.metrics.revenue.annual.length).toBe(b.metrics.revenue.annual.length);
   });
+
+  it('returns already normalized object as-is without re-normalizing (idempotency guard)', () => {
+    const normalized = normalizeCompanyFacts(aaplFacts);
+    const result = normalizeCompanyFacts(normalized);
+    expect(result).toBe(normalized);
+  });
 });
 
 describe('extractTimeSeriesData — fullHistory option', () => {
