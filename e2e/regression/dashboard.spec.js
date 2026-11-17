@@ -29,6 +29,13 @@ test.describe('Dashboard Flow', () => {
     await input.fill('AAPL');
     await input.press('Enter');
 
+    // Pass Step 1 Triage Gatekeeper
+    const continueBtn = page.getByRole('button', {
+      name: /I understand how this company makes money - Continue/i,
+    });
+    await expect(continueBtn).toBeVisible({ timeout: 35_000 });
+    await continueBtn.click();
+
     // Wait for dashboard to fully render
     const dashboard = page.locator(
       `[data-testid="${SELECTORS.dashboard.layout}"]`,
@@ -87,6 +94,13 @@ test.describe('Dashboard Flow', () => {
     await input.fill('AAPL');
     await input.press('Enter');
 
+    // Pass Step 1 Triage Gatekeeper
+    const continueBtn = page.getByRole('button', {
+      name: /I understand how this company makes money - Continue/i,
+    });
+    await expect(continueBtn).toBeVisible({ timeout: 35_000 });
+    await continueBtn.click();
+
     // Wait for dashboard
     const dashboard = page.locator(
       `[data-testid="${SELECTORS.dashboard.layout}"]`,
@@ -128,6 +142,13 @@ test.describe('Dashboard Flow', () => {
     await input.click();
     await input.fill('AAPL');
     await input.press('Enter');
+
+    // Pass Step 1 Triage Gatekeeper
+    const continueBtn = page.getByRole('button', {
+      name: /I understand how this company makes money - Continue/i,
+    });
+    await expect(continueBtn).toBeVisible({ timeout: 35_000 });
+    await continueBtn.click();
 
     // Wait for dashboard
     const dashboard = page.locator(

@@ -335,6 +335,32 @@ describe('useCompanySearch', () => {
 
       expect(result.current.error).toBeNull();
     });
+
+    it('does not re-normalize if companyFacts is already normalized (metadata.normalized === true)', async () => {
+      const alreadyNormalizedResult = {
+        ...mockSuccessResult,
+        data: {
+          ...mockSuccessResult.data,
+          companyFacts: {
+            ticker: 'AAPL',
+            metrics: { revenue: [] },
+            metadata: { normalized: true },
+          },
+        },
+      };
+      cacheCoordinator.getCompanyData.mockResolvedValue(alreadyNormalizedResult);
+
+      const { result } = renderHook(() => useCompanySearch());
+
+      await act(async () => {
+        await result.current.searchCompany('AAPL');
+      });
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      expect(gaapNormalizer.normalizeCompanyFacts).not.toHaveBeenCalled();
+      expect(result.current.data.metadata.normalized).toBe(true);
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -419,6 +445,10 @@ describe('useCompanySearch', () => {
       expect(result.current.data).toHaveProperty('cik', '0000320193');
       expect(result.current.data).toHaveProperty('companyName', 'Apple Inc.');
       expect(result.current.metadata).toEqual(mockSuccessResult.metadata);
+      expect(gaapNormalizer.normalizeCompanyFacts).toHaveBeenCalledWith(
+        mockSuccessResult.data.companyFacts,
+        { fullHistory: true }
+      );
       expect(result.current.error).toBeNull();
     });
   });

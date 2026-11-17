@@ -1,11 +1,11 @@
 /**
  * Firebase Configuration and Initialization
  *
- * This module initializes Firebase services (Auth, Firestore) and provides
+ * This module initializes Firebase services (Auth, Firestore, Functions) and provides
  * helper functions for interacting with Firebase across the application.
  *
  * When Firebase environment variables are not set, the module exports
- * null values for auth/db and sets firebaseAvailable to false, allowing
+ * null values for auth/db/functions and sets firebaseAvailable to false, allowing
  * the app to run without Firebase (with Firebase-dependent features disabled).
  *
  * Environment Variables Required (for Firebase features):
@@ -23,6 +23,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 
 // Check required environment variables
 const requiredEnvVars = [
@@ -39,6 +40,7 @@ const missingVars = requiredEnvVars.filter(varName => !import.meta.env[varName])
 let app = null;
 let auth = null;
 let db = null;
+let functions = null;
 
 /**
  * Whether Firebase is available and properly initialized.
@@ -71,6 +73,7 @@ if (missingVars.length > 0) {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
+    functions = getFunctions(app);
     firebaseAvailable = true;
 
     if (import.meta.env.DEV) {
@@ -83,6 +86,9 @@ if (missingVars.length > 0) {
       try {
         connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
         connectFirestoreEmulator(db, 'localhost', 8080);
+        if (functions) {
+          connectFunctionsEmulator(functions, 'localhost', 5001);
+        }
         console.log('Firebase: Connected to emulators');
       } catch (emulatorError) {
         console.warn('Failed to connect to Firebase Emulators:', emulatorError.message);
@@ -96,11 +102,12 @@ if (missingVars.length > 0) {
     app = null;
     auth = null;
     db = null;
+    functions = null;
     firebaseAvailable = false;
   }
 }
 
-export { auth, db };
+export { auth, db, functions };
 
 /**
  * Helper function to check if Firebase is properly initialized
