@@ -131,6 +131,13 @@ test.describe('Search Flows', () => {
     // Now press Enter to select the highlighted suggestion
     await page.keyboard.press('Enter');
 
+    // Pass Step 1 Triage Gatekeeper
+    const continueBtn = page.getByRole('button', {
+      name: /I understand how this company makes money - Continue/i,
+    });
+    await expect(continueBtn).toBeVisible({ timeout: 35_000 });
+    await continueBtn.click();
+
     // Dashboard should load — wait for company banner (live secCompanyFacts Cloud Function)
     await expect(
       page.locator(`[data-testid="${SELECTORS.companyBanner.root}"]`),
@@ -149,6 +156,13 @@ test.describe('Search Flows', () => {
     await input.click();
     await input.fill('AAPL');
     await input.press('Enter');
+
+    // Pass Step 1 Triage Gatekeeper
+    const continueBtn = page.getByRole('button', {
+      name: /I understand how this company makes money - Continue/i,
+    });
+    await expect(continueBtn).toBeVisible({ timeout: 35_000 });
+    await continueBtn.click();
 
     // Dashboard renders — wait for live Cloud Function response (companyFacts)
     await expect(
@@ -363,6 +377,13 @@ test.describe('Search Flows', () => {
 
     // Press Enter to select
     await page.keyboard.press('Enter');
+
+    // Pass Step 1 Triage Gatekeeper
+    const continueBtn = page.getByRole('button', {
+      name: /I understand how this company makes money - Continue/i,
+    });
+    await expect(continueBtn).toBeVisible({ timeout: 35_000 });
+    await continueBtn.click();
 
     // Dashboard should load (live secCompanyFacts Cloud Function)
     await expect(

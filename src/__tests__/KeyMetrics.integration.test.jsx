@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { ThemeProvider } from '../contexts/ThemeProvider';
 import App from '../App';
 import {
@@ -109,20 +109,33 @@ vi.mock('../components/ErrorBoundary', () => ({
 // Helpers
 // =============================================================================
 
+function passTriageGatekeeperIfPresent() {
+  const continueBtn = screen.queryByRole('button', {
+    name: /I understand how this company makes money - Continue/i,
+  });
+  if (continueBtn) {
+    fireEvent.click(continueBtn);
+  }
+}
+
 function renderApp() {
-  return render(
+  const result = render(
     <ThemeProvider>
       <App />
     </ThemeProvider>
   );
+  passTriageGatekeeperIfPresent();
+  return result;
 }
 
 function rerenderApp(rerender) {
-  return rerender(
+  const result = rerender(
     <ThemeProvider>
       <App />
     </ThemeProvider>
   );
+  passTriageGatekeeperIfPresent();
+  return result;
 }
 
 function setHookState(overrides) {
