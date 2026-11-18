@@ -173,6 +173,24 @@ describe('Step1Triage Component', () => {
     expect(screen.getByTestId('admin-controls-panel')).toBeTruthy()
     expect(screen.getByTestId('admin-refresh-ai-btn')).toBeTruthy()
     expect(screen.getByTestId('admin-force-refresh-company-btn')).toBeTruthy()
-    expect(screen.getByTestId('admin-edgar-source-badge')).toHaveTextContent('firestore')
+    expect(screen.getByTestId('admin-edgar-source-badge').textContent).toContain('firestore')
+  })
+
+  it('expands the Tear Sheet Blade (#319) to show segments, geography, Mermaid diagram, competitors, and moat breakdown', async () => {
+    render(<Step1Triage company={mockCompany} />)
+
+    const toggleBtn = await screen.findByTestId('toggle-tear-sheet-btn')
+    expect(screen.getByTestId('moat-summary-badge')).toBeTruthy()
+    expect(screen.getByTestId('business-model-traits')).toBeTruthy()
+
+    fireEvent.click(toggleBtn)
+
+    expect(screen.getByTestId('tear-sheet-expanded-content')).toBeTruthy()
+    expect(screen.getByTestId('tear-sheet-segments-card')).toBeTruthy()
+    expect(screen.getByTestId('tear-sheet-geo-card')).toBeTruthy()
+    expect(screen.getByTestId('tear-sheet-mermaid-diagram')).toBeTruthy()
+    expect(screen.getByTestId('tear-sheet-growth-engines-card')).toBeTruthy()
+    expect(screen.getByTestId('tear-sheet-competitors-card')).toBeTruthy()
+    expect(screen.getByTestId('tear-sheet-moat-sources')).toBeTruthy()
   })
 })

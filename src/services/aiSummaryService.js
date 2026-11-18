@@ -29,7 +29,7 @@ const DB_VERSION = 1;
 const STORE_NAME = 'summaries';
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-// Curated high-fidelity summaries for marquee tickers
+// Curated high-fidelity structured Tear Sheet summaries for marquee tickers
 const PRESET_MOCKS = {
   MSFT: {
     summary:
@@ -40,6 +40,96 @@ const PRESET_MOCKS = {
       'Windows & Enterprise OEM',
       'Xbox & Gaming Subscriptions',
     ],
+    businessModelTraits: [
+      'B2B Enterprise',
+      'Recurring SaaS (75%+)',
+      'High Operating Margin (44%)',
+      'Cloud & AI Infrastructure',
+    ],
+    revenueSegments: [
+      { name: 'Intelligent Cloud (Azure & Server)', pct: 43 },
+      { name: 'Productivity & Business (M365, LinkedIn)', pct: 32 },
+      { name: 'More Personal Computing (Windows, Xbox)', pct: 25 },
+    ],
+    geoBreakdown: [
+      { region: 'United States', pct: 51 },
+      { region: 'International (EMEA, APAC, Americas)', pct: 49 },
+    ],
+    mermaidDiagram:
+      'flowchart LR\n  A["Enterprise & Consumers"] --> B["M365 SaaS & Azure Cloud"]\n  B --> C["$245B Recurring Revenue"]\n  C --> D["44% Operating Margin"]',
+    growthEngines: [
+      'התרחבות Azure AI ואימוץ Copilot בקרב לקוחות ארגוניים (Fortune 500)',
+      'מעבר לקוחות לחבילות פרימיום E5 ב-Microsoft 365 והעלאות מחיר תקופתיות',
+      'צמיחת פרסום ב-LinkedIn ורכישת Activision Blizzard ב-Game Pass',
+    ],
+    competitors: ['Amazon AWS', 'Google Cloud & Workspace', 'Salesforce', 'Apple', 'Sony'],
+    moat: {
+      rating: 'Wide Moat',
+      score: '4/5',
+      summary:
+        'חפיר כלכלי רחב במיוחד הנשען על עלויות מעבר אדירות בארגונים (Active Directory, Office, Azure) ויתרון לגודל בתשתיות הענן.',
+      sources: [
+        {
+          name: 'Switching Costs',
+          active: true,
+          rationale: 'ארגונים תלויים ב-Office, Teams ו-Azure לתפעול יומיומי — החלפת ספק כרוכה בסיכון תפעולי כבד.',
+        },
+        {
+          name: 'Network Effects',
+          active: true,
+          rationale: 'LinkedIn (מיליארד משתמשים), GitHub ופורמט הקבצים של Office נהנים מאפקט רשת גלובלי.',
+        },
+        {
+          name: 'Cost Advantage',
+          active: true,
+          rationale: 'יתרון לגודל המאפשר השקעת עתק ($50B+ בשנה) בחוות שרתים ושבבי AI בעלות יחידה נמוכה.',
+        },
+        {
+          name: 'Intangible Assets',
+          active: true,
+          rationale: 'אמון מותג ארגוני של 40 שנה ואישורי אבטחה וממשל (FedRAMP).',
+        },
+      ],
+    },
+    translations: {
+      en: {
+        summary:
+          'Microsoft is a global technology leader generating revenue from enterprise software subscriptions (Office 365, Windows), cloud infrastructure (Azure), and gaming. Its model is built on high-margin recurring SaaS revenue.',
+        growthEngines: [
+          'Azure AI compute expansion and Copilot monetization across Fortune 500 enterprises',
+          'Seat upgrades to Microsoft 365 E5 tiers with strong pricing power',
+          'LinkedIn B2B ad growth and Xbox Game Pass ecosystem expansion',
+        ],
+        moat: {
+          rating: 'Wide Moat',
+          score: '4/5',
+          summary:
+            'Exceptional Wide Moat driven by mission-critical enterprise switching costs and hyperscale cloud cost advantages.',
+          sources: [
+            {
+              name: 'Switching Costs',
+              active: true,
+              rationale: 'Deep enterprise lock-in across Active Directory, Office 365, Teams, and Azure workloads.',
+            },
+            {
+              name: 'Network Effects',
+              active: true,
+              rationale: 'Two-sided network effects in LinkedIn, GitHub, and standard Office document formats.',
+            },
+            {
+              name: 'Cost Advantage',
+              active: true,
+              rationale: 'Hyperscale data center footprint lowers per-unit cloud and AI inference costs.',
+            },
+            {
+              name: 'Intangible Assets',
+              active: true,
+              rationale: 'Decades of enterprise trust, global distribution channel, and government compliance certifications.',
+            },
+          ],
+        },
+      },
+    },
   },
   AAPL: {
     summary:
@@ -50,6 +140,89 @@ const PRESET_MOCKS = {
       'Wearables & Accessories',
       'Mac & iPad Computing',
     ],
+    businessModelTraits: [
+      'B2C Premium Ecosystem',
+      'Hardware + Services Flywheel',
+      'High Gross Margin Services (74%)',
+      '2.2B+ Active Devices',
+    ],
+    revenueSegments: [
+      { name: 'iPhone', pct: 51 },
+      { name: 'Services (App Store, iCloud, Apple Pay)', pct: 25 },
+      { name: 'Mac & iPad', pct: 15 },
+      { name: 'Wearables, Home & Accessories', pct: 9 },
+    ],
+    geoBreakdown: [
+      { region: 'Americas', pct: 43 },
+      { region: 'Europe', pct: 26 },
+      { region: 'Greater China', pct: 17 },
+      { region: 'Japan & Rest of Asia Pacific', pct: 14 },
+    ],
+    mermaidDiagram:
+      'flowchart LR\n  A["Premium Hardware (iPhone/Mac)"] --> B["2.2B+ Installed Base"]\n  B --> C["Recurring Services (App Store/iCloud)"]\n  C --> D["$100B+ Annual Free Cash Flow"]',
+    growthEngines: [
+      'צמיחה דו-ספרתית בחטיבת ה-Services עם שולי רווח גולמי של מעל 70%',
+      'מחזורי שדרוג מכשירים מבוססי Apple Intelligence על גבי בסיס של 2.2 מיליארד מכשירים',
+      'חדירה לשווקים מתעוררים (הודו ודרום-מזרח אסיה) והרחבת שירותי פינטק (Apple Pay)',
+    ],
+    competitors: ['Samsung', 'Google Android', 'Xiaomi & Huawei', 'Microsoft', 'Spotify'],
+    moat: {
+      rating: 'Wide Moat',
+      score: '4/5',
+      summary:
+        'חפיר רחב המבוסס על אקוסיסטם סגור (iOS + חומרה + שירותים) היוצר עלויות מעבר גבוהות וכוח תמחור נדיר בשוק הצרכני.',
+      sources: [
+        {
+          name: 'Switching Costs',
+          active: true,
+          rationale: 'שילוב הדוק בין iPhone, Watch, iCloud ו-iMessage גורם לשיעור שימור לקוחות של מעל 90%.',
+        },
+        {
+          name: 'Intangible Assets',
+          active: true,
+          rationale: 'מותג הצרכנות החזק בעולם ותכנון שבבים פנימי (Apple Silicon).',
+        },
+        {
+          name: 'Network Effects',
+          active: true,
+          rationale: 'App Store מושך מפתחים בזכות בסיס המשתמשים הרווחי ביותר בעולם.',
+        },
+      ],
+    },
+    translations: {
+      en: {
+        summary:
+          'Apple designs and sells premium consumer hardware (iPhone, Mac, iPad, Watch) integrated with a high-margin digital Services ecosystem (App Store, iCloud, Apple Pay) across 2.2B+ active devices.',
+        growthEngines: [
+          'Double-digit Services growth carrying 70%+ gross margins',
+          'Apple Intelligence hardware upgrade cycles across its 2.2B+ installed base',
+          'Emerging market expansion in India and financial services adoption (Apple Pay)',
+        ],
+        moat: {
+          rating: 'Wide Moat',
+          score: '4/5',
+          summary:
+            'Wide Moat powered by a walled-garden hardware-plus-software ecosystem with 90%+ customer retention and unmatched brand pricing power.',
+          sources: [
+            {
+              name: 'Switching Costs',
+              active: true,
+              rationale: 'Seamless integration across iOS, iCloud, Apple Watch, and Mac locks in consumers.',
+            },
+            {
+              name: 'Intangible Assets',
+              active: true,
+              rationale: 'Premier global consumer brand and proprietary Apple Silicon chip architecture.',
+            },
+            {
+              name: 'Network Effects',
+              active: true,
+              rationale: 'iOS App Store ecosystem connects millions of developers with high-spending users.',
+            },
+          ],
+        },
+      },
+    },
   },
   GOOGL: {
     summary:
@@ -348,29 +521,124 @@ export async function clearAllCachedSummaries() {
 // Mock Generator
 // =============================================================================
 
+function enrichWithTearSheetDefaults(baseObj, normTicker, companyName) {
+  const engines = Array.isArray(baseObj.keyEngines) && baseObj.keyEngines.length > 0
+    ? baseObj.keyEngines
+    : [
+        `${normTicker} Core Products`,
+        'Subscription & Service Revenues',
+        'Enterprise Solutions',
+        'Global Distribution Network',
+      ];
+
+  return {
+    businessModelTraits: baseObj.businessModelTraits || [
+      'B2B & B2C Operations',
+      'Recurring & Transactional Mix',
+      'Scalable Platform',
+    ],
+    revenueSegments: baseObj.revenueSegments || [
+      { name: engines[0] || 'Core Products & Services', pct: 55 },
+      { name: engines[1] || 'Subscriptions & Recurring', pct: 30 },
+      { name: engines[2] || 'Other Operating Segments', pct: 15 },
+    ],
+    geoBreakdown: baseObj.geoBreakdown || [
+      { region: 'United States / Domestic', pct: 60 },
+      { region: 'International Markets', pct: 40 },
+    ],
+    mermaidDiagram:
+      baseObj.mermaidDiagram ||
+      `flowchart LR\n  A["Customers & Enterprises"] --> B["${engines[0] || normTicker}"]\n  B --> C["Recurring & Product Revenue"]\n  C --> D["Operating Cash Flow"]`,
+    growthEngines: baseObj.growthEngines || [
+      `הרחבת אימוץ ${engines[0] || 'מוצרי הליבה'} בקרב לקוחות קיימים וחדשים`,
+      `שיפור שולי הרווח התפעולי באמצעות יתרון לגודל ומינוף תפעולי`,
+      `חדירה לשווקים בינלאומיים והשקת שירותים משלימים`,
+    ],
+    competitors: baseObj.competitors || [
+      `${normTicker} Sector Peers`,
+      'Global Industry Leaders',
+      'Specialized Disruptors',
+    ],
+    moat: baseObj.moat || {
+      rating: 'Narrow Moat',
+      score: '2/5',
+      summary: `${companyName} נשענת על עלויות מעבר של לקוחות קיימים ומותג מבוסס בענף הפעילות שלה.`,
+      sources: [
+        {
+          name: 'Switching Costs',
+          active: true,
+          rationale: 'הטמעת המוצרים בתהליכי העבודה של הלקוחות מייצרת עלויות מעבר.',
+        },
+        {
+          name: 'Intangible Assets',
+          active: true,
+          rationale: 'מוניטין, קניין רוחני וקשרי לקוחות ארוכי טווח.',
+        },
+      ],
+    },
+    translations: baseObj.translations || {
+      en: {
+        summary: `${companyName} (${normTicker}) operates as a leading provider of products and services in its industry, generating revenue through direct sales, enterprise contracts, and recurring service offerings.`,
+        growthEngines: [
+          `Expanding adoption of ${engines[0] || 'core products'} across enterprise and consumer segments`,
+          'Operating margin expansion driven by scale and recurring revenue mix',
+          'International market penetration and new product innovation',
+        ],
+        moat: {
+          rating: baseObj.moat?.rating || 'Narrow Moat',
+          score: baseObj.moat?.score || '2/5',
+          summary: `${companyName} benefits from customer switching costs and established brand recognition in its core market.`,
+          sources: [
+            {
+              name: 'Switching Costs',
+              active: true,
+              rationale: 'Customer workflow integration creates retention and switching friction.',
+            },
+            {
+              name: 'Intangible Assets',
+              active: true,
+              rationale: 'Brand recognition, proprietary know-how, and enterprise relationships.',
+            },
+          ],
+        },
+      },
+    },
+    ...baseObj,
+    keyEngines: engines,
+  };
+}
+
 function generateDynamicMock(ticker, companyProfile) {
   const normTicker = ticker.toUpperCase().trim();
   const companyName = companyProfile?.name || companyProfile?.companyName || normTicker;
 
   if (PRESET_MOCKS[normTicker]) {
-    return {
-      ticker: normTicker,
-      ...PRESET_MOCKS[normTicker],
-      source: 'mock-preset',
-    };
+    return enrichWithTearSheetDefaults(
+      {
+        ticker: normTicker,
+        ...PRESET_MOCKS[normTicker],
+        source: 'mock-preset',
+      },
+      normTicker,
+      companyName
+    );
   }
 
-  return {
-    ticker: normTicker,
-    summary: `${companyName} (${normTicker}) היא חברה מובילה הפועלת ומספקת פתרונות ומוצרים מתקדמים בענף הפעילות שלה. החברה מרוויחה כסף ממכירה ישירה של שירותים, רישיונות ומוצרים ללקוחות פרטיים וארגוניים. המודל העסקי נשען על הרחבת קהל הלקוחות וחיזוק מנועי ההכנסה הקיימים.`,
-    keyEngines: [
-      `${normTicker} Core Products`,
-      'Subscription & Service Revenues',
-      'Enterprise Solutions',
-      'Global Distribution Network',
-    ],
-    source: 'mock-dynamic',
-  };
+  return enrichWithTearSheetDefaults(
+    {
+      ticker: normTicker,
+      summary: `${companyName} (${normTicker}) היא חברה מובילה הפועלת ומספקת פתרונות ומוצרים מתקדמים בענף הפעילות שלה. החברה מרוויחה כסף ממכירה ישירה של שירותים, רישיונות ומוצרים ללקוחות פרטיים וארגוניים. המודל העסקי נשען על הרחבת קהל הלקוחות וחיזוק מנועי ההכנסה הקיימים.`,
+      keyEngines: [
+        `${normTicker} Core Products`,
+        'Subscription & Service Revenues',
+        'Enterprise Solutions',
+        'Global Distribution Network',
+      ],
+      source: 'mock-dynamic',
+    },
+    normTicker,
+    companyName
+  );
 }
 
 // =============================================================================
@@ -382,12 +650,42 @@ async function callLlmApi(ticker, companyProfile, apiKey, options = {}) {
   const companyName = companyProfile?.name || companyProfile?.companyName || normTicker;
   const sector = companyProfile?.sector || '';
 
-  const promptText = `אתה אנליסט המייעץ למשקיע מתחיל. קרא את תיאור העסק והדוחות המצורפים של חברת ${companyName} (${normTicker}${sector ? `, בתחום: ${sector}` : ''}) וכתוב פסקה אחת בעברית (עד 3 משפטים) שעונה בפשטות על: מה החברה עושה ואיך היא מרוויחה כסף. השתמש בשפה פשוטה (רמת כיתה ה') והתבסס על נתוני הדוחות המצורפים. בנוסף, ספק רשימה של 3-4 מנועי הכנסה/מוצרים מרכזיים באנגלית.
+  const promptText = `אתה אנליסט השקעות ערך בכיר. קרא בעיון את נתוני דוח ה-10-K (Item 1, Item 1A, Item 7) ושיחת הוועידה המצורפים עבור ${companyName} (${normTicker}${sector ? `, סקטור: ${sector}` : ''}).
+בנה JSON מובנה עבור כרטיס סיכום ויזואלי ("Tear Sheet" / Blade) שמאפשר למשקיע להבין את העסק ב-30 שניות ללא "קיר של טקסט".
+שמור על עברית טבעית ורהוטה, והשאר מונחים מקצועיים ושמות חטיבות/מוצרים/מתחרים באנגלית.
 
-החזר את התשובה במבנה JSON בלבד ללא שום טקסט נוסף:
+החזר אך ורק JSON תקין במבנה הבא:
 {
-  "summary": "הפסקה בעברית",
-  "keyEngines": ["Engine 1 in English", "Engine 2 in English", "Engine 3 in English", "Engine 4 in English"]
+  "summary": "Elevator Pitch חד (1-2 משפטים בעברית פשוטה) שמסביר מה החברה עושה ואיך היא מרוויחה כסף",
+  "keyEngines": ["Engine 1 in English", "Engine 2 in English", "Engine 3 in English", "Engine 4 in English"],
+  "businessModelTraits": ["B2B / B2C", "Recurring SaaS / Transactional", "High Margin / Scale"],
+  "revenueSegments": [
+    { "name": "Segment Name in English", "pct": 50 },
+    { "name": "Segment 2 in English", "pct": 30 },
+    { "name": "Segment 3 in English", "pct": 20 }
+  ],
+  "geoBreakdown": [
+    { "region": "United States", "pct": 55 },
+    { "region": "International", "pct": 45 }
+  ],
+  "mermaidDiagram": "flowchart LR\\n  A[\\"Customers\\"] --> B[\\"Core Platform\\"] --> C[\\"Revenue Streams\\"] --> D[\\"Operating Profit\\"]",
+  "growthEngines": [
+    "מנוע צמיחה 1 קצר וממוקד בעברית מתוך ה-10-K/שיחת הוועידה",
+    "מנוע צמיחה 2 קצר וממוקד בעברית",
+    "מנוע צמיחה 3 קצר וממוקד בעברית"
+  ],
+  "competitors": ["Competitor 1", "Competitor 2", "Competitor 3", "Competitor 4"],
+  "moat": {
+    "rating": "Wide Moat | Narrow Moat | No Moat",
+    "score": "4/5",
+    "summary": "משפט אחד בעברית שמסכם את החפיר הכלכלי של החברה",
+    "sources": [
+      { "name": "Switching Costs", "active": true, "rationale": "נימוק קצר בעברית" },
+      { "name": "Network Effects", "active": true, "rationale": "נימוק קצר בעברית" },
+      { "name": "Cost Advantage", "active": false, "rationale": "נימוק קצר בעברית" },
+      { "name": "Intangible Assets", "active": true, "rationale": "נימוק קצר בעברית" }
+    ]
+  }
 }`;
 
   const provider = llmFactory.getProvider();
@@ -400,13 +698,82 @@ async function callLlmApi(ticker, companyProfile, apiKey, options = {}) {
     throw new Error('Malformed JSON structure from LLM');
   }
 
-  return {
-    ticker: normTicker,
-    summary: parsed.summary,
-    keyEngines: parsed.keyEngines.slice(0, 4),
-    ...(parsed._ingestionStatus ? { ingestionStatus: parsed._ingestionStatus } : {}),
-    source: 'ai-live',
-  };
+  return enrichWithTearSheetDefaults(
+    {
+      ticker: normTicker,
+      summary: parsed.summary,
+      keyEngines: parsed.keyEngines.slice(0, 4),
+      ...(Array.isArray(parsed.businessModelTraits)
+        ? { businessModelTraits: parsed.businessModelTraits.slice(0, 5) }
+        : {}),
+      ...(Array.isArray(parsed.revenueSegments)
+        ? { revenueSegments: parsed.revenueSegments.slice(0, 6) }
+        : {}),
+      ...(Array.isArray(parsed.geoBreakdown)
+        ? { geoBreakdown: parsed.geoBreakdown.slice(0, 5) }
+        : {}),
+      ...(typeof parsed.mermaidDiagram === 'string' && parsed.mermaidDiagram.trim()
+        ? { mermaidDiagram: parsed.mermaidDiagram.trim() }
+        : {}),
+      ...(Array.isArray(parsed.growthEngines)
+        ? { growthEngines: parsed.growthEngines.slice(0, 4) }
+        : {}),
+      ...(Array.isArray(parsed.competitors)
+        ? { competitors: parsed.competitors.slice(0, 6) }
+        : {}),
+      ...(parsed.moat && typeof parsed.moat === 'object' ? { moat: parsed.moat } : {}),
+      ...(parsed._ingestionStatus ? { ingestionStatus: parsed._ingestionStatus } : {}),
+      source: 'ai-live',
+    },
+    normTicker,
+    companyName
+  );
+}
+
+/**
+ * Translates an existing structured summary JSON on-demand to the requested target language ('en' or 'he')
+ * without re-sending the heavy 10-K context, and caches the translation inside the summary record.
+ */
+export async function translateSummaryOnDemand(ticker, summaryObj, targetLang = 'en') {
+  if (!summaryObj || targetLang === 'he') {
+    return summaryObj;
+  }
+
+  if (summaryObj.translations?.[targetLang]?.summary) {
+    return summaryObj;
+  }
+
+  const normTicker = (ticker || summaryObj.ticker || 'MSFT').toUpperCase().trim();
+  const apiKey = getConfiguredApiKey();
+  const provider = llmFactory.getProvider();
+
+  try {
+    const compactPayload = {
+      summary: summaryObj.summary,
+      growthEngines: summaryObj.growthEngines || [],
+      moat: summaryObj.moat || null,
+    };
+
+    const translatePrompt = `Translate the following structured investment Tear Sheet JSON fields into clear, professional English for value investors. Return ONLY valid JSON with the exact same keys ("summary", "growthEngines", "moat"):
+${JSON.stringify(compactPayload)}`;
+
+    const translated = await provider.generateJSON(translatePrompt, apiKey);
+    if (translated && translated.summary) {
+      const updated = {
+        ...summaryObj,
+        translations: {
+          ...(summaryObj.translations || {}),
+          [targetLang]: translated,
+        },
+      };
+      await setCachedSummary(normTicker, updated);
+      return updated;
+    }
+  } catch {
+    // Fall back to existing translation defaults if live call fails
+  }
+
+  return enrichWithTearSheetDefaults(summaryObj, normTicker, normTicker);
 }
 
 // =============================================================================
@@ -543,11 +910,15 @@ export async function getOrFetchCompanySummary(ticker, companyProfile = {}, opti
   if (forceRefresh) {
     await invalidateCachedSummary(normTicker);
   } else if (existingCached) {
-    return {
-      ...existingCached,
-      originalSource: existingCached.originalSource || existingCached.source || 'unknown',
-      source: 'cache',
-    };
+    return enrichWithTearSheetDefaults(
+      {
+        ...existingCached,
+        originalSource: existingCached.originalSource || existingCached.source || 'unknown',
+        source: 'cache',
+      },
+      normTicker,
+      companyProfile?.name || companyProfile?.companyName || normTicker
+    );
   }
 
   // 2. Attempt live call via Factory/Adapter (Cloud Function for Gemini, API key for others)
@@ -618,4 +989,5 @@ export default {
   getCompanyContextStatus,
   refreshCompanyContext,
   saveManualTranscript,
+  translateSummaryOnDemand,
 };

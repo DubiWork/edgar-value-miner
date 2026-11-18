@@ -24,7 +24,27 @@ import {
   getCompanyContextStatus,
   refreshCompanyContext,
   saveManualTranscript,
+  translateSummaryOnDemand,
 } from '../../services/aiSummaryService.js'
+
+/**
+ * Parses a Mermaid `flowchart LR` / `graph LR` string into ordered flow nodes
+ * so it can render as a crisp, zero-CDN interactive flowchart in the Tear Sheet.
+ */
+function parseMermaidFlowNodes(mermaidCode) {
+  if (!mermaidCode || typeof mermaidCode !== 'string') return []
+  const labelMatches = Array.from(mermaidCode.matchAll(/\["([^"]+)"\]|\[([^\]]+)\]/g))
+  const seen = new Set()
+  const nodes = []
+  for (const m of labelMatches) {
+    const label = (m[1] || m[2] || '').trim()
+    if (label && !seen.has(label)) {
+      seen.add(label)
+      nodes.push(label)
+    }
+  }
+  return nodes
+}
 
 /**
  * InfoTooltip Component
@@ -118,6 +138,10 @@ export function Step1Triage({
   const [showManualUpload, setShowManualUpload] = useState(false)
   const [manualTranscriptInput, setManualTranscriptInput] = useState('')
   const [isSavingTranscript, setIsSavingTranscript] = useState(false)
+  const [isBladeOpen, setIsBladeOpen] = useState(false)
+  const [lang, setLang] = useState('he')
+  const [isTranslating, setIsTranslating] = useState(false)
+  const [showRawMermaid, setShowRawMermaid] = useState(false)
 
   const ticker = company?.ticker || companyFacts?.ticker || 'MSFT'
   const companyName = company?.name || companyFacts?.companyName || ticker
@@ -314,6 +338,42 @@ export function Step1Triage({
   ]
 
   const passedCount = fundamentalIndicators.filter((i) => i.status === 'pass').length
+
+  const handleLanguageSwitch = useCallback(
+    async (nextLang) => {
+      setLang(nextLang)
+      if (nextLang === 'en' && aiSummary && !aiSummary.translations?.en?.summary) {
+        setIsTranslating(true)
+        try {
+          const updated = await translateSummaryOnDemand(ticker, aiSummary, 'en')
+          setAiSummary(updated)
+        } finally {
+          setIsTranslating(false)
+        }
+      }
+    },
+    [ticker, aiSummary]
+  )
+
+  const activeSummaryText =
+    lang === 'en' && aiSummary?.translations?.en?.summary
+      ? aiSummary.translations.en.summary
+      : aiSummary?.summary
+
+  const activeGrowthEngines =
+    lang === 'en' && Array.isArray(aiSummary?.translations?.en?.growthEngines)
+      ? aiSummary.translations.en.growthEngines
+      : aiSummary?.growthEngines || []
+
+  const activeMoat =
+    lang === 'en' && aiSummary?.translations?.en?.moat
+      ? aiSummary.translations.en.moat
+      : aiSummary?.moat || null
+
+  const mermaidNodes = useMemo(
+    () => parseMermaidFlowNodes(aiSummary?.mermaidDiagram),
+    [aiSummary?.mermaidDiagram]
+  )
 
   const handleContinue = () => {
     setHasAcknowledged(true)
@@ -608,9 +668,12 @@ export function Step1Triage({
         </div>
       )}
 
-      {/* SECTION 1: Business Clarity (Circle of Competence) - AI Summary */}
-      <div className="relative rounded-2xl border border-sky-500/20 bg-linear-to-b from-sky-50/50 via-white to-white dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900 shadow-sm p-6 sm:p-7">
-        <div className="flex items-center justify-between gap-3 mb-4">
+      {/* SECTION 1: Business Clarity & Economic Moat Tear Sheet Blade (#319) */}
+      <div
+        data-testid="tear-sheet-blade"
+        className="relative rounded-2xl border border-sky-500/20 bg-linear-to-b from-sky-50/50 via-white to-white dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900 shadow-sm p-6 sm:p-7"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2.5">
             <div
               className={`p-2 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 ${
@@ -630,23 +693,88 @@ export function Step1Triage({
                 />
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                AI Summary &bull; How does this company generate its cash flows?
+                AI Summary &bull; Grounded in SEC 10-K (Item 1, 1A, 7) &amp; Earnings Calls
               </p>
             </div>
           </div>
-          {isLoadingSummary ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 border border-sky-300/40 dark:border-sky-800/50 animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping" />
-              AI Thinking...
-            </span>
-          ) : (
-            <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-300/40 dark:border-sky-800/50">
-              Core Model
-            </span>
-          )}
+
+          <div className="flex items-center gap-2">
+            {/* Economic Moat Summary Badge (Upfront in Step 1) */}
+            {!isLoadingSummary && activeMoat?.rating && (
+              <span
+                data-testid="moat-summary-badge"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span>
+                  {activeMoat.rating}
+                  {activeMoat.score ? ` (${activeMoat.score})` : ''}
+                </span>
+              </span>
+            )}
+
+            {/* On-Demand Language Toggle (HE | EN) */}
+            <div
+              data-testid="summary-language-toggle"
+              className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-0.5 text-xs"
+            >
+              <button
+                type="button"
+                data-testid="lang-btn-he"
+                onClick={() => handleLanguageSwitch('he')}
+                className={`px-2 py-0.5 rounded-md font-semibold cursor-pointer transition-colors ${
+                  lang === 'he'
+                    ? 'bg-sky-600 text-white'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                עב
+              </button>
+              <button
+                type="button"
+                data-testid="lang-btn-en"
+                onClick={() => handleLanguageSwitch('en')}
+                className={`px-2 py-0.5 rounded-md font-semibold cursor-pointer transition-colors ${
+                  lang === 'en'
+                    ? 'bg-sky-600 text-white'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                EN
+              </button>
+            </div>
+
+            {isLoadingSummary || isTranslating ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 border border-sky-300/40 dark:border-sky-800/50 animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping" />
+                AI Thinking...
+              </span>
+            ) : (
+              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-300/40 dark:border-sky-800/50">
+                Core Model
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Hebrew Summary Content / Skeleton Loader */}
+        {/* 1. Business Model Trait Pill Badges */}
+        {!isLoadingSummary && Array.isArray(aiSummary?.businessModelTraits) && (
+          <div
+            data-testid="business-model-traits"
+            className="flex flex-wrap items-center gap-2 mb-3 text-xs"
+          >
+            {aiSummary.businessModelTraits.map((trait) => (
+              <span
+                key={trait}
+                className="inline-flex items-center px-2.5 py-0.5 rounded-full font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20"
+              >
+                {trait}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Elevator Pitch / Skeleton Loader */}
         {isLoadingSummary ? (
           <div
             data-testid="ai-summary-skeleton"
@@ -658,42 +786,306 @@ export function Step1Triage({
           </div>
         ) : (
           <div
-            dir="rtl"
-            className="rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 text-right font-sans"
+            dir={lang === 'he' ? 'rtl' : 'ltr'}
+            className={`rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 ${
+              lang === 'he' ? 'text-right' : 'text-left'
+            } font-sans space-y-2`}
           >
             <p className="text-base sm:text-lg leading-relaxed text-slate-800 dark:text-slate-200 font-medium">
-              {aiSummary?.summary}
+              {activeSummaryText}
             </p>
+            {activeMoat?.summary && (
+              <p className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-300 font-medium pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                🛡️ {activeMoat.summary}
+              </p>
+            )}
           </div>
         )}
 
         {/* Revenue Pillars / Breakdown Tags */}
-        <div className="mt-4 flex flex-wrap items-center gap-2 pt-2 text-xs">
-          <span className="text-slate-400 dark:text-slate-500 font-medium mr-1">
-            Key Engines:
-          </span>
-          {isLoadingSummary ? (
-            <>
-              <div className="h-6 w-32 bg-slate-200 dark:bg-slate-700/60 rounded-md animate-pulse" />
-              <div className="h-6 w-28 bg-slate-200 dark:bg-slate-700/60 rounded-md animate-pulse" />
-              <div className="h-6 w-36 bg-slate-200 dark:bg-slate-700/60 rounded-md animate-pulse" />
-            </>
-          ) : (
-            aiSummary?.keyEngines?.map((engine, idx) => {
-              const dotColors = ['bg-sky-500', 'bg-emerald-500', 'bg-indigo-500', 'bg-amber-500']
-              const dotClass = dotColors[idx % dotColors.length]
-              return (
-                <span
-                  key={engine}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
-                  {engine}
-                </span>
-              )
-            })
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 pt-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-slate-400 dark:text-slate-500 font-medium mr-1">
+              Key Engines:
+            </span>
+            {isLoadingSummary ? (
+              <>
+                <div className="h-6 w-32 bg-slate-200 dark:bg-slate-700/60 rounded-md animate-pulse" />
+                <div className="h-6 w-28 bg-slate-200 dark:bg-slate-700/60 rounded-md animate-pulse" />
+                <div className="h-6 w-36 bg-slate-200 dark:bg-slate-700/60 rounded-md animate-pulse" />
+              </>
+            ) : (
+              aiSummary?.keyEngines?.map((engine, idx) => {
+                const dotColors = ['bg-sky-500', 'bg-emerald-500', 'bg-indigo-500', 'bg-amber-500']
+                const dotClass = dotColors[idx % dotColors.length]
+                return (
+                  <span
+                    key={engine}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
+                    {engine}
+                  </span>
+                )
+              })
+            )}
+          </div>
+
+          {!isLoadingSummary && (
+            <button
+              type="button"
+              data-testid="toggle-tear-sheet-btn"
+              onClick={() => setIsBladeOpen((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/25 hover:bg-sky-500/20 cursor-pointer transition-colors"
+            >
+              <span>
+                {isBladeOpen
+                  ? lang === 'he'
+                    ? 'הסתר כרטיס ניתוח מלא (Tear Sheet)'
+                    : 'Hide Full Tear Sheet Blade'
+                  : lang === 'he'
+                  ? 'פתח כרטיס ניתוח מלא (Segments, Geo, Mermaid & Moat)'
+                  : 'Open Full Tear Sheet Blade'}
+              </span>
+            </button>
           )}
         </div>
+
+        {/* EXPANDABLE GENERATIVE UI TEAR SHEET BLADE (Progressive Disclosure) */}
+        {!isLoadingSummary && isBladeOpen && (
+          <div
+            data-testid="tear-sheet-expanded-content"
+            className="mt-5 pt-5 border-t border-slate-200 dark:border-slate-800 space-y-5 animate-fade-in"
+          >
+            {/* 2. Revenue Segments & Geographic Footprint Visual Progress Bars */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4" dir="ltr">
+              {/* Revenue Segments Progress Bars */}
+              <div
+                data-testid="tear-sheet-segments-card"
+                className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-4 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">
+                    Revenue Segments Breakdown
+                  </h3>
+                  <span className="text-xs text-slate-400">10-K Segment Mix</span>
+                </div>
+                <div className="space-y-2.5">
+                  {aiSummary?.revenueSegments?.map((seg, idx) => {
+                    const barColors = [
+                      'bg-sky-500',
+                      'bg-emerald-500',
+                      'bg-indigo-500',
+                      'bg-amber-500',
+                    ]
+                    const barClass = barColors[idx % barColors.length]
+                    const pctVal = Math.max(0, Math.min(100, Number(seg.pct) || 0))
+                    return (
+                      <div key={seg.name} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                            {seg.name}
+                          </span>
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            {pctVal}%
+                          </span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${barClass}`}
+                            style={{ width: `${pctVal}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Geographic Footprint Progress Bars */}
+              <div
+                data-testid="tear-sheet-geo-card"
+                className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-4 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                    Geographic Footprint
+                  </h3>
+                  <span className="text-xs text-slate-400">Global Revenue Split</span>
+                </div>
+                <div className="space-y-2.5">
+                  {aiSummary?.geoBreakdown?.map((geo, idx) => {
+                    const geoColors = [
+                      'bg-indigo-500',
+                      'bg-sky-500',
+                      'bg-teal-500',
+                      'bg-amber-500',
+                    ]
+                    const barClass = geoColors[idx % geoColors.length]
+                    const pctVal = Math.max(0, Math.min(100, Number(geo.pct) || 0))
+                    return (
+                      <div key={geo.region} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                            {geo.region}
+                          </span>
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            {pctVal}%
+                          </span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${barClass}`}
+                            style={{ width: `${pctVal}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Business Flow Diagram (Generative UI — Mermaid.js Flowchart) */}
+            {aiSummary?.mermaidDiagram && (
+              <div
+                data-testid="tear-sheet-mermaid-diagram"
+                dir="ltr"
+                className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/70 p-4 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Business Flow Diagram (Generative UI &bull; Mermaid.js)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowRawMermaid((prev) => !prev)}
+                    className="text-xs text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
+                  >
+                    {showRawMermaid ? 'Hide Mermaid Source' : 'View Mermaid Syntax'}
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-2 py-2">
+                  {mermaidNodes.map((nodeLabel, idx) => (
+                    <div key={nodeLabel} className="flex items-center gap-2">
+                      <div className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-sky-500/30 text-xs font-semibold text-slate-800 dark:text-slate-100 shadow-2xs">
+                        {nodeLabel}
+                      </div>
+                      {idx < mermaidNodes.length - 1 && (
+                        <ArrowRight className="w-4 h-4 text-sky-500 shrink-0" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {showRawMermaid && (
+                  <pre className="p-3 rounded-lg bg-slate-900 text-slate-200 text-xs overflow-x-auto font-mono">
+                    {aiSummary.mermaidDiagram}
+                  </pre>
+                )}
+              </div>
+            )}
+
+            {/* 4. Compact Cards Grid: Growth Engines, Competitive Landscape & Economic Moat */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Growth Engines Card */}
+              <div
+                data-testid="tear-sheet-growth-engines-card"
+                dir={lang === 'he' ? 'rtl' : 'ltr'}
+                className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-4 space-y-2.5"
+              >
+                <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  {lang === 'he' ? 'מנועי צמיחה מרכזיים (Growth Engines)' : 'Key Growth Engines'}
+                </h3>
+                <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+                  {activeGrowthEngines.map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <span className="text-emerald-500 font-bold mt-0.5">&bull;</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Competitive Landscape (Competitor Chips/Tags) */}
+              <div
+                data-testid="tear-sheet-competitors-card"
+                dir="ltr"
+                className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-4 space-y-2.5"
+              >
+                <h3 className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                  Competitive Landscape (10-K Peers)
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {aiSummary?.competitors?.map((comp) => (
+                    <span
+                      key={comp}
+                      className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25"
+                    >
+                      {comp}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 5. Detailed Economic Moat Sources & SEC Filing Citations */}
+            {Array.isArray(activeMoat?.sources) && activeMoat.sources.length > 0 && (
+              <div
+                data-testid="tear-sheet-moat-sources"
+                dir={lang === 'he' ? 'rtl' : 'ltr'}
+                className="rounded-xl border border-emerald-500/25 bg-emerald-50/30 dark:bg-emerald-950/15 p-4 space-y-3"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                    {lang === 'he'
+                      ? `ניתוח חפיר כלכלי (${activeMoat.rating})`
+                      : `Economic Moat Breakdown (${activeMoat.rating})`}
+                  </h3>
+                  {ingestionStatus?.tenK?.url && (
+                    <a
+                      href={ingestionStatus.tenK.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      dir="ltr"
+                      className="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline"
+                    >
+                      SEC {ingestionStatus.tenK.form || '10-K'} ({ingestionStatus.tenK.date}) ↗
+                    </a>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {activeMoat.sources.map((src) => (
+                    <div
+                      key={src.name}
+                      className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1"
+                    >
+                      <div className="flex items-center justify-between text-xs" dir="ltr">
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          {src.name}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full font-semibold ${
+                            src.active
+                              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                              : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                          }`}
+                        >
+                          {src.active ? 'Active ✓' : 'Secondary'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                        {src.rationale}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* SECTION 2: Fast Fundamentals Indicators (4 Grid Cards with Sparklines) */}
