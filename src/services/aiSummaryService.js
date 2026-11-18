@@ -377,12 +377,12 @@ function generateDynamicMock(ticker, companyProfile) {
 // LLM API Caller (via Factory/Adapter Pattern)
 // =============================================================================
 
-async function callLlmApi(ticker, companyProfile, apiKey) {
+async function callLlmApi(ticker, companyProfile, apiKey, options = {}) {
   const normTicker = ticker.toUpperCase().trim();
   const companyName = companyProfile?.name || companyProfile?.companyName || normTicker;
   const sector = companyProfile?.sector || '';
 
-  const promptText = `אתה אנליסט המייעץ למשקיע מתחיל. קרא את תיאור העסק של חברת ${companyName} (${normTicker}${sector ? `, בתחום: ${sector}` : ''}) וכתוב פסקה אחת בעברית (עד 3 משפטים) שעונה בפשטות על: מה החברה עושה ואיך היא מרוויחה כסף. השתמש בשפה פשוטה (רמת כיתה ה'). בנוסף, ספק רשימה של 3-4 מנועי הכנסה/מוצרים מרכזיים באנגלית.
+  const promptText = `אתה אנליסט המייעץ למשקיע מתחיל. קרא את תיאור העסק והדוחות המצורפים של חברת ${companyName} (${normTicker}${sector ? `, בתחום: ${sector}` : ''}) וכתוב פסקה אחת בעברית (עד 3 משפטים) שעונה בפשטות על: מה החברה עושה ואיך היא מרוויחה כסף. השתמש בשפה פשוטה (רמת כיתה ה') והתבסס על נתוני הדוחות המצורפים. בנוסף, ספק רשימה של 3-4 מנועי הכנסה/מוצרים מרכזיים באנגלית.
 
 החזר את התשובה במבנה JSON בלבד ללא שום טקסט נוסף:
 {
@@ -391,7 +391,10 @@ async function callLlmApi(ticker, companyProfile, apiKey) {
 }`;
 
   const provider = llmFactory.getProvider();
-  const parsed = await provider.generateJSON(promptText, apiKey);
+  const parsed = await provider.generateJSON(promptText, apiKey, {
+    ticker: normTicker,
+    forceRefreshContext: Boolean(options?.forceRefresh),
+  });
 
   if (!parsed || !parsed.summary || !Array.isArray(parsed.keyEngines)) {
     throw new Error('Malformed JSON structure from LLM');
@@ -401,6 +404,7 @@ async function callLlmApi(ticker, companyProfile, apiKey) {
     ticker: normTicker,
     summary: parsed.summary,
     keyEngines: parsed.keyEngines.slice(0, 4),
+    ...(parsed._ingestionStatus ? { ingestionStatus: parsed._ingestionStatus } : {}),
     source: 'ai-live',
   };
 }
@@ -457,6 +461,69 @@ export async function getAiBudgetStatus() {
   }
 }
 
+/**
+ * Fetches the 10-K / Transcript / 8-K ingestion status for a ticker from Firestore via Cloud Function.
+ * @param {string} ticker
+ * @returns {Promise<Object|null>}
+ */
+export async function getCompanyContextStatus(ticker) {
+  try {
+    const functions = firebaseLib.functions;
+    if (!functions || !ticker) return null;
+    const callable = httpsCallable(functions, 'generateAiSummary');
+    const response = await callable({
+      action: 'getCompanyContextStatus',
+      ticker: ticker.toUpperCase().trim(),
+    });
+    const payload = response?.data ?? response;
+    return payload?.ingestionStatus || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Forces a fresh server-side download & extraction of the 10-K + Transcript / 8-K for a ticker.
+ * @param {string} ticker
+ * @returns {Promise<Object|null>}
+ */
+export async function refreshCompanyContext(ticker) {
+  try {
+    const functions = firebaseLib.functions;
+    if (!functions || !ticker) return null;
+    const callable = httpsCallable(functions, 'generateAiSummary');
+    const response = await callable({
+      action: 'refreshCompanyContext',
+      ticker: ticker.toUpperCase().trim(),
+    });
+    const payload = response?.data ?? response;
+    return payload?.ingestionStatus || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Saves an Admin-supplied manual transcript for a ticker into Firestore (`companyContext/{ticker}`).
+ * @param {string} ticker
+ * @param {string} manualTranscriptText
+ * @param {string} [manualTranscriptDate]
+ * @returns {Promise<Object|null>}
+ */
+export async function saveManualTranscript(ticker, manualTranscriptText, manualTranscriptDate) {
+  const functions = firebaseLib.functions;
+  if (!functions || !ticker || !manualTranscriptText) return null;
+  const callable = httpsCallable(functions, 'generateAiSummary');
+  const response = await callable({
+    action: 'saveManualTranscript',
+    ticker: ticker.toUpperCase().trim(),
+    manualTranscriptText,
+    ...(manualTranscriptDate ? { manualTranscriptDate } : {}),
+  });
+  const payload = response?.data ?? response;
+  return payload?.ingestionStatus || null;
+}
+
 export async function getOrFetchCompanySummary(ticker, companyProfile = {}, options = {}) {
   if (!ticker || typeof ticker !== 'string') {
     return generateDynamicMock('MSFT', companyProfile);
@@ -490,7 +557,9 @@ export async function getOrFetchCompanySummary(ticker, companyProfile = {}, opti
   const canCallLive = provider.requiresApiKey === false || Boolean(apiKey);
   if (canCallLive) {
     try {
-      const liveResult = await callLlmApi(normTicker, companyProfile, apiKey);
+      const liveResult = await callLlmApi(normTicker, companyProfile, apiKey, {
+        forceRefresh,
+      });
       await setCachedSummary(normTicker, liveResult);
       return liveResult;
     } catch (err) {
@@ -546,4 +615,7 @@ export default {
   invalidateCachedSummary,
   clearAllCachedSummaries,
   getAiBudgetStatus,
+  getCompanyContextStatus,
+  refreshCompanyContext,
+  saveManualTranscript,
 };

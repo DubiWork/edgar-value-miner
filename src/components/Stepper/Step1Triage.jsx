@@ -21,6 +21,9 @@ import {
   getOrFetchCompanySummary,
   invalidateCachedSummary,
   getAiBudgetStatus,
+  getCompanyContextStatus,
+  refreshCompanyContext,
+  saveManualTranscript,
 } from '../../services/aiSummaryService.js'
 
 /**
@@ -111,17 +114,27 @@ export function Step1Triage({
   const [isLoadingSummary, setIsLoadingSummary] = useState(true)
   const [adminStatusMessage, setAdminStatusMessage] = useState(null)
   const [aiBudget, setAiBudget] = useState(null)
+  const [ingestionStatus, setIngestionStatus] = useState(null)
+  const [showManualUpload, setShowManualUpload] = useState(false)
+  const [manualTranscriptInput, setManualTranscriptInput] = useState('')
+  const [isSavingTranscript, setIsSavingTranscript] = useState(false)
 
   const ticker = company?.ticker || companyFacts?.ticker || 'MSFT'
   const companyName = company?.name || companyFacts?.companyName || ticker
 
   const refreshAdminBudget = useCallback(async () => {
     if (!isAdmin) return
-    const status = await getAiBudgetStatus()
+    const [status, ctxStatus] = await Promise.all([
+      getAiBudgetStatus(),
+      getCompanyContextStatus(ticker),
+    ])
     if (status) {
       setAiBudget(status)
     }
-  }, [isAdmin])
+    if (ctxStatus) {
+      setIngestionStatus(ctxStatus)
+    }
+  }, [isAdmin, ticker])
 
   useEffect(() => {
     if (isAdmin) {
@@ -142,6 +155,9 @@ export function Step1Triage({
       .then((result) => {
         if (!isCancelled) {
           setAiSummary(result)
+          if (result?.ingestionStatus) {
+            setIngestionStatus(result.ingestionStatus)
+          }
           setIsLoadingSummary(false)
           if (isAdmin) {
             refreshAdminBudget()
@@ -196,13 +212,37 @@ export function Step1Triage({
 
   // Admin handler: Clear both EDGAR + AI caches and force refresh company facts from SEC into Firestore DB
   const handleFullCompanyCacheReset = useCallback(async () => {
-    setAdminStatusMessage(`מנקה מטמון עבור ${ticker} ומרענן נתוני SEC ל-Firestore...`)
+    setAdminStatusMessage(`מנקה מטמון עבור ${ticker} ומרענן נתוני SEC + דוחות 10-K/8-K ל-Firestore...`)
     await invalidateCachedSummary(ticker)
     if (onForceRefreshCompany) {
       await onForceRefreshCompany(ticker)
     }
+    const freshCtx = await refreshCompanyContext(ticker)
+    if (freshCtx) {
+      setIngestionStatus(freshCtx)
+    }
     await handleRefreshAiSummary()
   }, [ticker, onForceRefreshCompany, handleRefreshAiSummary])
+
+  const handleSaveManualTranscript = useCallback(async () => {
+    if (!manualTranscriptInput.trim()) return
+    setIsSavingTranscript(true)
+    setAdminStatusMessage(`שומר תמליל שיחת ועידה ידני עבור ${ticker} ב-Firestore...`)
+    try {
+      const updatedStatus = await saveManualTranscript(ticker, manualTranscriptInput.trim())
+      if (updatedStatus) {
+        setIngestionStatus(updatedStatus)
+      }
+      setShowManualUpload(false)
+      setManualTranscriptInput('')
+      setAdminStatusMessage(`תמליל שיחת ועידה נשמר בהצלחה עבור ${ticker}. מרענן תקציר AI...`)
+      await handleRefreshAiSummary()
+    } catch (err) {
+      setAdminStatusMessage(`שגיאה בשמירת תמליל ידני: ${err?.message || 'Unknown error'}`)
+    } finally {
+      setIsSavingTranscript(false)
+    }
+  }, [ticker, manualTranscriptInput, handleRefreshAiSummary])
 
   // Calculate real fundamental indicators & 10-15Y historical sparklines
   const triageData = useMemo(() => {
@@ -477,6 +517,94 @@ export function Step1Triage({
               {adminStatusMessage}
             </div>
           )}
+
+          {/* Admin Document Ingestion Monitor (10-K / Transcript / 8-K) */}
+          <div
+            data-testid="admin-ingestion-monitor"
+            className="pt-2 border-t border-amber-500/20 flex flex-col gap-2 text-xs"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                  ניטור קבצי מקור ב-DB:
+                </span>
+                <span data-testid="admin-tenk-status">
+                  10-K (Item 1/1A/7):{' '}
+                  <strong
+                    className={
+                      ingestionStatus?.tenK?.status === 'ok'
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-rose-600 dark:text-rose-400'
+                    }
+                  >
+                    {ingestionStatus?.tenK?.status === 'ok'
+                      ? `תקין (${ingestionStatus.tenK.date || 'OK'})`
+                      : ingestionStatus?.tenK?.error || 'טרם נשלף'}
+                  </strong>
+                </span>
+                <span>&bull;</span>
+                <span data-testid="admin-transcript-status">
+                  שיחת ועידה / 8-K:{' '}
+                  <strong
+                    className={
+                      ingestionStatus?.transcript?.status === 'ok' ||
+                      ingestionStatus?.transcript?.status === 'manual'
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : ingestionStatus?.transcript?.status === 'fallback_8k'
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-rose-600 dark:text-rose-400'
+                    }
+                  >
+                    {ingestionStatus?.transcript?.status === 'ok'
+                      ? `תמליל (${ingestionStatus.transcript.source})`
+                      : ingestionStatus?.transcript?.status === 'manual'
+                      ? `תמליל ידני (${ingestionStatus.transcript.date})`
+                      : ingestionStatus?.transcript?.status === 'fallback_8k'
+                      ? `גיבוי 8-K (${ingestionStatus.transcript.date})`
+                      : ingestionStatus?.transcript?.error || 'חסר'}
+                  </strong>
+                </span>
+              </div>
+
+              <button
+                type="button"
+                data-testid="admin-toggle-manual-transcript-btn"
+                onClick={() => setShowManualUpload((prev) => !prev)}
+                className="px-2.5 py-1 rounded-md font-semibold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
+              >
+                {showManualUpload ? 'סגור הזנת תמליל' : '+ הזן תמליל שיחת ועידה ידנית'}
+              </button>
+            </div>
+
+            {showManualUpload && (
+              <div
+                data-testid="admin-manual-transcript-panel"
+                className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-amber-500/30 space-y-2"
+              >
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  הדבק טקסט שיחת ועידה (Earnings Call Transcript) עבור {ticker}:
+                </label>
+                <textarea
+                  rows={4}
+                  value={manualTranscriptInput}
+                  onChange={(e) => setManualTranscriptInput(e.target.value)}
+                  placeholder="Paste raw earnings call transcript text here..."
+                  dir="ltr"
+                  className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 text-xs text-slate-900 dark:text-slate-100"
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={isSavingTranscript || !manualTranscriptInput.trim()}
+                    onClick={handleSaveManualTranscript}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSavingTranscript ? 'שומר...' : 'שמור ב-Firestore ורענן AI'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
