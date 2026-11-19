@@ -21,6 +21,322 @@ import * as firebaseLib from '../lib/firebase.js';
 import llmFactory from './llm/llmFactory.js';
 
 // =============================================================================
+// Canonical Moat & Business Model Dictionaries
+// =============================================================================
+
+export const CANONICAL_MOAT_SOURCES = [
+  {
+    key: 'Switching Costs',
+    labelHe: 'עלויות מעבר',
+    labelEn: 'Switching Costs',
+    descriptionHe: 'קושי, זמן ועלות גבוהה ללקוחות לנטוש את המוצר ולעבור למתחרה.',
+    descriptionEn: 'High cost, time, or operational risk for customers to switch to a competitor.',
+    defaultInactiveHe: 'לא זוהה כמנוע חפיר מרכזי בדוח ה-10-K.',
+    defaultInactiveEn: 'Not identified as a primary moat source in the 10-K.',
+  },
+  {
+    key: 'Network Effects',
+    labelHe: 'אפקט רשת',
+    labelEn: 'Network Effects',
+    descriptionHe: 'ערך המוצר או הפלטפורמה עולה עבור כל משתמש ככל שמצטרפים יותר משתמשים.',
+    descriptionEn: 'The product becomes more valuable to each user as more users join the ecosystem.',
+    defaultInactiveHe: 'לא זוהה אפקט רשת משמעותי כמקור חפיר מרכזי בדוח.',
+    defaultInactiveEn: 'No strong network effect identified as a primary moat source.',
+  },
+  {
+    key: 'Cost Advantage',
+    labelHe: 'יתרון עלות וגודל',
+    labelEn: 'Cost Advantage',
+    descriptionHe: 'יכולת מבנית לייצר או לספק שירות בעלות נמוכה מהמתחרים בזכות יתרון לגודל ותשתיות.',
+    descriptionEn: 'Structural ability to deliver products or services at lower unit cost than peers.',
+    defaultInactiveHe: 'לא זוהה יתרון עלות מבני מובהק בדוח.',
+    defaultInactiveEn: 'No structural cost advantage identified as a primary moat source.',
+  },
+  {
+    key: 'Intangible Assets',
+    labelHe: 'נכסים בלתי מוחשיים',
+    labelEn: 'Intangible Assets',
+    descriptionHe: 'כוח מותג חזק, פטנטים, קניין רוחני (IP), רישיונות רגולטוריים ואמון רב-שנים.',
+    descriptionEn: 'Strong brand equity, patents, proprietary IP, or regulatory licenses providing pricing power.',
+    defaultInactiveHe: 'לא זוהו נכסים בלתי מוחשיים כמקור חפיר מרכזי בדוח.',
+    defaultInactiveEn: 'Intangible assets not cited as a primary moat driver.',
+  },
+  {
+    key: 'Efficient Scale',
+    labelHe: 'יעילות קנה מידה',
+    labelEn: 'Efficient Scale',
+    descriptionHe: 'שוק המשרת מספר מצומצם של שחקנים, כך שלמתחרים חדשים לא משתלם כלכלית להיכנס.',
+    descriptionEn: 'Concentrated market where new entrants cannot economically justify entry.',
+    defaultInactiveHe: 'השוק תחרותי בקנה מידה עולמי ואינו מוגן כמונופול טבעי אזורי.',
+    defaultInactiveEn: 'Market remains competitive for scaled global peers rather than a natural oligopoly.',
+  },
+];
+
+const MOAT_KEY_ALIASES = {
+  'switching costs': 'Switching Costs',
+  'switching cost': 'Switching Costs',
+  'network effects': 'Network Effects',
+  'network effect': 'Network Effects',
+  'cost advantage': 'Cost Advantage',
+  'cost advantages': 'Cost Advantage',
+  'economies of scale': 'Cost Advantage',
+  'intangible assets': 'Intangible Assets',
+  'brand': 'Intangible Assets',
+  'patents': 'Intangible Assets',
+  'efficient scale': 'Efficient Scale',
+};
+
+const MOAT_RATING_HE_MAP = {
+  'wide moat': 'חפיר רחב',
+  'narrow moat': 'חפיר צר',
+  'no moat': 'ללא חפיר',
+};
+
+export function translateMoatRating(rating, lang = 'he') {
+  if (!rating) return lang === 'he' ? 'חפיר צר' : 'Narrow Moat';
+  const normalized = String(rating).trim();
+  if (lang !== 'he') return normalized;
+  return MOAT_RATING_HE_MAP[normalized.toLowerCase()] || normalized;
+}
+
+/**
+ * Ensures any moat object always lists all 5 canonical economic moat sources in fixed order
+ * and computes its X/5 score deterministically from active sources.
+ */
+export function normalizeMoat(rawMoat, companyName = '', lang = 'he') {
+  const incomingSources = Array.isArray(rawMoat?.sources) ? rawMoat.sources : [];
+  const byKey = new Map();
+
+  for (const item of incomingSources) {
+    if (!item || !item.name) continue;
+    const rawKey = String(item.name).trim().toLowerCase();
+    const mappedKey = MOAT_KEY_ALIASES[rawKey] || item.name;
+    const canon = CANONICAL_MOAT_SOURCES.find(
+      (c) =>
+        c.key.toLowerCase() === String(mappedKey).toLowerCase() ||
+        c.labelHe === item.name
+    );
+    if (canon && !byKey.has(canon.key)) {
+      byKey.set(canon.key, item);
+    }
+  }
+
+  const sources = CANONICAL_MOAT_SOURCES.map((canon) => {
+    const match = byKey.get(canon.key);
+    const active = match ? Boolean(match.active) : false;
+    const rationale = match?.rationale
+      ? String(match.rationale).trim()
+      : active
+      ? lang === 'he'
+        ? canon.descriptionHe
+        : canon.descriptionEn
+      : lang === 'he'
+      ? canon.defaultInactiveHe
+      : canon.defaultInactiveEn;
+
+    return {
+      name: canon.key,
+      labelHe: canon.labelHe,
+      labelEn: canon.labelEn,
+      descriptionHe: canon.descriptionHe,
+      descriptionEn: canon.descriptionEn,
+      active,
+      rationale,
+    };
+  });
+
+  const activeCount = sources.filter((s) => s.active).length;
+  const rating =
+    rawMoat?.rating ||
+    (activeCount >= 3 ? 'Wide Moat' : activeCount >= 1 ? 'Narrow Moat' : 'No Moat');
+
+  const activeNames = sources
+    .filter((s) => s.active)
+    .map((s) => (lang === 'he' ? s.labelHe : s.labelEn));
+
+  const fallbackSummary =
+    lang === 'he'
+      ? `${companyName ? `${companyName}: ` : ''}${translateMoatRating(rating, 'he')} (${activeCount} מתוך 5 מקורות${activeNames.length ? `: ${activeNames.join(', ')}` : ''}).`
+      : `${companyName ? `${companyName}: ` : ''}${rating} (${activeCount} of 5 sources${activeNames.length ? `: ${activeNames.join(', ')}` : ''}).`;
+
+  return {
+    rating,
+    score: `${activeCount}/5`,
+    summary: rawMoat?.summary || fallbackSummary,
+    sources,
+  };
+}
+
+const EXACT_TRAIT_META = {
+  'b2b enterprise': {
+    labelHe: 'מכירה לארגונים (B2B Enterprise)',
+    explanationHe: 'החברה מוכרת רישיונות ותוכנה בעיקר לעסקים ולארגונים בחוזים רב-שנתיים עם נטישת לקוחות נמוכה.',
+    explanationEn: 'Sells software and services primarily to enterprises under multi-year contracts.',
+  },
+  'recurring saas (75%+)': {
+    labelHe: 'הכנסות חוזרות ממנויים (Recurring SaaS)',
+    explanationHe: 'מעל 75% מההכנסות הן מדמי מנוי חוזרים לתוכנה וענן, מה שמייצר יציבות ותזרים צפוי.',
+    explanationEn: 'Over 75% of revenue comes from recurring cloud and software subscriptions.',
+  },
+  'high operating margin (44%)': {
+    labelHe: 'רווחיות תפעולית גבוהה (44% Operating Margin)',
+    explanationHe: 'החברה שומרת על כ-44% רווח תפעולי מתוך ההכנסות — סימן מובהק לכוח תמחור ויעילות לגודל.',
+    explanationEn: 'Generates ~44% operating margins, reflecting pricing power and operating leverage.',
+  },
+  'cloud & ai infrastructure': {
+    labelHe: 'תשתיות ענן ובינה מלאכותית (Cloud & AI)',
+    explanationHe: 'מפעילה מרכזי נתונים עולמיים שעליהם ארגונים מריצים מערכות ליבה ומודלי AI.',
+    explanationEn: 'Operates hyperscale data centers powering enterprise cloud workloads and AI.',
+  },
+  'b2c premium ecosystem': {
+    labelHe: 'אקוסיסטם צרכני פרימיום (B2C Ecosystem)',
+    explanationHe: 'מערכת סגורה של חומרה ותוכנה לצרכנים פרטיים היוצרת נאמנות וכוח תמחור גבוה.',
+    explanationEn: 'Tightly integrated consumer hardware and software ecosystem with strong brand loyalty.',
+  },
+  'hardware + services flywheel': {
+    labelHe: 'חומרה המזינה שירותים (Flywheel)',
+    explanationHe: 'כל מכשיר שנמכר מגדיל את מאגר המשתמשים הרוכשים שירותים דיגיטליים רווחיים לאורך שנים.',
+    explanationEn: 'Each device sold expands the installed base monetized via recurring digital services.',
+  },
+  'high gross margin services (74%)': {
+    labelHe: 'שירותים ברווח גולמי גבוה (74% Gross Margin)',
+    explanationHe: 'חטיבת השירותים הדיגיטליים נהנית משולי רווח גולמי של מעל 70%, גבוהים ממכירת החומרה.',
+    explanationEn: 'Digital services carry 70%+ gross margins, lifting overall profitability.',
+  },
+  '2.2b+ active devices': {
+    labelHe: 'בסיס של 2.2B+ מכשירים פעילים',
+    explanationHe: 'פריסה עולמית של מעל 2.2 מיליארד מכשירים המשמשת ערוץ הפצה ישיר לשירותים חדשים.',
+    explanationEn: 'Massive installed base of 2.2B+ active devices serving as a direct services distribution channel.',
+  },
+  'b2b & b2c operations': {
+    labelHe: 'פעילות לעסקים ולצרכנים (B2B & B2C)',
+    explanationHe: 'שילוב מכירות הן ללקוחות עסקיים (B2B) והן לצרכנים פרטיים (B2C) להרחבת בסיס ההכנסות.',
+    explanationEn: 'Diversified revenue across both enterprise customers (B2B) and consumers (B2C).',
+  },
+  'recurring & transactional mix': {
+    labelHe: 'תמהיל הכנסות חוזרות ועסקאות (Recurring Mix)',
+    explanationHe: 'שילוב בין הכנסות מנוי קבועות לבין מכירות חד-פעמיות של מוצרים או שירותים.',
+    explanationEn: 'Blends predictable subscription streams with transactional product or service sales.',
+  },
+  'scalable platform': {
+    labelHe: 'פלטפורמה בעלת יכולת התרחבות (Scalable Platform)',
+    explanationHe: 'תשתית המאפשרת לצרף לקוחות חדשים בעלות שולית נמוכה ולשפר רווחיות עם הגדילה.',
+    explanationEn: 'Platform economics where revenue scales faster than incremental operating costs.',
+  },
+};
+
+const TRAIT_KEYWORD_RULES = [
+  {
+    test: (s) => /\bb2b\b/i.test(s) && /\bb2c\b/i.test(s),
+    heLabel: 'מכירה לעסקים ולצרכנים',
+    heExplain: 'פונה הן לארגונים (B2B) בחוזים גדולים והן לצרכנים פרטיים (B2C).',
+    enExplain: 'Serves both enterprise clients (B2B) and retail consumers (B2C).',
+  },
+  {
+    test: (s) => /\bb2b\b/i.test(s) && !/\bb2c\b/i.test(s),
+    heLabel: 'מכירה לארגונים (B2B)',
+    heExplain: 'מתמקדת במכירה לעסקים ולארגונים — חוזים ארוכי טווח ושימור לקוחות גבוה.',
+    enExplain: 'Enterprise-focused business model with structured B2B contracts.',
+  },
+  {
+    test: (s) => /\bb2c\b/i.test(s) && !/\bb2b\b/i.test(s),
+    heLabel: 'מכירה לצרכנים (B2C)',
+    heExplain: 'מוכרת ישירות לצרכן הפרטי ונשענת על מותג וביקוש רחב.',
+    enExplain: 'Direct-to-consumer business model anchored by brand reach.',
+  },
+  {
+    test: (s) => /(recurring|saas|subscription)/i.test(s),
+    heLabel: 'הכנסות חוזרות / מנויי SaaS',
+    heExplain: 'מודל מנויים חוזר (SaaS) שמבטיח זרם הכנסות קבוע ויציב מדי רבעון.',
+    enExplain: 'Subscription-driven revenue providing predictable recurring cash flows.',
+  },
+  {
+    test: (s) => /(consumption|usage-based)/i.test(s),
+    heLabel: 'תמחור ענן לפי שימוש',
+    heExplain: 'ההכנסות צומחות אוטומטית ככל שהלקוח צורך יותר משאבי מחשוב או שירותים.',
+    enExplain: 'Revenue scales organically with customer compute or service consumption.',
+  },
+  {
+    test: (s) => /(high operating margin|high margin|high gross margin)/i.test(s),
+    heLabel: 'שולי רווח גבוהים',
+    heExplain: 'שיעור רווחיות גבוה המצביע על כוח תמחור, יתרון איכותי ויעילות תפעולית.',
+    enExplain: 'Elevated profit margins signaling pricing power and cost discipline.',
+  },
+  {
+    test: (s) => /(global scale|economies of scale|scale)/i.test(s),
+    heLabel: 'פריסה ויתרון לגודל',
+    heExplain: 'גודל גלובלי המפזר עלויות פיתוח ותשתית ומקשה על מתחרים קטנים להדביק פער.',
+    enExplain: 'Global operating scale amortizing fixed infrastructure and R&D costs.',
+  },
+  {
+    test: (s) => /(cloud|ai|infrastructure)/i.test(s),
+    heLabel: 'תשתיות ענן ו-AI',
+    heExplain: 'הפעלת תשתיות מחשוב, שרתים ושירותי בינה מלאכותית לארגונים.',
+    enExplain: 'Core cloud compute and artificial intelligence infrastructure.',
+  },
+  {
+    test: (s) => /transactional/i.test(s),
+    heLabel: 'הכנסות מעסקאות',
+    heExplain: 'מבוססת על נפח עסקאות או מכירה חד-פעמית של מוצרים ושירותים.',
+    enExplain: 'Generates revenue per transaction or product sale.',
+  },
+];
+
+/**
+ * Resolves a Business Model Trait (either a legacy string or structured bilingual object)
+ * into clean display pill text and an investor-friendly explanation for tooltips.
+ */
+export function resolveTraitDisplay(rawTrait, lang = 'he') {
+  if (rawTrait && typeof rawTrait === 'object') {
+    const labelEn = String(rawTrait.label || rawTrait.labelEn || '').trim();
+    const labelHe = String(rawTrait.labelHe || labelEn).trim();
+    return {
+      key: labelEn || labelHe,
+      displayLabel: lang === 'he' ? labelHe : labelEn || labelHe,
+      englishTerm: labelEn,
+      explanation:
+        lang === 'he'
+          ? rawTrait.explanationHe || rawTrait.explanationEn || ''
+          : rawTrait.explanationEn || rawTrait.explanationHe || '',
+    };
+  }
+
+  const text = String(rawTrait || '').trim();
+  const exact = EXACT_TRAIT_META[text.toLowerCase()];
+  if (exact) {
+    return {
+      key: text,
+      displayLabel: lang === 'he' ? exact.labelHe : text,
+      englishTerm: text,
+      explanation: lang === 'he' ? exact.explanationHe : exact.explanationEn,
+    };
+  }
+
+  const matchedRules = TRAIT_KEYWORD_RULES.filter((r) => r.test(text));
+  if (matchedRules.length > 0) {
+    const heParts = [...new Set(matchedRules.map((r) => r.heLabel))].slice(0, 2);
+    const heDesc = matchedRules.map((r) => r.heExplain).join(' ');
+    const enDesc = matchedRules.map((r) => r.enExplain).join(' ');
+    return {
+      key: text,
+      displayLabel: lang === 'he' ? `${heParts.join(' · ')} (${text})` : text,
+      englishTerm: text,
+      explanation: lang === 'he' ? heDesc : enDesc,
+    };
+  }
+
+  return {
+    key: text,
+    displayLabel: text,
+    englishTerm: text,
+    explanation:
+      lang === 'he'
+        ? `מאפיין מודל עסקי (${text}) כפי שזוהה מתוך דוח החברה.`
+        : `Core business model characteristic identified in company filings (${text}).`,
+  };
+}
+
+// =============================================================================
 // Constants & Configuration
 // =============================================================================
 
@@ -67,7 +383,7 @@ const PRESET_MOCKS = {
       rating: 'Wide Moat',
       score: '4/5',
       summary:
-        'חפיר כלכלי רחב במיוחד הנשען על עלויות מעבר אדירות בארגונים (Active Directory, Office, Azure) ויתרון לגודל בתשתיות הענן.',
+        'חפיר כלכלי רחב (4 מתוך 5 מקורות): מבוסס על עלויות מעבר ארגוניות, אפקט רשת (LinkedIn ו-GitHub), יתרון עלות וגודל בתשתיות הענן ונכסי מותג ו-IP.',
       sources: [
         {
           name: 'Switching Costs',
@@ -89,6 +405,11 @@ const PRESET_MOCKS = {
           active: true,
           rationale: 'אמון מותג ארגוני של 40 שנה ואישורי אבטחה וממשל (FedRAMP).',
         },
+        {
+          name: 'Efficient Scale',
+          active: false,
+          rationale: 'שוק הענן והתוכנה תחרותי בקנה מידה גלובלי מול AWS ו-Google ואינו מונופול אזורי סגור.',
+        },
       ],
     },
     translations: {
@@ -104,7 +425,7 @@ const PRESET_MOCKS = {
           rating: 'Wide Moat',
           score: '4/5',
           summary:
-            'Exceptional Wide Moat driven by mission-critical enterprise switching costs and hyperscale cloud cost advantages.',
+            'Wide Moat (4 of 5 sources): Built on mission-critical enterprise switching costs, network effects (LinkedIn/GitHub), hyperscale cloud cost advantage, and trusted brand/IP assets.',
           sources: [
             {
               name: 'Switching Costs',
@@ -125,6 +446,11 @@ const PRESET_MOCKS = {
               name: 'Intangible Assets',
               active: true,
               rationale: 'Decades of enterprise trust, global distribution channel, and government compliance certifications.',
+            },
+            {
+              name: 'Efficient Scale',
+              active: false,
+              rationale: 'Global cloud and enterprise software faces scaled competition (AWS, Google Cloud) rather than a natural local monopoly.',
             },
           ],
         },
@@ -170,7 +496,7 @@ const PRESET_MOCKS = {
       rating: 'Wide Moat',
       score: '4/5',
       summary:
-        'חפיר רחב המבוסס על אקוסיסטם סגור (iOS + חומרה + שירותים) היוצר עלויות מעבר גבוהות וכוח תמחור נדיר בשוק הצרכני.',
+        'חפיר רחב (4 מתוך 5 מקורות): מבוסס על עלויות מעבר גבוהות באקוסיסטם iOS, אפקט רשת ב-App Store, יתרון עלות בייצור ושבבים ונכסי מותג צרכניים.',
       sources: [
         {
           name: 'Switching Costs',
@@ -178,14 +504,24 @@ const PRESET_MOCKS = {
           rationale: 'שילוב הדוק בין iPhone, Watch, iCloud ו-iMessage גורם לשיעור שימור לקוחות של מעל 90%.',
         },
         {
-          name: 'Intangible Assets',
-          active: true,
-          rationale: 'מותג הצרכנות החזק בעולם ותכנון שבבים פנימי (Apple Silicon).',
-        },
-        {
           name: 'Network Effects',
           active: true,
           rationale: 'App Store מושך מפתחים בזכות בסיס המשתמשים הרווחי ביותר בעולם.',
+        },
+        {
+          name: 'Cost Advantage',
+          active: true,
+          rationale: 'כוח מיקוח חסר תקדים מול ספקיות ייצור ותכנון שבבים עצמאי (Apple Silicon).',
+        },
+        {
+          name: 'Intangible Assets',
+          active: true,
+          rationale: 'מותג הצרכנות החזק בעולם ותכנון שבבים ופטנטים פנימיים.',
+        },
+        {
+          name: 'Efficient Scale',
+          active: false,
+          rationale: 'שוק הסמארטפונים והחומרה העולמי פתוח למתחרים (Samsung, Google, Xiaomi).',
         },
       ],
     },
@@ -202,7 +538,7 @@ const PRESET_MOCKS = {
           rating: 'Wide Moat',
           score: '4/5',
           summary:
-            'Wide Moat powered by a walled-garden hardware-plus-software ecosystem with 90%+ customer retention and unmatched brand pricing power.',
+            'Wide Moat (4 of 5 sources): Powered by iOS switching costs, App Store network effects, supply-chain and silicon cost advantage, and premier consumer brand equity.',
           sources: [
             {
               name: 'Switching Costs',
@@ -210,14 +546,24 @@ const PRESET_MOCKS = {
               rationale: 'Seamless integration across iOS, iCloud, Apple Watch, and Mac locks in consumers.',
             },
             {
-              name: 'Intangible Assets',
-              active: true,
-              rationale: 'Premier global consumer brand and proprietary Apple Silicon chip architecture.',
-            },
-            {
               name: 'Network Effects',
               active: true,
               rationale: 'iOS App Store ecosystem connects millions of developers with high-spending users.',
+            },
+            {
+              name: 'Cost Advantage',
+              active: true,
+              rationale: 'Unmatched component purchasing scale and custom Apple Silicon chip design.',
+            },
+            {
+              name: 'Intangible Assets',
+              active: true,
+              rationale: 'Premier global consumer brand and proprietary hardware-software IP.',
+            },
+            {
+              name: 'Efficient Scale',
+              active: false,
+              rationale: 'Global consumer electronics remains open to large international rivals.',
             },
           ],
         },
@@ -531,80 +877,84 @@ function enrichWithTearSheetDefaults(baseObj, normTicker, companyName) {
         'Global Distribution Network',
       ];
 
+  const defaultMoatInput = baseObj.moat || {
+    rating: 'Narrow Moat',
+    score: '2/5',
+    summary: `${companyName} נשענת על עלויות מעבר של לקוחות קיימים ונכסי מותג ומוניטין בענף הפעילות שלה.`,
+    sources: [
+      {
+        name: 'Switching Costs',
+        active: true,
+        rationale: 'הטמעת המוצרים בתהליכי העבודה של הלקוחות מייצרת עלויות מעבר.',
+      },
+      {
+        name: 'Intangible Assets',
+        active: true,
+        rationale: 'מוניטין, קניין רוחני וקשרי לקוחות ארוכי טווח.',
+      },
+    ],
+  };
+
+  const normalizedMoat = normalizeMoat(defaultMoatInput, companyName, 'he');
+
+  const rawEn = baseObj.translations?.en;
+  const fallbackEnMoatInput = rawEn?.moat || {
+    rating: normalizedMoat.rating,
+    sources: normalizedMoat.sources.map((s) => ({
+      name: s.name,
+      active: s.active,
+      rationale: s.active ? s.descriptionEn : s.defaultInactiveEn || s.descriptionEn,
+    })),
+  };
+  const normalizedEnMoat = normalizeMoat(fallbackEnMoatInput, companyName, 'en');
+
+  const isFallbackEn = !rawEn?.summary;
+  const enrichedTranslations = {
+    ...(baseObj.translations || {}),
+    en: {
+      ...(isFallbackEn ? { _isFallbackTranslation: true } : {}),
+      summary:
+        rawEn?.summary ||
+        `${companyName} (${normTicker}) operates as a leading provider of products and services in its industry, generating revenue through direct sales, enterprise contracts, and recurring service offerings.`,
+      growthEngines: rawEn?.growthEngines || [
+        `Expanding adoption of ${engines[0] || 'core products'} across enterprise and consumer segments`,
+        'Operating margin expansion driven by scale and recurring revenue mix',
+        'International market penetration and new product innovation',
+      ],
+      moat: normalizedEnMoat,
+    },
+  };
+
   return {
-    businessModelTraits: baseObj.businessModelTraits || [
+    businessModelTraits: [
       'B2B & B2C Operations',
       'Recurring & Transactional Mix',
       'Scalable Platform',
     ],
-    revenueSegments: baseObj.revenueSegments || [
+    revenueSegments: [
       { name: engines[0] || 'Core Products & Services', pct: 55 },
       { name: engines[1] || 'Subscriptions & Recurring', pct: 30 },
       { name: engines[2] || 'Other Operating Segments', pct: 15 },
     ],
-    geoBreakdown: baseObj.geoBreakdown || [
+    geoBreakdown: [
       { region: 'United States / Domestic', pct: 60 },
       { region: 'International Markets', pct: 40 },
     ],
-    mermaidDiagram:
-      baseObj.mermaidDiagram ||
-      `flowchart LR\n  A["Customers & Enterprises"] --> B["${engines[0] || normTicker}"]\n  B --> C["Recurring & Product Revenue"]\n  C --> D["Operating Cash Flow"]`,
-    growthEngines: baseObj.growthEngines || [
+    mermaidDiagram: `flowchart LR\n  A["Customers & Enterprises"] --> B["${engines[0] || normTicker}"]\n  B --> C["Recurring & Product Revenue"]\n  C --> D["Operating Cash Flow"]`,
+    growthEngines: [
       `הרחבת אימוץ ${engines[0] || 'מוצרי הליבה'} בקרב לקוחות קיימים וחדשים`,
       `שיפור שולי הרווח התפעולי באמצעות יתרון לגודל ומינוף תפעולי`,
       `חדירה לשווקים בינלאומיים והשקת שירותים משלימים`,
     ],
-    competitors: baseObj.competitors || [
+    competitors: [
       `${normTicker} Sector Peers`,
       'Global Industry Leaders',
       'Specialized Disruptors',
     ],
-    moat: baseObj.moat || {
-      rating: 'Narrow Moat',
-      score: '2/5',
-      summary: `${companyName} נשענת על עלויות מעבר של לקוחות קיימים ומותג מבוסס בענף הפעילות שלה.`,
-      sources: [
-        {
-          name: 'Switching Costs',
-          active: true,
-          rationale: 'הטמעת המוצרים בתהליכי העבודה של הלקוחות מייצרת עלויות מעבר.',
-        },
-        {
-          name: 'Intangible Assets',
-          active: true,
-          rationale: 'מוניטין, קניין רוחני וקשרי לקוחות ארוכי טווח.',
-        },
-      ],
-    },
-    translations: baseObj.translations || {
-      en: {
-        summary: `${companyName} (${normTicker}) operates as a leading provider of products and services in its industry, generating revenue through direct sales, enterprise contracts, and recurring service offerings.`,
-        growthEngines: [
-          `Expanding adoption of ${engines[0] || 'core products'} across enterprise and consumer segments`,
-          'Operating margin expansion driven by scale and recurring revenue mix',
-          'International market penetration and new product innovation',
-        ],
-        moat: {
-          rating: baseObj.moat?.rating || 'Narrow Moat',
-          score: baseObj.moat?.score || '2/5',
-          summary: `${companyName} benefits from customer switching costs and established brand recognition in its core market.`,
-          sources: [
-            {
-              name: 'Switching Costs',
-              active: true,
-              rationale: 'Customer workflow integration creates retention and switching friction.',
-            },
-            {
-              name: 'Intangible Assets',
-              active: true,
-              rationale: 'Brand recognition, proprietary know-how, and enterprise relationships.',
-            },
-          ],
-        },
-      },
-    },
     ...baseObj,
     keyEngines: engines,
+    moat: normalizedMoat,
+    translations: enrichedTranslations,
   };
 }
 
@@ -658,7 +1008,14 @@ async function callLlmApi(ticker, companyProfile, apiKey, options = {}) {
 {
   "summary": "Elevator Pitch חד (1-2 משפטים בעברית פשוטה) שמסביר מה החברה עושה ואיך היא מרוויחה כסף",
   "keyEngines": ["Engine 1 in English", "Engine 2 in English", "Engine 3 in English", "Engine 4 in English"],
-  "businessModelTraits": ["B2B / B2C", "Recurring SaaS / Transactional", "High Margin / Scale"],
+  "businessModelTraits": [
+    {
+      "label": "Short English Tag (e.g. B2B & B2C)",
+      "labelHe": "תווית קצרה בעברית (למשל: מכירה לארגונים וצרכנים · B2B & B2C)",
+      "explanationHe": "משפט קצר בעברית שמסביר מה התווית אומרת עבור החברה",
+      "explanationEn": "One concise sentence explaining this business model trait"
+    }
+  ],
   "revenueSegments": [
     { "name": "Segment Name in English", "pct": 50 },
     { "name": "Segment 2 in English", "pct": 30 },
@@ -678,12 +1035,13 @@ async function callLlmApi(ticker, companyProfile, apiKey, options = {}) {
   "moat": {
     "rating": "Wide Moat | Narrow Moat | No Moat",
     "score": "4/5",
-    "summary": "משפט אחד בעברית שמסכם את החפיר הכלכלי של החברה",
+    "summary": "משפט מאוזן בעברית הסוקר את כלל מקורות החפיר הפעילים של החברה (ולא רק מקור אחד)",
     "sources": [
       { "name": "Switching Costs", "active": true, "rationale": "נימוק קצר בעברית" },
       { "name": "Network Effects", "active": true, "rationale": "נימוק קצר בעברית" },
-      { "name": "Cost Advantage", "active": false, "rationale": "נימוק קצר בעברית" },
-      { "name": "Intangible Assets", "active": true, "rationale": "נימוק קצר בעברית" }
+      { "name": "Cost Advantage", "active": true, "rationale": "נימוק קצר בעברית" },
+      { "name": "Intangible Assets", "active": true, "rationale": "נימוק קצר בעברית" },
+      { "name": "Efficient Scale", "active": false, "rationale": "נימוק קצר בעברית מדוע קיים או לא קיים" }
     ]
   }
 }`;
@@ -739,7 +1097,10 @@ export async function translateSummaryOnDemand(ticker, summaryObj, targetLang = 
     return summaryObj;
   }
 
-  if (summaryObj.translations?.[targetLang]?.summary) {
+  if (
+    summaryObj.translations?.[targetLang]?.summary &&
+    !summaryObj.translations?.[targetLang]?._isFallbackTranslation
+  ) {
     return summaryObj;
   }
 
@@ -754,20 +1115,24 @@ export async function translateSummaryOnDemand(ticker, summaryObj, targetLang = 
       moat: summaryObj.moat || null,
     };
 
-    const translatePrompt = `Translate the following structured investment Tear Sheet JSON fields into clear, professional English for value investors. Return ONLY valid JSON with the exact same keys ("summary", "growthEngines", "moat"):
+    const translatePrompt = `Translate the following structured investment Tear Sheet JSON fields into clear, professional English for value investors. Return ONLY valid JSON with the exact same keys ("summary", "growthEngines", "moat") preserving all 5 moat sources:
 ${JSON.stringify(compactPayload)}`;
 
     const translated = await provider.generateJSON(translatePrompt, apiKey);
     if (translated && translated.summary) {
+      const normalizedTranslated = {
+        ...translated,
+        ...(translated.moat ? { moat: normalizeMoat(translated.moat, normTicker, 'en') } : {}),
+      };
       const updated = {
         ...summaryObj,
         translations: {
           ...(summaryObj.translations || {}),
-          [targetLang]: translated,
+          [targetLang]: normalizedTranslated,
         },
       };
       await setCachedSummary(normTicker, updated);
-      return updated;
+      return enrichWithTearSheetDefaults(updated, normTicker, normTicker);
     }
   } catch {
     // Fall back to existing translation defaults if live call fails
@@ -990,4 +1355,8 @@ export default {
   refreshCompanyContext,
   saveManualTranscript,
   translateSummaryOnDemand,
+  CANONICAL_MOAT_SOURCES,
+  normalizeMoat,
+  resolveTraitDisplay,
+  translateMoatRating,
 };

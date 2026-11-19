@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { Step1Triage } from '../Step1Triage'
 import { setCachedSummary } from '../../../services/aiSummaryService.js'
 
@@ -35,18 +35,37 @@ describe('Step1Triage Component', () => {
     expect(screen.getByText('10-Second Triage')).toBeTruthy()
   })
 
-  it('renders Business Clarity (Circle of Competence) card with the AI summary', async () => {
+  it('renders Business Clarity card in RTL Hebrew by default with company logo, 5 moat pillars, transparent grounding, and switches cleanly to LTR English', async () => {
     render(<Step1Triage company={mockCompany} />)
 
-    expect(
-      screen.getByText('Business Clarity (Circle of Competence)')
-    ).toBeTruthy()
+    const blade = screen.getByTestId('tear-sheet-blade')
+    expect(blade.getAttribute('dir')).toBe('rtl')
+    expect(screen.getByTestId('company-logo')).toBeTruthy()
+    expect(screen.getByText('בהירות עסקית (מעגל הכשירות)')).toBeTruthy()
 
     const expectedText =
       'מייקרוסופט היא ענקית טכנולוגיה שמרוויחה כסף ממכירת רישיונות תוכנה (Windows, Office), שירותי ענן לארגונים (Azure), ומוצרי חומרה וגיימינג. המודל נשען על הכנסות חוזרות ממנויים (SaaS).'
 
     const summaryEl = await screen.findByText(expectedText)
     expect(summaryEl).toBeTruthy()
+
+    // Core Model pill removed & replaced by transparent grounding badge
+    expect(screen.queryByText('Core Model')).toBeNull()
+    expect(screen.getByTestId('data-grounding-badge')).toBeTruthy()
+
+    // Inline 5 canonical moat categories visible even before expanding Tear Sheet
+    const moatCats = screen.getByTestId('moat-inline-categories')
+    expect(moatCats.textContent).toContain('עלויות מעבר')
+    expect(moatCats.textContent).toContain('יעילות קנה מידה')
+    expect(screen.getByText('מקורות הכנסה עיקריים (מוצרי ליבה):')).toBeTruthy()
+
+    // Toggle card language to English -> only the card switches to LTR & English headings
+    fireEvent.click(screen.getByTestId('lang-btn-en'))
+    expect(blade.getAttribute('dir')).toBe('ltr')
+    expect(screen.getByText('Business Clarity (Circle of Competence)')).toBeTruthy()
+    expect(screen.getByText('Core Revenue Streams:')).toBeTruthy()
+    expect(moatCats.textContent).toContain('Switching Costs')
+    expect(moatCats.textContent).toContain('Efficient Scale')
   })
 
   it('renders the 4 Fast Fundamentals indicators with updated titles and target thresholds', () => {
@@ -68,34 +87,42 @@ describe('Step1Triage Component', () => {
     expect(screen.getByText('Current Ratio תקין > 1')).toBeTruthy()
   })
 
-  it('renders educational tooltips with the required rationales for beginners', () => {
+  it('renders educational tooltips with the required rationales for beginners', async () => {
     render(<Step1Triage company={mockCompany} />)
 
-    // 5 Educational Info buttons
+    // 6 Educational Info buttons (Business Clarity, Core Revenue Streams, and 4 Fundamentals)
     const infoButtons = screen.getAllByRole('button', { name: /educational rationale/i })
-    expect(infoButtons).toHaveLength(5)
+    expect(infoButtons).toHaveLength(6)
 
     // 1. Business Clarity Tooltip
     expect(
       screen.getByText(/מעגל הכשירות: הכלל הראשון בהשקעות הוא לא להשקיע בעסק שאנחנו לא מבינים/i)
     ).toBeTruthy()
 
-    // 2. Revenue Growth Tooltip
+    // 2. Core Revenue Streams Tooltip
+    expect(
+      screen.getByText(/המוצרים, השירותים והחטיבות העיקריים שמייצרים לחברה הכנסות כיום/i)
+    ).toBeTruthy()
+
+    // Wait for async summary load to settle cleanly
+    await screen.findByTestId('toggle-tear-sheet-btn')
+
+    // 3. Revenue Growth Tooltip
     expect(
       screen.getByText(/צמיחה בהכנסות: עסק בריא הוא עסק שצומח/i)
     ).toBeTruthy()
 
-    // 3. Operating Margins Tooltip
+    // 4. Operating Margins Tooltip
     expect(
       screen.getByText(/שולי רווח תפעולי: המדד ליעילות ויציבות/i)
     ).toBeTruthy()
 
-    // 4. Share Dilution Tooltip
+    // 5. Share Dilution Tooltip
     expect(
       screen.getByText(/דילול מניות: כשהחברה מנפיקה עוד מניות/i)
     ).toBeTruthy()
 
-    // 5. Balance Sheet / Current Ratio Tooltip
+    // 6. Balance Sheet / Current Ratio Tooltip
     expect(
       screen.getByText(/יחס שוטף \(Current Ratio\): אנחנו רוצים לישון בשקט בלילה/i)
     ).toBeTruthy()

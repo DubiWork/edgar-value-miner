@@ -22,10 +22,9 @@ test.describe('Step 1 Triage Feature E2E (#310)', () => {
     await expect(page.getByText('1. Triage')).toBeVisible();
     await expect(page.getByText('2. Moat')).toBeVisible();
 
-    // Section 1: Business Clarity (Circle of Competence)
-    await expect(
-      page.getByText('Business Clarity (Circle of Competence)'),
-    ).toBeVisible();
+    // Section 1: Business Clarity Tear Sheet Card (defaults to Hebrew RTL, toggles to English LTR)
+    await expect(page.locator('[data-testid="tear-sheet-blade"]')).toBeVisible();
+    await expect(page.getByText('בהירות עסקית (מעגל הכשירות)')).toBeVisible();
 
     // Section 2: 4 Instant Fundamentals Checks
     await expect(page.getByText('Instant Fundamentals Check')).toBeVisible();

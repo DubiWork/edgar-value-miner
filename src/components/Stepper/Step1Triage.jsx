@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import PropTypes from 'prop-types'
 import {
-  Sparkles,
   TrendingUp,
   Percent,
   Coins,
@@ -25,7 +24,187 @@ import {
   refreshCompanyContext,
   saveManualTranscript,
   translateSummaryOnDemand,
+  resolveTraitDisplay,
+  translateMoatRating,
 } from '../../services/aiSummaryService.js'
+
+/**
+ * Renders the company logo from FMP's stock image CDN with a clean ticker monogram fallback.
+ */
+function CompanyLogo({ ticker, companyName, isLoading }) {
+  const [failedTicker, setFailedTicker] = useState(null)
+
+  const normTicker = String(ticker || 'MS').toUpperCase().trim()
+  const hasError = failedTicker === normTicker
+  const logoUrl = `https://financialmodelingprep.com/image-stock/${encodeURIComponent(normTicker)}.png`
+
+  return (
+    <div
+      data-testid="company-logo"
+      className={`w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden shadow-2xs shrink-0 ${
+        isLoading ? 'animate-pulse' : ''
+      }`}
+    >
+      {!hasError ? (
+        <img
+          src={logoUrl}
+          alt={`${companyName || normTicker} logo`}
+          className="w-7 h-7 object-contain"
+          onError={() => setFailedTicker(normTicker)}
+        />
+      ) : (
+        <span className="text-xs font-extrabold tracking-tight text-sky-700 dark:text-sky-300">
+          {normTicker.slice(0, 4)}
+        </span>
+      )}
+    </div>
+  )
+}
+
+CompanyLogo.propTypes = {
+  ticker: PropTypes.string.isRequired,
+  companyName: PropTypes.string,
+  isLoading: PropTypes.bool,
+}
+
+/**
+ * Computes transparent data-grounding status from the summary source and SEC ingestionStatus.
+ */
+function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading) {
+  const isHe = lang === 'he'
+  if (isLoading) {
+    return {
+      isMock: false,
+      verifiedCount: 0,
+      badgeLabel: isHe ? 'בודק מקורות מידע...' : 'Checking data sources...',
+      subtitle: isHe ? 'מאמת זמינות דוח 10-K, 8-K ותמליל שיחת ועידה...' : 'Verifying SEC 10-K, 8-K & transcript sources...',
+      toneClass:
+        'bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 border-sky-300/40 dark:border-sky-800/50',
+      checks: [],
+    }
+  }
+
+  const effectiveSource =
+    aiSummary?.source === 'cache' ? aiSummary?.originalSource || 'cache' : aiSummary?.source
+  const isMock = effectiveSource === 'mock-preset' || effectiveSource === 'mock-dynamic'
+
+  const hasTenK = !isMock && ingestionStatus?.tenK?.status === 'ok'
+  const hasEightK =
+    !isMock &&
+    (ingestionStatus?.eightK?.status === 'ok' || ingestionStatus?.transcript?.status === 'fallback_8k')
+  const hasTranscript =
+    !isMock &&
+    (ingestionStatus?.transcript?.status === 'ok' || ingestionStatus?.transcript?.status === 'manual')
+
+  const checks = [
+    {
+      id: 'tenK',
+      ok: hasTenK,
+      label: isHe ? 'דוח שנתי SEC 10-K (סעיפים 1, 1A, 7)' : 'SEC 10-K Annual Report (Item 1, 1A, 7)',
+      detail: hasTenK
+        ? isHe
+          ? `חולץ (${ingestionStatus.tenK.date || 'עדכני'})`
+          : `Extracted (${ingestionStatus.tenK.date || 'Latest'})`
+        : isMock
+        ? isHe
+          ? 'לא נשלף (תצוגת דוגמה)'
+          : 'Not fetched (Demo preset)'
+        : isHe
+        ? 'טרם חולץ בשרת'
+        : 'Not yet attached',
+    },
+    {
+      id: 'eightK',
+      ok: hasEightK,
+      label: isHe ? 'דיווח כספי רבעוני SEC 8-K (Item 2.02)' : 'SEC 8-K Earnings Release (Item 2.02)',
+      detail: hasEightK
+        ? isHe
+          ? `חולץ (${ingestionStatus.eightK?.date || ingestionStatus.transcript?.date || 'עדכני'})`
+          : `Extracted (${ingestionStatus.eightK?.date || ingestionStatus.transcript?.date || 'Latest'})`
+        : isMock
+        ? isHe
+          ? 'לא נשלף (תצוגת דוגמה)'
+          : 'Not fetched (Demo preset)'
+        : isHe
+        ? 'לא זמין'
+        : 'Unavailable',
+    },
+    {
+      id: 'transcript',
+      ok: hasTranscript,
+      label: isHe ? 'תמליל שיחת ועידה (Earnings Call)' : 'Earnings Call Transcript',
+      detail: hasTranscript
+        ? isHe
+          ? `זמין (${ingestionStatus.transcript.status === 'manual' ? 'הוזן ידנית' : ingestionStatus.transcript.source || 'רשמי'})`
+          : `Available (${ingestionStatus.transcript.status === 'manual' ? 'Manual' : ingestionStatus.transcript.source || 'Verified'})`
+        : !isMock && ingestionStatus?.transcript?.status === 'fallback_8k'
+        ? isHe
+          ? 'אין תמליל שיחה — הסתמכות על 8-K'
+          : 'No transcript — using 8-K fallback'
+        : isHe
+        ? 'אין תמליל שיחת ועידה'
+        : 'No earnings transcript available',
+    },
+  ]
+
+  const verifiedCount = [hasTenK, hasEightK, hasTranscript].filter(Boolean).length
+
+  if (isMock) {
+    return {
+      isMock: true,
+      verifiedCount: 0,
+      badgeLabel: isHe ? 'ביסוס נתונים: 0/3 (דוגמת תצוגה)' : 'Data Grounding: 0/3 (Demo)',
+      subtitle: isHe
+        ? 'תקציר דוגמה מובנה • ללא קריאת דוח 10-K או שיחת ועידה מה-SEC'
+        : 'Structured demo summary • Live SEC 10-K & transcript not yet fetched',
+      toneClass:
+        'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30',
+      checks,
+    }
+  }
+
+  if (verifiedCount === 0) {
+    return {
+      isMock: false,
+      verifiedCount: 0,
+      badgeLabel: isHe ? 'ביסוס נתונים: 0/3 (AI כללי)' : 'Data Grounding: 0/3 (General AI)',
+      subtitle: isHe
+        ? 'ניתוח AI כללי • טרם צורפו דוחות 10-K או תמליל שיחת ועידה מהשרת'
+        : 'General AI output • SEC 10-K and earnings call transcript not yet attached',
+      toneClass:
+        'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700',
+      checks,
+    }
+  }
+
+  const partsHe = [
+    hasTenK ? 'דוח 10-K' : null,
+    hasEightK ? 'דיווח 8-K' : null,
+    hasTranscript ? 'תמליל שיחת ועידה' : null,
+  ].filter(Boolean)
+
+  const partsEn = [
+    hasTenK ? 'SEC 10-K' : null,
+    hasEightK ? '8-K Filing' : null,
+    hasTranscript ? 'Earnings Call' : null,
+  ].filter(Boolean)
+
+  return {
+    isMock: false,
+    verifiedCount,
+    badgeLabel: isHe
+      ? `ביסוס נתונים: ${verifiedCount}/3 מקורות`
+      : `Data Grounding: ${verifiedCount}/3 Sources`,
+    subtitle: isHe
+      ? `מבוסס בפועל על: ${partsHe.join(' + ')}${!hasTranscript ? ' • ללא תמליל שיחת ועידה' : ''}`
+      : `Grounded in: ${partsEn.join(' + ')}${!hasTranscript ? ' • No Earnings Transcript' : ''}`,
+    toneClass:
+      verifiedCount === 3
+        ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25'
+        : 'bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border-sky-300/40 dark:border-sky-800/50',
+    checks,
+  }
+}
 
 /**
  * Parses a Mermaid `flowchart LR` / `graph LR` string into ordered flow nodes
@@ -50,16 +229,20 @@ function parseMermaidFlowNodes(mermaidCode) {
  * InfoTooltip Component
  * Subtle info ("i") icon with a floating dark tooltip bubble on hover/focus.
  */
-function InfoTooltip({ text, align = 'center' }) {
+function InfoTooltip({ text, align = 'center', dir = 'rtl' }) {
   const alignClasses = {
     left: 'left-0 sm:-left-3',
     right: 'right-0 sm:-right-3',
+    start: 'start-0',
+    end: 'end-0',
     center: 'left-1/2 -translate-x-1/2',
   }[align] || 'left-1/2 -translate-x-1/2'
 
   const arrowClasses = {
     left: 'left-3 sm:left-4',
     right: 'right-3 sm:right-4',
+    start: 'start-3',
+    end: 'end-3',
     center: 'left-1/2 -translate-x-1/2',
   }[align] || 'left-1/2 -translate-x-1/2'
 
@@ -86,8 +269,10 @@ function InfoTooltip({ text, align = 'center' }) {
       {/* Floating Tooltip Bubble */}
       <span
         role="tooltip"
-        dir="rtl"
-        className={`pointer-events-none absolute bottom-full mb-2 ${alignClasses} w-64 sm:w-72 p-3 text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-xl shadow-xl border border-slate-700/60 dark:border-slate-800 text-right opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible group-focus-within/tooltip:opacity-100 group-focus-within/tooltip:visible transition-all duration-200 z-50 font-sans font-normal normal-case tracking-normal`}
+        dir={dir}
+        className={`pointer-events-none absolute bottom-full mb-2 ${alignClasses} w-64 sm:w-72 p-3 text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-xl shadow-xl border border-slate-700/60 dark:border-slate-800 ${
+          dir === 'rtl' ? 'text-right' : 'text-left'
+        } opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible group-focus-within/tooltip:opacity-100 group-focus-within/tooltip:visible transition-all duration-200 z-50 font-sans font-normal normal-case tracking-normal`}
       >
         {text}
         {/* Tooltip Downward Arrow */}
@@ -102,7 +287,8 @@ function InfoTooltip({ text, align = 'center' }) {
 
 InfoTooltip.propTypes = {
   text: PropTypes.string.isRequired,
-  align: PropTypes.oneOf(['left', 'right', 'center']),
+  align: PropTypes.oneOf(['left', 'right', 'start', 'end', 'center']),
+  dir: PropTypes.oneOf(['rtl', 'ltr']),
 }
 
 /**
@@ -166,26 +352,31 @@ export function Step1Triage({
     }
   }, [isAdmin, refreshAdminBudget])
 
-  // Fetch or load from cache AI summary on ticker change
+  // Fetch or load from cache AI summary on ticker change + sync server grounding status
   useEffect(() => {
     let isCancelled = false
     setIsLoadingSummary(true)
     setAdminStatusMessage(null)
+    setIngestionStatus(null)
 
     getOrFetchCompanySummary(ticker, {
       name: companyName,
       sector: company?.sector,
     })
-      .then((result) => {
-        if (!isCancelled) {
-          setAiSummary(result)
-          if (result?.ingestionStatus) {
-            setIngestionStatus(result.ingestionStatus)
+      .then(async (result) => {
+        if (isCancelled) return
+        setAiSummary(result)
+        if (result?.ingestionStatus) {
+          setIngestionStatus(result.ingestionStatus)
+        } else {
+          const ctxStatus = await getCompanyContextStatus(ticker)
+          if (!isCancelled && ctxStatus) {
+            setIngestionStatus(ctxStatus)
           }
-          setIsLoadingSummary(false)
-          if (isAdmin) {
-            refreshAdminBudget()
-          }
+        }
+        setIsLoadingSummary(false)
+        if (isAdmin) {
+          refreshAdminBudget()
         }
       })
       .catch((err) => {
@@ -342,7 +533,11 @@ export function Step1Triage({
   const handleLanguageSwitch = useCallback(
     async (nextLang) => {
       setLang(nextLang)
-      if (nextLang === 'en' && aiSummary && !aiSummary.translations?.en?.summary) {
+      if (
+        nextLang === 'en' &&
+        aiSummary &&
+        (!aiSummary.translations?.en?.summary || aiSummary.translations?.en?._isFallbackTranslation)
+      ) {
         setIsTranslating(true)
         try {
           const updated = await translateSummaryOnDemand(ticker, aiSummary, 'en')
@@ -369,6 +564,11 @@ export function Step1Triage({
     lang === 'en' && aiSummary?.translations?.en?.moat
       ? aiSummary.translations.en.moat
       : aiSummary?.moat || null
+
+  const grounding = useMemo(
+    () => buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoadingSummary),
+    [aiSummary, ingestionStatus, lang, isLoadingSummary]
+  )
 
   const mermaidNodes = useMemo(
     () => parseMermaidFlowNodes(aiSummary?.mermaidDiagram),
@@ -671,46 +871,85 @@ export function Step1Triage({
       {/* SECTION 1: Business Clarity & Economic Moat Tear Sheet Blade (#319) */}
       <div
         data-testid="tear-sheet-blade"
+        dir={lang === 'he' ? 'rtl' : 'ltr'}
         className="relative rounded-2xl border border-sky-500/20 bg-linear-to-b from-sky-50/50 via-white to-white dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900 shadow-sm p-6 sm:p-7"
       >
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2.5">
-            <div
-              className={`p-2 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 ${
-                isLoadingSummary ? 'animate-pulse' : ''
-              }`}
-            >
-              <Sparkles className="w-5 h-5" />
-            </div>
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            <CompanyLogo ticker={ticker} companyName={companyName} isLoading={isLoadingSummary} />
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-                  Business Clarity (Circle of Competence)
+                  {lang === 'he'
+                    ? 'בהירות עסקית (מעגל הכשירות)'
+                    : 'Business Clarity (Circle of Competence)'}
                 </h2>
                 <InfoTooltip
-                  text="מעגל הכשירות: הכלל הראשון בהשקעות הוא לא להשקיע בעסק שאנחנו לא מבינים. המטרה היא לוודא שאנחנו יודעים להסביר בפשטות כיצד החברה מייצרת כסף. אם אי אפשר להסביר את זה בפשטות - עוברים הלאה."
-                  align="left"
+                  text={
+                    lang === 'he'
+                      ? 'מעגל הכשירות: הכלל הראשון בהשקעות הוא לא להשקיע בעסק שאנחנו לא מבינים. המטרה היא לוודא שאנחנו יודעים להסביר בפשטות כיצד החברה מייצרת כסף. אם אי אפשר להסביר את זה בפשטות - עוברים הלאה.'
+                      : 'Circle of Competence: Never invest in a business you cannot simply explain. Make sure you clearly understand how the company makes money before analyzing numbers.'
+                  }
+                  align="start"
+                  dir={lang === 'he' ? 'rtl' : 'ltr'}
                 />
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                AI Summary &bull; Grounded in SEC 10-K (Item 1, 1A, 7) &amp; Earnings Calls
-              </p>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <span data-testid="grounding-subtitle">{grounding.subtitle}</span>
+                {ingestionStatus?.tenK?.url && !grounding.isMock && (
+                  <a
+                    href={ingestionStatus.tenK.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    dir="ltr"
+                    className="inline-flex items-center gap-0.5 font-semibold text-sky-600 dark:text-sky-400 hover:underline"
+                  >
+                    SEC {ingestionStatus.tenK.form || '10-K'} ↗
+                  </a>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Economic Moat Summary Badge (Upfront in Step 1) */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Economic Moat Summary Badge (Clickable + Hover Explanation of the 5 Categories) */}
             {!isLoadingSummary && activeMoat?.rating && (
-              <span
-                data-testid="moat-summary-badge"
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25"
-              >
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span>
-                  {activeMoat.rating}
-                  {activeMoat.score ? ` (${activeMoat.score})` : ''}
-                </span>
-              </span>
+              <div className="relative group/moatbadge">
+                <button
+                  type="button"
+                  data-testid="moat-summary-badge"
+                  onClick={() => setIsBladeOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span>
+                    {translateMoatRating(activeMoat.rating, lang)}
+                    {activeMoat.score
+                      ? lang === 'he'
+                        ? ` (${activeMoat.score} מקורות)`
+                        : ` (${activeMoat.score} Sources)`
+                      : ''}
+                  </span>
+                </button>
+                <div
+                  role="tooltip"
+                  dir={lang === 'he' ? 'rtl' : 'ltr'}
+                  className={`pointer-events-none absolute top-full mt-2 end-0 w-72 p-3 text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-xl shadow-xl border border-slate-700/60 ${
+                    lang === 'he' ? 'text-right' : 'text-left'
+                  } opacity-0 invisible group-hover/moatbadge:opacity-100 group-hover/moatbadge:visible group-focus-within/moatbadge:opacity-100 group-focus-within/moatbadge:visible transition-all duration-200 z-50 space-y-1.5`}
+                >
+                  <div className="font-bold text-emerald-300">
+                    {lang === 'he'
+                      ? 'ציון החפיר הכלכלי (מתוך 5 מקורות קלאסיים):'
+                      : 'Economic Moat Score (Out of 5 Classic Sources):'}
+                  </div>
+                  <p className="text-slate-300 text-[11px]">
+                    {lang === 'he'
+                      ? 'עלויות מעבר, אפקט רשת, יתרון עלות וגודל, נכסים בלתי מוחשיים ויעילות קנה מידה. לחץ כדי לפתוח את הפירוט המלא.'
+                      : 'Switching Costs, Network Effects, Cost Advantage, Intangible Assets, and Efficient Scale. Click to open full breakdown.'}
+                  </p>
+                </div>
+              </div>
             )}
 
             {/* On-Demand Language Toggle (HE | EN) */}
@@ -744,33 +983,85 @@ export function Step1Triage({
               </button>
             </div>
 
+            {/* Transparent Data Grounding Confidence Indicator (Replaces Core Model) */}
             {isLoadingSummary || isTranslating ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 border border-sky-300/40 dark:border-sky-800/50 animate-pulse">
                 <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping" />
-                AI Thinking...
+                {lang === 'he' ? 'מנתח...' : 'AI Thinking...'}
               </span>
             ) : (
-              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-300/40 dark:border-sky-800/50">
-                Core Model
-              </span>
+              <div className="relative group/grounding">
+                <button
+                  type="button"
+                  data-testid="data-grounding-badge"
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border cursor-help transition-colors ${grounding.toneClass}`}
+                >
+                  <span>{grounding.badgeLabel}</span>
+                </button>
+                <div
+                  role="tooltip"
+                  dir={lang === 'he' ? 'rtl' : 'ltr'}
+                  className={`pointer-events-none absolute top-full mt-2 end-0 w-72 sm:w-80 p-3.5 text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-xl shadow-xl border border-slate-700/60 ${
+                    lang === 'he' ? 'text-right' : 'text-left'
+                  } opacity-0 invisible group-hover/grounding:opacity-100 group-hover/grounding:visible group-focus-within/grounding:opacity-100 group-focus-within/grounding:visible transition-all duration-200 z-50 space-y-2`}
+                >
+                  <div className="font-bold text-sky-300 border-b border-slate-700/70 pb-1.5">
+                    {lang === 'he'
+                      ? 'שקיפות מקורות מידע וביסוס הניתוח:'
+                      : 'Data Grounding & Source Verification:'}
+                  </div>
+                  <ul className="space-y-1.5">
+                    {grounding.checks.map((item) => (
+                      <li key={item.id} className="flex items-start justify-between gap-2 text-[11px]">
+                        <span className="flex items-center gap-1.5 text-slate-200">
+                          <span className={item.ok ? 'text-emerald-400 font-bold' : 'text-slate-500'}>
+                            {item.ok ? '✓' : '✕'}
+                          </span>
+                          <span>{item.label}</span>
+                        </span>
+                        <span className={item.ok ? 'text-emerald-300 font-medium shrink-0' : 'text-slate-400 shrink-0'}>
+                          {item.detail}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
             )}
           </div>
         </div>
 
-        {/* 1. Business Model Trait Pill Badges */}
+        {/* 1. Business Model Trait Pill Badges with Localized Labels & Hover Explanations */}
         {!isLoadingSummary && Array.isArray(aiSummary?.businessModelTraits) && (
           <div
             data-testid="business-model-traits"
             className="flex flex-wrap items-center gap-2 mb-3 text-xs"
           >
-            {aiSummary.businessModelTraits.map((trait) => (
-              <span
-                key={trait}
-                className="inline-flex items-center px-2.5 py-0.5 rounded-full font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20"
-              >
-                {trait}
-              </span>
-            ))}
+            {aiSummary.businessModelTraits.map((rawTrait) => {
+              const traitInfo = resolveTraitDisplay(rawTrait, lang)
+              return (
+                <div key={traitInfo.key} className="relative group/trait inline-flex">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 hover:bg-sky-500/20 transition-colors cursor-help focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  >
+                    <span>{traitInfo.displayLabel}</span>
+                    <span className="text-[10px] opacity-65 font-normal">ⓘ</span>
+                  </button>
+                  {traitInfo.explanation && (
+                    <span
+                      role="tooltip"
+                      dir={lang === 'he' ? 'rtl' : 'ltr'}
+                      className={`pointer-events-none absolute bottom-full mb-2 start-0 w-64 p-2.5 text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-xl shadow-xl border border-slate-700/60 ${
+                        lang === 'he' ? 'text-right' : 'text-left'
+                      } opacity-0 invisible group-hover/trait:opacity-100 group-hover/trait:visible group-focus-within/trait:opacity-100 group-focus-within/trait:visible transition-all duration-200 z-50 font-normal`}
+                    >
+                      {traitInfo.explanation}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
 
@@ -786,27 +1077,92 @@ export function Step1Triage({
           </div>
         ) : (
           <div
-            dir={lang === 'he' ? 'rtl' : 'ltr'}
             className={`rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 ${
               lang === 'he' ? 'text-right' : 'text-left'
-            } font-sans space-y-2`}
+            } font-sans space-y-2.5`}
           >
             <p className="text-base sm:text-lg leading-relaxed text-slate-800 dark:text-slate-200 font-medium">
               {activeSummaryText}
             </p>
-            {activeMoat?.summary && (
-              <p className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-300 font-medium pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
-                🛡️ {activeMoat.summary}
-              </p>
+            {activeMoat && (
+              <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 space-y-2">
+                {activeMoat.summary && (
+                  <p className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-300 font-medium">
+                    🛡️ {activeMoat.summary}
+                  </p>
+                )}
+
+                {/* Transparent 5-Category Economic Moat Pills */}
+                {Array.isArray(activeMoat.sources) && activeMoat.sources.length > 0 && (
+                  <div
+                    data-testid="moat-inline-categories"
+                    className="flex flex-wrap items-center gap-1.5 text-[11px]"
+                  >
+                    <span className="text-slate-500 dark:text-slate-400 font-semibold">
+                      {lang === 'he' ? '5 מקורות החפיר:' : '5 Moat Pillars:'}
+                    </span>
+                    {activeMoat.sources.map((src) => {
+                      const label = lang === 'he' ? src.labelHe || src.name : src.labelEn || src.name
+                      const defText =
+                        lang === 'he' ? src.descriptionHe : src.descriptionEn
+                      return (
+                        <div key={src.name} className="relative group/moatcat inline-flex">
+                          <button
+                            type="button"
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-medium cursor-help transition-colors focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
+                              src.active
+                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                                : 'bg-slate-100 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700/70'
+                            }`}
+                          >
+                            <span>{src.active ? '✓' : '✕'}</span>
+                            <span>{label}</span>
+                          </button>
+                          <div
+                            role="tooltip"
+                            dir={lang === 'he' ? 'rtl' : 'ltr'}
+                            className={`pointer-events-none absolute bottom-full mb-2 start-0 w-64 sm:w-72 p-3 text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-xl shadow-xl border border-slate-700/60 ${
+                              lang === 'he' ? 'text-right' : 'text-left'
+                            } opacity-0 invisible group-hover/moatcat:opacity-100 group-hover/moatcat:visible group-focus-within/moatcat:opacity-100 group-focus-within/moatcat:visible transition-all duration-200 z-50 space-y-1`}
+                          >
+                            <div className="font-bold text-emerald-300">
+                              {label} ({src.name})
+                            </div>
+                            {defText && <div className="text-slate-400 text-[11px]">{defText}</div>}
+                            {src.rationale && (
+                              <div className="text-slate-100 pt-1 border-t border-slate-800">
+                                {src.rationale}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
 
-        {/* Revenue Pillars / Breakdown Tags */}
+        {/* Revenue Pillars / Core Revenue Streams */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 pt-2 text-xs">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-slate-400 dark:text-slate-500 font-medium mr-1">
-              Key Engines:
+            <span className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400 font-semibold">
+              <span>
+                {lang === 'he'
+                  ? 'מקורות הכנסה עיקריים (מוצרי ליבה):'
+                  : 'Core Revenue Streams:'}
+              </span>
+              <InfoTooltip
+                text={
+                  lang === 'he'
+                    ? 'המוצרים, השירותים והחטיבות העיקריים שמייצרים לחברה הכנסות כיום. מנועי הצמיחה העתידיים של החברה מפורטים בתוך כרטיס הניתוח המלא.'
+                    : 'The primary products, services, and divisions generating current revenue. Future growth drivers appear inside the Full Tear Sheet.'
+                }
+                align="start"
+                dir={lang === 'he' ? 'rtl' : 'ltr'}
+              />
             </span>
             {isLoadingSummary ? (
               <>
@@ -821,6 +1177,7 @@ export function Step1Triage({
                 return (
                   <span
                     key={engine}
+                    dir="ltr"
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
                   >
                     <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
@@ -841,11 +1198,11 @@ export function Step1Triage({
               <span>
                 {isBladeOpen
                   ? lang === 'he'
-                    ? 'הסתר כרטיס ניתוח מלא (Tear Sheet)'
+                    ? 'הסתר כרטיס ניתוח מלא'
                     : 'Hide Full Tear Sheet Blade'
                   : lang === 'he'
-                  ? 'פתח כרטיס ניתוח מלא (Segments, Geo, Mermaid & Moat)'
-                  : 'Open Full Tear Sheet Blade'}
+                  ? 'פתח כרטיס ניתוח מלא (מגזרים, גיאוגרפיה, זרימה וחפיר)'
+                  : 'Open Full Tear Sheet Blade (Segments, Geo, Flow & Moat)'}
               </span>
             </button>
           )}
@@ -858,7 +1215,7 @@ export function Step1Triage({
             className="mt-5 pt-5 border-t border-slate-200 dark:border-slate-800 space-y-5 animate-fade-in"
           >
             {/* 2. Revenue Segments & Geographic Footprint Visual Progress Bars */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4" dir="ltr">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Revenue Segments Progress Bars */}
               <div
                 data-testid="tear-sheet-segments-card"
@@ -866,11 +1223,15 @@ export function Step1Triage({
               >
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">
-                    Revenue Segments Breakdown
+                    {lang === 'he'
+                      ? 'פילוח הכנסות לפי מגזרים (10-K)'
+                      : 'Revenue Segments Breakdown'}
                   </h3>
-                  <span className="text-xs text-slate-400">10-K Segment Mix</span>
+                  <span className="text-xs text-slate-400">
+                    {lang === 'he' ? 'תמהיל חטיבות' : '10-K Segment Mix'}
+                  </span>
                 </div>
-                <div className="space-y-2.5">
+                <div className="space-y-2.5" dir="ltr">
                   {aiSummary?.revenueSegments?.map((seg, idx) => {
                     const barColors = [
                       'bg-sky-500',
@@ -909,11 +1270,13 @@ export function Step1Triage({
               >
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                    Geographic Footprint
+                    {lang === 'he' ? 'פילוח הכנסות גיאוגרפי' : 'Geographic Footprint'}
                   </h3>
-                  <span className="text-xs text-slate-400">Global Revenue Split</span>
+                  <span className="text-xs text-slate-400">
+                    {lang === 'he' ? 'חלוקה גלובלית' : 'Global Revenue Split'}
+                  </span>
                 </div>
-                <div className="space-y-2.5">
+                <div className="space-y-2.5" dir="ltr">
                   {aiSummary?.geoBreakdown?.map((geo, idx) => {
                     const geoColors = [
                       'bg-indigo-500',
@@ -950,23 +1313,30 @@ export function Step1Triage({
             {aiSummary?.mermaidDiagram && (
               <div
                 data-testid="tear-sheet-mermaid-diagram"
-                dir="ltr"
                 className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/70 p-4 space-y-3"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Business Flow Diagram (Generative UI &bull; Mermaid.js)
+                    {lang === 'he'
+                      ? 'תרשים זרימת הכסף בעסק (מודל ההכנסות)'
+                      : 'Business Flow Diagram (Generative UI · Mermaid.js)'}
                   </span>
                   <button
                     type="button"
                     onClick={() => setShowRawMermaid((prev) => !prev)}
                     className="text-xs text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
                   >
-                    {showRawMermaid ? 'Hide Mermaid Source' : 'View Mermaid Syntax'}
+                    {showRawMermaid
+                      ? lang === 'he'
+                        ? 'הסתר קוד תרשים'
+                        : 'Hide Mermaid Source'
+                      : lang === 'he'
+                      ? 'הצג קוד תרשים'
+                      : 'View Mermaid Syntax'}
                   </button>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-center gap-2 py-2">
+                <div className="flex flex-wrap items-center justify-center gap-2 py-2" dir="ltr">
                   {mermaidNodes.map((nodeLabel, idx) => (
                     <div key={nodeLabel} className="flex items-center gap-2">
                       <div className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-sky-500/30 text-xs font-semibold text-slate-800 dark:text-slate-100 shadow-2xs">
@@ -980,7 +1350,7 @@ export function Step1Triage({
                 </div>
 
                 {showRawMermaid && (
-                  <pre className="p-3 rounded-lg bg-slate-900 text-slate-200 text-xs overflow-x-auto font-mono">
+                  <pre dir="ltr" className="p-3 rounded-lg bg-slate-900 text-slate-200 text-xs overflow-x-auto font-mono">
                     {aiSummary.mermaidDiagram}
                   </pre>
                 )}
@@ -992,11 +1362,10 @@ export function Step1Triage({
               {/* Growth Engines Card */}
               <div
                 data-testid="tear-sheet-growth-engines-card"
-                dir={lang === 'he' ? 'rtl' : 'ltr'}
                 className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-4 space-y-2.5"
               >
                 <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                  {lang === 'he' ? 'מנועי צמיחה מרכזיים (Growth Engines)' : 'Key Growth Engines'}
+                  {lang === 'he' ? 'מנועי צמיחה עתידיים' : 'Key Growth Engines'}
                 </h3>
                 <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
                   {activeGrowthEngines.map((item) => (
@@ -1011,13 +1380,14 @@ export function Step1Triage({
               {/* Competitive Landscape (Competitor Chips/Tags) */}
               <div
                 data-testid="tear-sheet-competitors-card"
-                dir="ltr"
                 className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-4 space-y-2.5"
               >
                 <h3 className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                  Competitive Landscape (10-K Peers)
+                  {lang === 'he'
+                    ? 'מפת תחרות ומתחרים עיקריים (10-K)'
+                    : 'Competitive Landscape (10-K Peers)'}
                 </h3>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2" dir="ltr">
                   {aiSummary?.competitors?.map((comp) => (
                     <span
                       key={comp}
@@ -1030,20 +1400,19 @@ export function Step1Triage({
               </div>
             </div>
 
-            {/* 5. Detailed Economic Moat Sources & SEC Filing Citations */}
+            {/* 5. Detailed Economic Moat Sources (All 5 Categories) & SEC Filing Citations */}
             {Array.isArray(activeMoat?.sources) && activeMoat.sources.length > 0 && (
               <div
                 data-testid="tear-sheet-moat-sources"
-                dir={lang === 'he' ? 'rtl' : 'ltr'}
                 className="rounded-xl border border-emerald-500/25 bg-emerald-50/30 dark:bg-emerald-950/15 p-4 space-y-3"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
                     {lang === 'he'
-                      ? `ניתוח חפיר כלכלי (${activeMoat.rating})`
-                      : `Economic Moat Breakdown (${activeMoat.rating})`}
+                      ? `פירוט 5 מקורות החפיר הכלכלי (${translateMoatRating(activeMoat.rating, 'he')} · ${activeMoat.score})`
+                      : `Economic Moat Breakdown (${activeMoat.rating} · ${activeMoat.score})`}
                   </h3>
-                  {ingestionStatus?.tenK?.url && (
+                  {ingestionStatus?.tenK?.url && !grounding.isMock && (
                     <a
                       href={ingestionStatus.tenK.url}
                       target="_blank"
@@ -1057,30 +1426,53 @@ export function Step1Triage({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {activeMoat.sources.map((src) => (
-                    <div
-                      key={src.name}
-                      className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1"
-                    >
-                      <div className="flex items-center justify-between text-xs" dir="ltr">
-                        <span className="font-bold text-slate-900 dark:text-white">
-                          {src.name}
-                        </span>
-                        <span
-                          className={`px-2 py-0.5 rounded-full font-semibold ${
-                            src.active
-                              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                              : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
-                          }`}
-                        >
-                          {src.active ? 'Active ✓' : 'Secondary'}
-                        </span>
+                  {activeMoat.sources.map((src) => {
+                    const sourceTitle =
+                      lang === 'he'
+                        ? `${src.labelHe || src.name} (${src.name})`
+                        : src.labelEn || src.name
+                    const sourceDesc =
+                      lang === 'he' ? src.descriptionHe : src.descriptionEn
+                    return (
+                      <div
+                        key={src.name}
+                        className={`p-3 rounded-lg border space-y-1.5 ${
+                          src.active
+                            ? 'bg-white dark:bg-slate-900 border-emerald-500/25'
+                            : 'bg-slate-50/80 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 opacity-85'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            {sourceTitle}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full font-semibold shrink-0 ${
+                              src.active
+                                ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                            }`}
+                          >
+                            {src.active
+                              ? lang === 'he'
+                                ? 'פעיל ✓'
+                                : 'Active ✓'
+                              : lang === 'he'
+                              ? 'לא זוהה ✕'
+                              : 'Inactive'}
+                          </span>
+                        </div>
+                        {sourceDesc && (
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            {sourceDesc}
+                          </p>
+                        )}
+                        <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                          {src.rationale}
+                        </p>
                       </div>
-                      <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                        {src.rationale}
-                      </p>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}

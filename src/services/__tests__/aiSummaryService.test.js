@@ -23,6 +23,9 @@ import {
   getCachedSummary,
   setCachedSummary,
   invalidateCachedSummary,
+  normalizeMoat,
+  resolveTraitDisplay,
+  CANONICAL_MOAT_SOURCES,
 } from '../aiSummaryService.js';
 import llmFactory from '../llm/llmFactory.js';
 import geminiAdapter from '../llm/geminiAdapter.js';
@@ -175,5 +178,48 @@ describe('aiSummaryService', () => {
     expect(result.summary).toBe('תקציר אמזון קיים במטמון');
     expect(result.source).toBe('cache');
     expect(result.budgetExhausted).toBe(true);
+  });
+
+  it('normalizes any moat object to all 5 canonical categories with deterministic X/5 score', () => {
+    const partial = {
+      rating: 'Wide Moat',
+      score: '5/5', // intentionally mismatched from 3 active inputs
+      sources: [
+        { name: 'Switching Costs', active: true, rationale: 'High enterprise lock-in' },
+        { name: 'Network Effects', active: true, rationale: 'Platform effects' },
+        { name: 'Intangible Assets', active: true, rationale: 'Strong brand' },
+      ],
+    };
+
+    const normalized = normalizeMoat(partial, 'TestCo', 'he');
+    expect(normalized.sources).toHaveLength(CANONICAL_MOAT_SOURCES.length);
+    expect(normalized.sources).toHaveLength(5);
+    expect(normalized.score).toBe('3/5');
+    expect(normalized.sources.map((s) => s.name)).toEqual([
+      'Switching Costs',
+      'Network Effects',
+      'Cost Advantage',
+      'Intangible Assets',
+      'Efficient Scale',
+    ]);
+    expect(normalized.sources.find((s) => s.name === 'Efficient Scale').active).toBe(false);
+  });
+
+  it('resolves both legacy English string traits and structured bilingual trait objects into Hebrew labels and explanations', () => {
+    const legacy = resolveTraitDisplay('Recurring SaaS & consumption-based cloud', 'he');
+    expect(legacy.displayLabel).toContain('הכנסות חוזרות');
+    expect(legacy.explanation).toMatch(/SaaS|מנוי|שימוש/);
+
+    const structured = resolveTraitDisplay(
+      {
+        label: 'B2B & B2C',
+        labelHe: 'מכירה לארגונים וצרכנים (B2B & B2C)',
+        explanationHe: 'שילוב מכירות לחברות ולקהל הרחב.',
+        explanationEn: 'Balanced enterprise and consumer mix.',
+      },
+      'he'
+    );
+    expect(structured.displayLabel).toBe('מכירה לארגונים וצרכנים (B2B & B2C)');
+    expect(structured.explanation).toBe('שילוב מכירות לחברות ולקהל הרחב.');
   });
 });
