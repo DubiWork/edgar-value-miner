@@ -215,8 +215,13 @@ describe('Step1Triage Component', () => {
     render(<Step1Triage company={mockCompany} />)
 
     const toggleBtn = await screen.findByTestId('toggle-tear-sheet-btn')
-    expect(screen.getByTestId('moat-summary-badge')).toBeTruthy()
+    const moatBadge = screen.getByTestId('moat-summary-badge')
+    expect(moatBadge).toBeTruthy()
     expect(screen.getByTestId('business-model-traits')).toBeTruthy()
+
+    // Clicking the Moat informational badge must NOT unexpectedly expand the Tear Sheet
+    fireEvent.click(moatBadge)
+    expect(screen.queryByTestId('tear-sheet-expanded-content')).toBeNull()
 
     fireEvent.click(toggleBtn)
 

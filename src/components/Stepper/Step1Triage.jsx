@@ -603,7 +603,7 @@ export function Step1Triage({
             </div>
             <h1 className="text-xl font-bold text-slate-900 dark:text-white">
               {companyName}{' '}
-              <span className="text-slate-400 dark:text-slate-500 font-normal">
+              <span className="text-slate-600 dark:text-slate-400 font-normal">
                 ({ticker})
               </span>
             </h1>
@@ -611,17 +611,17 @@ export function Step1Triage({
         </div>
 
         {/* Mini Step Pills */}
-        <div className="flex items-center gap-1.5 self-start sm:self-center bg-slate-100 dark:bg-slate-800/60 p-1.5 rounded-full border border-slate-200/60 dark:border-slate-700/60 text-xs">
-          <span className="px-3 py-1 font-semibold rounded-full bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs">
+        <div className="flex items-center gap-1.5 self-start sm:self-center bg-slate-100 dark:bg-slate-800/60 p-1.5 rounded-full border border-slate-200 dark:border-slate-700/60 text-xs">
+          <span className="px-3 py-1 font-semibold rounded-full bg-white dark:bg-slate-700 text-slate-900 dark:text-white border border-slate-200/80 dark:border-slate-600/50 shadow-xs">
             1. Triage
           </span>
-          <span className="px-2.5 py-1 text-slate-400 dark:text-slate-500">
+          <span className="px-2.5 py-1 font-medium text-slate-600 dark:text-slate-400">
             2. Moat
           </span>
-          <span className="px-2.5 py-1 text-slate-400 dark:text-slate-500">
+          <span className="px-2.5 py-1 font-medium text-slate-600 dark:text-slate-400">
             3. Financials
           </span>
-          <span className="px-2.5 py-1 text-slate-400 dark:text-slate-500">
+          <span className="px-2.5 py-1 font-medium text-slate-600 dark:text-slate-400">
             4. Valuation
           </span>
         </div>
@@ -912,14 +912,13 @@ export function Step1Triage({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Economic Moat Summary Badge (Clickable + Hover Explanation of the 5 Categories) */}
+            {/* Economic Moat Summary Badge (Informational Pill + Hover Explanation of the 5 Categories) */}
             {!isLoadingSummary && activeMoat?.rating && (
               <div className="relative group/moatbadge">
                 <button
                   type="button"
                   data-testid="moat-summary-badge"
-                  onClick={() => setIsBladeOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 cursor-help"
                 >
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
                   <span>
@@ -945,8 +944,8 @@ export function Step1Triage({
                   </div>
                   <p className="text-slate-300 text-[11px]">
                     {lang === 'he'
-                      ? 'עלויות מעבר, אפקט רשת, יתרון עלות וגודל, נכסים בלתי מוחשיים ויעילות קנה מידה. לחץ כדי לפתוח את הפירוט המלא.'
-                      : 'Switching Costs, Network Effects, Cost Advantage, Intangible Assets, and Efficient Scale. Click to open full breakdown.'}
+                      ? 'הדירוג סוכם כמה מתוך 5 מקורות החפיר מתקיימים בחברה: עלויות מעבר, אפקט רשת, יתרון עלות וגודל, נכסים בלתי מוחשיים ויעילות קנה מידה.'
+                      : 'Scores how many of the 5 classic moat sources apply: Switching Costs, Network Effects, Cost Advantage, Intangible Assets, and Efficient Scale.'}
                   </p>
                 </div>
               </div>
@@ -1571,7 +1570,7 @@ export function Step1Triage({
 
                   {/* Title + Info Tooltip */}
                   <div className="flex items-center gap-1.5">
-                    <h4 className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    <h4 className="text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-slate-400">
                       {indicator.title}
                     </h4>
                     <InfoTooltip text={indicator.tooltip} align={indicator.tooltipAlign} />
@@ -1583,7 +1582,7 @@ export function Step1Triage({
                       {indicator.value}
                     </div>
                     {indicator.target && (
-                      <div className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                      <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
                         {indicator.target}
                       </div>
                     )}
@@ -1620,7 +1619,7 @@ export function Step1Triage({
                   >
                     {indicator.detail}
                   </p>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                     {indicator.metricSummary}
                   </p>
                 </div>
@@ -1632,7 +1631,7 @@ export function Step1Triage({
 
       {/* SECTION 3: The Gatekeeper (Bottom Action Button) */}
       <div className="pt-4 pb-2">
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 p-6 sm:p-8 text-center max-w-2xl mx-auto shadow-xs">
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-6 sm:p-8 text-center max-w-2xl mx-auto shadow-xs">
           <div className="inline-flex p-3 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 mb-3">
             <Check className="w-6 h-6 stroke-[2.5]" />
           </div>
