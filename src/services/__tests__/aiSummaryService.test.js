@@ -282,4 +282,25 @@ describe('aiSummaryService', () => {
       translated.translations.en.moat.sources.find((s) => s.name === 'Intangible Assets').rationale
     ).toBe('Scarce airport gate slots.');
   });
+
+  it('enforces 0/5 active pillars when qualitative AI rating is "No Moat" while preserving explanatory rationales', () => {
+    const contradictory = {
+      rating: 'No Moat',
+      score: '3/5',
+      summary: 'שוק תחרותי מאוד ללא חפיר הגנתי ממושך.',
+      sources: [
+        { name: 'Switching Costs', active: true, rationale: 'מעבר ספקים פשוט יחסית.' },
+        { name: 'Cost Advantage', active: true, rationale: 'יתרון זמני בלבד שקיים גם למתחרים.' },
+        { name: 'Intangible Assets', active: true, rationale: 'מותג מוכר ללא כוח תמחור חריג.' },
+      ],
+    };
+
+    const normalized = normalizeMoat(contradictory, 'CommodityCo', 'he');
+    expect(normalized.rating).toBe('No Moat');
+    expect(normalized.score).toBe('0/5');
+    expect(normalized.sources.every((s) => s.active === false)).toBe(true);
+    expect(normalized.sources.find((s) => s.name === 'Switching Costs').rationale).toBe(
+      'מעבר ספקים פשוט יחסית.'
+    );
+  });
 });

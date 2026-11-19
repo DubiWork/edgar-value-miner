@@ -121,9 +121,12 @@ export function normalizeMoat(rawMoat, companyName = '', lang = 'he') {
     }
   }
 
+  const isNoMoatRating =
+    String(rawMoat?.rating || '').trim().toLowerCase() === 'no moat';
+
   const sources = CANONICAL_MOAT_SOURCES.map((canon) => {
     const match = byKey.get(canon.key);
-    const active = match ? Boolean(match.active) : false;
+    const active = isNoMoatRating ? false : match ? Boolean(match.active) : false;
     const rationale = match?.rationale
       ? String(match.rationale).trim()
       : active
@@ -1039,9 +1042,9 @@ async function callLlmApi(ticker, companyProfile, apiKey, options = {}) {
   ],
   "competitors": ["Competitor 1", "Competitor 2", "Competitor 3", "Competitor 4"],
   "moat": {
-    "rating": "Wide Moat | Narrow Moat | No Moat",
-    "score": "4/5",
-    "summary": "משפט מאוזן בעברית הסוקר את כלל מקורות החפיר הפעילים של החברה (ולא רק מקור אחד)",
+    "rating": "Wide Moat | Narrow Moat | No Moat (הערכה איכותנית לפי מתודולוגיית Morningstar/באפט — בהתחשב בעוצמת התחרות בענף וביריבים כמו דואופול, לא ספירה מכנית בלבד. דרג Narrow Moat אם מתחרים חזקים יכולים לנגוס בנתח שוק או בתמחור, ו-No Moat רק אם אין אף מקור חפיר פעיל)",
+    "score": "X/5 (חייב להתאים למספר ה-active: true למטה; ב-No Moat חובה 0 active)",
+    "summary": "משפט מאוזן בעברית הסוקר את החפיר (כולל מגבלות מול מתחרים מרכזיים אם קיימות)",
     "sources": [
       { "name": "Switching Costs", "active": true, "rationale": "נימוק קצר בעברית" },
       { "name": "Network Effects", "active": true, "rationale": "נימוק קצר בעברית" },

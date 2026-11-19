@@ -29,7 +29,9 @@ import {
 } from '../../services/aiSummaryService.js'
 
 /**
- * Renders the company logo from FMP's stock image CDN with a clean ticker monogram fallback.
+ * Renders the company logo from FMP's stock image CDN inside an adaptive dark-slate frame
+ * with subtle light border/shadow so white, colored, and transparent logos stand out cleanly
+ * in both Light and Dark themes, falling back to a crisp ticker monogram.
  */
 function CompanyLogo({ ticker, companyName, isLoading }) {
   const [failedTicker, setFailedTicker] = useState(null)
@@ -41,7 +43,7 @@ function CompanyLogo({ ticker, companyName, isLoading }) {
   return (
     <div
       data-testid="company-logo"
-      className={`w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden shadow-2xs shrink-0 ${
+      className={`w-10 h-10 rounded-xl bg-slate-800 border border-slate-300 dark:border-slate-700 flex items-center justify-center overflow-hidden shadow-xs shrink-0 ${
         isLoading ? 'animate-pulse' : ''
       }`}
     >
@@ -49,16 +51,41 @@ function CompanyLogo({ ticker, companyName, isLoading }) {
         <img
           src={logoUrl}
           alt={`${companyName || normTicker} logo`}
-          className="w-7 h-7 object-contain"
+          className="w-7 h-7 object-contain drop-shadow-[0_0_2px_rgba(255,255,255,0.28)]"
           onError={() => setFailedTicker(normTicker)}
         />
       ) : (
-        <span className="text-xs font-extrabold tracking-tight text-sky-700 dark:text-sky-300">
+        <span className="text-xs font-extrabold tracking-tight text-sky-300">
           {normTicker.slice(0, 4)}
         </span>
       )}
     </div>
   )
+}
+
+const MOAT_THEME_MAP = {
+  'wide moat': {
+    badge: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25',
+    dot: 'bg-emerald-500',
+    summary: 'text-emerald-700 dark:text-emerald-300',
+    tooltipTitle: 'text-emerald-300',
+  },
+  'narrow moat': {
+    badge: 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30',
+    dot: 'bg-amber-500',
+    summary: 'text-amber-700 dark:text-amber-300',
+    tooltipTitle: 'text-amber-300',
+  },
+  'no moat': {
+    badge: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/25',
+    dot: 'bg-rose-500',
+    summary: 'text-rose-700 dark:text-rose-300',
+    tooltipTitle: 'text-rose-300',
+  },
+}
+
+function getMoatTheme(rating) {
+  return MOAT_THEME_MAP[String(rating || '').trim().toLowerCase()] || MOAT_THEME_MAP['narrow moat']
 }
 
 CompanyLogo.propTypes = {
@@ -565,6 +592,8 @@ export function Step1Triage({
       ? aiSummary.translations.en.moat
       : aiSummary?.moat || null
 
+  const moatTheme = getMoatTheme(activeMoat?.rating)
+
   const grounding = useMemo(
     () => buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoadingSummary),
     [aiSummary, ingestionStatus, lang, isLoadingSummary]
@@ -912,15 +941,15 @@ export function Step1Triage({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Economic Moat Summary Badge (Informational Pill + Hover Explanation of the 5 Categories) */}
+            {/* Economic Moat Summary Badge (Informational Pill + Hover Qualitative AI & 5-Pillar Explanation) */}
             {!isLoadingSummary && activeMoat?.rating && (
               <div className="relative group/moatbadge">
                 <button
                   type="button"
                   data-testid="moat-summary-badge"
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 cursor-help"
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border cursor-help ${moatTheme.badge}`}
                 >
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className={`w-2 h-2 rounded-full ${moatTheme.dot}`} />
                   <span>
                     {translateMoatRating(activeMoat.rating, lang)}
                     {activeMoat.score
@@ -933,19 +962,19 @@ export function Step1Triage({
                 <div
                   role="tooltip"
                   dir={lang === 'he' ? 'rtl' : 'ltr'}
-                  className={`pointer-events-none absolute top-full mt-2 end-0 w-72 p-3 text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-xl shadow-xl border border-slate-700/60 ${
+                  className={`pointer-events-none absolute top-full mt-2 end-0 w-72 sm:w-80 p-3 text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-xl shadow-xl border border-slate-700/60 ${
                     lang === 'he' ? 'text-right' : 'text-left'
                   } opacity-0 invisible group-hover/moatbadge:opacity-100 group-hover/moatbadge:visible group-focus-within/moatbadge:opacity-100 group-focus-within/moatbadge:visible transition-all duration-200 z-50 space-y-1.5`}
                 >
-                  <div className="font-bold text-emerald-300">
+                  <div className={`font-bold ${moatTheme.tooltipTitle}`}>
                     {lang === 'he'
-                      ? 'ציון החפיר הכלכלי (מתוך 5 מקורות קלאסיים):'
-                      : 'Economic Moat Score (Out of 5 Classic Sources):'}
+                      ? 'דירוג החפיר הכלכלי (הערכת AI איכותנית + 5 מקורות):'
+                      : 'Economic Moat Rating (Qualitative AI + 5 Pillars):'}
                   </div>
                   <p className="text-slate-300 text-[11px]">
                     {lang === 'he'
-                      ? 'הדירוג סוכם כמה מתוך 5 מקורות החפיר מתקיימים בחברה: עלויות מעבר, אפקט רשת, יתרון עלות וגודל, נכסים בלתי מוחשיים ויעילות קנה מידה.'
-                      : 'Scores how many of the 5 classic moat sources apply: Switching Costs, Network Effects, Cost Advantage, Intangible Assets, and Efficient Scale.'}
+                      ? 'הדירוג (רחב / צר / ללא חפיר) נקבע בהערכה איכותנית של ה-AI לגבי עמידות היתרון התחרותי מול המתחרים בענף, לצד בדיקת 5 מקורות החפיר: עלויות מעבר, אפקט רשת, יתרון עלות וגודל, נכסים בלתי מוחשיים ויעילות קנה מידה.'
+                      : 'Assessed qualitatively by AI based on durable competitive advantage against industry rivals, alongside the 5 classic moat pillars: Switching Costs, Network Effects, Cost Advantage, Intangible Assets, and Efficient Scale.'}
                   </p>
                 </div>
               </div>
@@ -1111,7 +1140,7 @@ export function Step1Triage({
             {activeMoat && (
               <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 space-y-2">
                 {activeMoat.summary && (
-                  <p className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-300 font-medium">
+                  <p className={`text-xs sm:text-sm font-medium ${moatTheme.summary}`}>
                     🛡️ {activeMoat.summary}
                   </p>
                 )}
