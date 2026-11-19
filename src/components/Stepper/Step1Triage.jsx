@@ -1031,13 +1031,33 @@ export function Step1Triage({
           </div>
         </div>
 
-        {/* 1. Business Model Trait Pill Badges with Localized Labels & Hover Explanations */}
-        {!isLoadingSummary && Array.isArray(aiSummary?.businessModelTraits) && (
-          <div
-            data-testid="business-model-traits"
-            className="flex flex-wrap items-center gap-2 mb-3 text-xs"
-          >
-            {aiSummary.businessModelTraits.map((rawTrait) => {
+        {/* 1. Business Model Trait Pill Badges with Localized Header, Tooltip & Hover Explanations */}
+        <div
+          data-testid="business-model-traits"
+          className="flex flex-wrap items-center gap-2 mb-3 text-xs"
+        >
+          <span className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400 font-semibold">
+            <span>
+              {lang === 'he' ? 'מאפייני המודל העסקי:' : 'Business Model Traits:'}
+            </span>
+            <InfoTooltip
+              text={
+                lang === 'he'
+                  ? 'איך החברה בנויה להרוויח כסף (למשל: מכירה לארגונים B2B מול צרכנים B2C, הכנסות חוזרות ממנויים SaaS, או רווחיות תפעולית גבוהה). עמוד עם העכבר על כל תגית להסבר מפורט.'
+                  : 'How the company is structured to earn money (e.g., B2B vs B2C, recurring SaaS vs transactional sales, or high operating margins). Hover any badge for details.'
+              }
+              align="start"
+              dir={lang === 'he' ? 'rtl' : 'ltr'}
+            />
+          </span>
+          {isLoadingSummary ? (
+            <>
+              <div className="h-5 w-28 bg-slate-200 dark:bg-slate-700/60 rounded-full animate-pulse" />
+              <div className="h-5 w-32 bg-slate-200 dark:bg-slate-700/60 rounded-full animate-pulse" />
+            </>
+          ) : (
+            Array.isArray(aiSummary?.businessModelTraits) &&
+            aiSummary.businessModelTraits.map((rawTrait) => {
               const traitInfo = resolveTraitDisplay(rawTrait, lang)
               return (
                 <div key={traitInfo.key} className="relative group/trait inline-flex">
@@ -1061,16 +1081,21 @@ export function Step1Triage({
                   )}
                 </div>
               )
-            })}
-          </div>
-        )}
+            })
+          )}
+        </div>
 
-        {/* Elevator Pitch / Skeleton Loader */}
-        {isLoadingSummary ? (
+        {/* Elevator Pitch / Skeleton Loader (also shown while translating on-demand) */}
+        {isLoadingSummary || isTranslating ? (
           <div
             data-testid="ai-summary-skeleton"
             className="rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 space-y-3"
           >
+            {isTranslating && (
+              <p className="text-xs font-medium text-sky-600 dark:text-sky-400">
+                {lang === 'en' ? 'Translating analysis to English...' : 'מתרגם את הניתוח לעברית...'}
+              </p>
+            )}
             <div className="h-4 bg-slate-200 dark:bg-slate-700/60 rounded-md w-full animate-pulse" />
             <div className="h-4 bg-slate-200 dark:bg-slate-700/60 rounded-md w-11/12 animate-pulse" />
             <div className="h-4 bg-slate-200 dark:bg-slate-700/60 rounded-md w-3/4 animate-pulse" />

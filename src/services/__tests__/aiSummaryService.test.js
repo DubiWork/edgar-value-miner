@@ -25,6 +25,7 @@ import {
   invalidateCachedSummary,
   normalizeMoat,
   resolveTraitDisplay,
+  translateSummaryOnDemand,
   CANONICAL_MOAT_SOURCES,
 } from '../aiSummaryService.js';
 import llmFactory from '../llm/llmFactory.js';
@@ -221,5 +222,64 @@ describe('aiSummaryService', () => {
     );
     expect(structured.displayLabel).toBe('מכירה לארגונים וצרכנים (B2B & B2C)');
     expect(structured.explanation).toBe('שילוב מכירות לחברות ולקהל הרחב.');
+  });
+
+  it('flags legacy generic fallback English cache entries and preserves HE↔EN moat parity during on-demand translation', async () => {
+    const ticker = 'AAL';
+    await setCachedSummary(ticker, {
+      ticker,
+      summary: 'אמריקן איירליינס היא חברת תעופה גדולה המפעילה טיסות פנים וטיסות בינלאומיות.',
+      keyEngines: ['Passenger Air Travel', 'Cargo Services'],
+      moat: {
+        rating: 'Narrow Moat',
+        score: '1/5',
+        summary: 'חפיר צר המבוסס על סלוטים בשדות תעופה.',
+        sources: [{ name: 'Intangible Assets', active: true, rationale: 'סלוטים בשדות תעופה מרכזיים.' }],
+      },
+      translations: {
+        en: {
+          summary:
+            'American Airlines (AAL) operates as a leading provider of products and services in its industry, generating revenue through direct sales.',
+        },
+      },
+      source: 'ai-live',
+    });
+
+    const cached = await getOrFetchCompanySummary(ticker);
+    expect(cached.translations.en._isFallbackTranslation).toBe(true);
+    expect(cached.moat.score).toBe('1/5');
+
+    // Simulate LLM translation returning slightly altered active flags -> parity logic must preserve original active flags & rating
+    const mockCallable = vi.fn().mockResolvedValueOnce({
+      data: {
+        text: JSON.stringify({
+          summary: 'American Airlines is a major carrier operating domestic and international flights.',
+          growthEngines: ['Fleet modernization'],
+          moat: {
+            rating: 'Wide Moat',
+            summary: 'Narrow moat anchored by airport hub slots.',
+            sources: [
+              { name: 'Switching Costs', active: true, rationale: 'No high switching costs.' },
+              { name: 'Intangible Assets', active: true, rationale: 'Scarce airport gate slots.' },
+            ],
+          },
+        }),
+      },
+    });
+    mockHttpsCallable.mockReturnValueOnce(mockCallable);
+
+    const translated = await translateSummaryOnDemand(ticker, cached, 'en');
+    expect(translated.translations.en.summary).toBe(
+      'American Airlines is a major carrier operating domestic and international flights.'
+    );
+    expect(translated.translations.en._isFallbackTranslation).toBeUndefined();
+    expect(translated.translations.en.moat.rating).toBe('Narrow Moat');
+    expect(translated.translations.en.moat.score).toBe('1/5');
+    expect(
+      translated.translations.en.moat.sources.find((s) => s.name === 'Switching Costs').active
+    ).toBe(false);
+    expect(
+      translated.translations.en.moat.sources.find((s) => s.name === 'Intangible Assets').rationale
+    ).toBe('Scarce airport gate slots.');
   });
 });

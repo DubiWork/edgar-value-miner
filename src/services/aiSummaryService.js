@@ -908,7 +908,13 @@ function enrichWithTearSheetDefaults(baseObj, normTicker, companyName) {
   };
   const normalizedEnMoat = normalizeMoat(fallbackEnMoatInput, companyName, 'en');
 
-  const isFallbackEn = !rawEn?.summary;
+  const LEGACY_EN_FALLBACK_MARKER =
+    'operates as a leading provider of products and services in its industry';
+  const hasCuratedOrLiveEn =
+    Boolean(rawEn?.summary) &&
+    !rawEn?._isFallbackTranslation &&
+    !String(rawEn.summary).includes(LEGACY_EN_FALLBACK_MARKER);
+  const isFallbackEn = !hasCuratedOrLiveEn;
   const enrichedTranslations = {
     ...(baseObj.translations || {}),
     en: {
@@ -1120,9 +1126,40 @@ ${JSON.stringify(compactPayload)}`;
 
     const translated = await provider.generateJSON(translatePrompt, apiKey);
     if (translated && translated.summary) {
+      const sourceMoat = summaryObj.moat
+        ? normalizeMoat(summaryObj.moat, normTicker, 'he')
+        : null;
+      let mergedMoat = translated.moat;
+      if (sourceMoat) {
+        const translatedNormalized = normalizeMoat(translated.moat || {}, normTicker, 'en');
+        const translatedByName = new Map(
+          translatedNormalized.sources.map((s) => [s.name, s])
+        );
+        mergedMoat = normalizeMoat(
+          {
+            rating: sourceMoat.rating,
+            summary: translated.moat?.summary || translatedNormalized.summary,
+            sources: sourceMoat.sources.map((origSrc) => {
+              const trSrc = translatedByName.get(origSrc.name);
+              return {
+                name: origSrc.name,
+                active: origSrc.active,
+                rationale:
+                  trSrc?.rationale ||
+                  (origSrc.active ? origSrc.descriptionEn : origSrc.defaultInactiveEn),
+              };
+            }),
+          },
+          normTicker,
+          'en'
+        );
+      } else if (mergedMoat) {
+        mergedMoat = normalizeMoat(mergedMoat, normTicker, 'en');
+      }
+
       const normalizedTranslated = {
         ...translated,
-        ...(translated.moat ? { moat: normalizeMoat(translated.moat, normTicker, 'en') } : {}),
+        ...(mergedMoat ? { moat: mergedMoat } : {}),
       };
       const updated = {
         ...summaryObj,

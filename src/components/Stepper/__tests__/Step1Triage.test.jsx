@@ -53,7 +53,8 @@ describe('Step1Triage Component', () => {
     expect(screen.queryByText('Core Model')).toBeNull()
     expect(screen.getByTestId('data-grounding-badge')).toBeTruthy()
 
-    // Inline 5 canonical moat categories visible even before expanding Tear Sheet
+    // Inline 5 canonical moat categories & headers visible even before expanding Tear Sheet
+    expect(screen.getByText('מאפייני המודל העסקי:')).toBeTruthy()
     const moatCats = screen.getByTestId('moat-inline-categories')
     expect(moatCats.textContent).toContain('עלויות מעבר')
     expect(moatCats.textContent).toContain('יעילות קנה מידה')
@@ -63,9 +64,11 @@ describe('Step1Triage Component', () => {
     fireEvent.click(screen.getByTestId('lang-btn-en'))
     expect(blade.getAttribute('dir')).toBe('ltr')
     expect(screen.getByText('Business Clarity (Circle of Competence)')).toBeTruthy()
+    expect(screen.getByText('Business Model Traits:')).toBeTruthy()
     expect(screen.getByText('Core Revenue Streams:')).toBeTruthy()
-    expect(moatCats.textContent).toContain('Switching Costs')
-    expect(moatCats.textContent).toContain('Efficient Scale')
+    const enMoatCats = await screen.findByTestId('moat-inline-categories')
+    expect(enMoatCats.textContent).toContain('Switching Costs')
+    expect(enMoatCats.textContent).toContain('Efficient Scale')
   })
 
   it('renders the 4 Fast Fundamentals indicators with updated titles and target thresholds', () => {
@@ -90,16 +93,21 @@ describe('Step1Triage Component', () => {
   it('renders educational tooltips with the required rationales for beginners', async () => {
     render(<Step1Triage company={mockCompany} />)
 
-    // 6 Educational Info buttons (Business Clarity, Core Revenue Streams, and 4 Fundamentals)
+    // 7 Educational Info buttons (Business Clarity, Business Model Traits, Core Revenue Streams, and 4 Fundamentals)
     const infoButtons = screen.getAllByRole('button', { name: /educational rationale/i })
-    expect(infoButtons).toHaveLength(6)
+    expect(infoButtons).toHaveLength(7)
 
     // 1. Business Clarity Tooltip
     expect(
       screen.getByText(/מעגל הכשירות: הכלל הראשון בהשקעות הוא לא להשקיע בעסק שאנחנו לא מבינים/i)
     ).toBeTruthy()
 
-    // 2. Core Revenue Streams Tooltip
+    // 2. Business Model Traits Tooltip
+    expect(
+      screen.getByText(/איך החברה בנויה להרוויח כסף/i)
+    ).toBeTruthy()
+
+    // 3. Core Revenue Streams Tooltip
     expect(
       screen.getByText(/המוצרים, השירותים והחטיבות העיקריים שמייצרים לחברה הכנסות כיום/i)
     ).toBeTruthy()
@@ -107,22 +115,22 @@ describe('Step1Triage Component', () => {
     // Wait for async summary load to settle cleanly
     await screen.findByTestId('toggle-tear-sheet-btn')
 
-    // 3. Revenue Growth Tooltip
+    // 4. Revenue Growth Tooltip
     expect(
       screen.getByText(/צמיחה בהכנסות: עסק בריא הוא עסק שצומח/i)
     ).toBeTruthy()
 
-    // 4. Operating Margins Tooltip
+    // 5. Operating Margins Tooltip
     expect(
       screen.getByText(/שולי רווח תפעולי: המדד ליעילות ויציבות/i)
     ).toBeTruthy()
 
-    // 5. Share Dilution Tooltip
+    // 6. Share Dilution Tooltip
     expect(
       screen.getByText(/דילול מניות: כשהחברה מנפיקה עוד מניות/i)
     ).toBeTruthy()
 
-    // 6. Balance Sheet / Current Ratio Tooltip
+    // 7. Balance Sheet / Current Ratio Tooltip
     expect(
       screen.getByText(/יחס שוטף \(Current Ratio\): אנחנו רוצים לישון בשקט בלילה/i)
     ).toBeTruthy()
