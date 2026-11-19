@@ -5,6 +5,7 @@ import * as zlib from 'zlib';
 const SEC_USER_AGENT = 'edgar-value-miner (contact@example.com)';
 const COMPANY_CONTEXT_COLLECTION = 'companyContext';
 const CONTEXT_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days (1 quarter)
+const SUBMISSIONS_CHECK_COOLDOWN_MS = 12 * 60 * 60 * 1000; // 12 hours cheap SEC filing-date check
 
 const MAX_ITEM1_CHARS = 22_000;
 const MAX_ITEM1A_CHARS = 12_000;
@@ -49,6 +50,7 @@ export interface StoredCompanyContext {
   } | null;
   ingestionStatus: IngestionStatus;
   lastFetched: string;
+  lastSubmissionsCheck?: string;
 }
 
 const inMemoryContextStore = new Map<string, StoredCompanyContext>();
@@ -578,8 +580,18 @@ export async function getOrFetchCompanyContext(
     const cached = await loadCachedCompanyContext(norm);
     if (cached && cached.lastFetched) {
       const ageMs = Date.now() - new Date(cached.lastFetched).getTime();
+      const checkAgeMs =
+        Date.now() - new Date(cached.lastSubmissionsCheck || cached.lastFetched).getTime();
       if (ageMs < CONTEXT_TTL_MS && cached.tenK?.item1Business) {
-        return cached;
+        // When context is already complete and checked within 12h, return immediately (0 HTTP calls).
+        if (isContextGroundedComplete(cached) && checkAgeMs < SUBMISSIONS_CHECK_COOLDOWN_MS) {
+          return cached;
+        }
+        // Otherwise verify filing dates cheaply (~$0 LLM cost) before serving cached context
+        const freshness = await checkAndRefreshCompanyContext(norm, { fetcher });
+        if (freshness.context?.tenK?.item1Business) {
+          return freshness.context;
+        }
       }
     }
   }
@@ -756,10 +768,124 @@ export async function getOrFetchCompanyContext(
     earnings: earningsData,
     ingestionStatus,
     lastFetched: nowIso,
+    lastSubmissionsCheck: nowIso,
   };
 
   await saveCompanyContext(contextDoc);
   return contextDoc;
+}
+
+/**
+ * Returns true only when both 10-K text and 8-K metadata were successfully grounded.
+ */
+export function isContextGroundedComplete(ctx: StoredCompanyContext | null): boolean {
+  if (!ctx) return false;
+  return (
+    Boolean(ctx.tenK?.item1Business) &&
+    ctx.ingestionStatus?.tenK?.status === 'ok' &&
+    ctx.ingestionStatus?.eightK?.status === 'ok'
+  );
+}
+
+/**
+ * Cheaply verifies SEC submissions JSON (~$0 LLM cost) against cached context & client dates.
+ * Only downloads full 10-K / 8-K filings if filing dates changed or prior ingestion was incomplete.
+ */
+export async function checkAndRefreshCompanyContext(
+  ticker: string,
+  options: {
+    clientFilingDates?: { tenKDate?: string | null; eightKDate?: string | null } | null;
+    fetcher?: typeof httpsGetRaw;
+    nowMs?: number;
+  } = {}
+): Promise<{
+  context: StoredCompanyContext | null;
+  refreshed: boolean;
+  hasNewerFilings: boolean;
+  latestFilingDates: { tenKDate: string | null; eightKDate: string | null };
+}> {
+  const norm = sanitizeTicker(ticker);
+  const fetcher = options.fetcher || httpsGetRaw;
+  const nowMs = typeof options.nowMs === 'number' ? options.nowMs : Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+
+  let current = await loadCachedCompanyContext(norm);
+  if (!current) {
+    return {
+      context: null,
+      refreshed: false,
+      hasNewerFilings: false,
+      latestFilingDates: { tenKDate: null, eightKDate: null },
+    };
+  }
+
+  let refreshed = false;
+  const lastCheckMs = new Date(current.lastSubmissionsCheck || current.lastFetched || 0).getTime();
+  const cooldownExpired = nowMs - lastCheckMs >= SUBMISSIONS_CHECK_COOLDOWN_MS;
+  const incomplete = !isContextGroundedComplete(current) || current.cik === 0;
+
+  if (incomplete || cooldownExpired) {
+    try {
+      let cik = current.cik;
+      if (!cik) {
+        const resolved = await resolveTickerFromSec(norm, fetcher);
+        cik = resolved.cik;
+      }
+
+      const { tenK, eightKEarnings } = await findLatestSecFilings(cik, fetcher);
+      const secTenKDate = tenK?.filingDate || null;
+      const secEightKDate = eightKEarnings?.filingDate || null;
+
+      const needsTenKRefresh = Boolean(
+        secTenKDate &&
+          (!current.tenK?.item1Business ||
+            current.ingestionStatus?.tenK?.status !== 'ok' ||
+            secTenKDate !== current.tenK?.filingDate)
+      );
+      const needsEightKRefresh = Boolean(
+        secEightKDate &&
+          (current.ingestionStatus?.eightK?.status !== 'ok' ||
+            secEightKDate !== current.ingestionStatus?.eightK?.date)
+      );
+
+      if (needsTenKRefresh || needsEightKRefresh) {
+        current = await getOrFetchCompanyContext(norm, { forceRefresh: true, fetcher });
+        refreshed = true;
+      } else {
+        current = {
+          ...current,
+          lastSubmissionsCheck: nowIso,
+        };
+        await saveCompanyContext(current);
+      }
+    } catch {
+      // Preserve existing context cleanly on transient SEC API error
+    }
+  }
+
+  const latestTenKDate = current.ingestionStatus?.tenK?.date || current.tenK?.filingDate || null;
+  const latestEightKDate = current.ingestionStatus?.eightK?.date || null;
+  const clientDates = options.clientFilingDates;
+
+  const hasNewerFilings = Boolean(
+    clientDates &&
+      ((clientDates.tenKDate !== undefined &&
+        latestTenKDate &&
+        latestTenKDate !== clientDates.tenKDate) ||
+        (clientDates.eightKDate !== undefined &&
+          latestEightKDate &&
+          latestEightKDate !== clientDates.eightKDate))
+  );
+
+  return {
+    context: current,
+    refreshed,
+    hasNewerFilings,
+    latestFilingDates: {
+      tenKDate: latestTenKDate,
+      eightKDate: latestEightKDate,
+    },
+  };
 }
 
 /**

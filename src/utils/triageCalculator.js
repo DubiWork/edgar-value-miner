@@ -23,12 +23,28 @@ const DEFAULT_MSFT_TRIAGE = {
   revenue: {
     id: 'revenue-growth',
     title: 'Revenue Growth',
+    titleHe: 'צמיחה בהכנסות',
     value: '+14% YoY',
+    valueHe: '+14% בשנה',
     latestValue: 245120000000,
     growthRate: 14.2,
     badge: 'Consistent Growth',
+    badgeHe: 'צמיחה עקבית',
     detail: 'צמיחה עקבית של ~14% בשנה',
-    metricSummary: '5Y CAGR ~14.2%',
+    detailEn: 'Consistent ~14% annual revenue growth',
+    metricSummary: '5Y CAGR ~14.2% · 9Y ~11.3%',
+    metricSummaryHe: 'CAGR 5 ש׳: ~14% · 9 ש׳: ~11%',
+    sparklineUnit: '$M',
+    historyMeta: {
+      startYear: 2015,
+      endYear: 2024,
+      avg: 152176,
+      minVal: 85320,
+      maxVal: 245120,
+      cycleType: 'steady',
+      cycleBadgeHe: 'עלייה רציפה',
+      cycleBadgeEn: 'Steady',
+    },
     status: 'pass',
     sparkline: [
       { year: 2015, value: 93580 },
@@ -46,11 +62,27 @@ const DEFAULT_MSFT_TRIAGE = {
   margins: {
     id: 'operating-margins',
     title: 'Operating Margins',
+    titleHe: 'שולי רווח תפעולי',
     value: '44%+',
+    valueHe: '44.6%',
     latestValue: 44.6,
     badge: 'High & Stable',
+    badgeHe: 'גבוהים ויציבים',
     detail: 'שוליים יציבים מעל 40%',
+    detailEn: 'Stable operating margins above 40%',
     metricSummary: 'Operating Margin > 40%',
+    metricSummaryHe: 'ממוצע רב-שנתי: 36.7% (יציב)',
+    sparklineUnit: '%',
+    historyMeta: {
+      startYear: 2015,
+      endYear: 2024,
+      avg: 36.7,
+      minVal: 29.5,
+      maxVal: 44.6,
+      cycleType: 'steady',
+      cycleBadgeHe: 'יציב (29.5%–44.6%)',
+      cycleBadgeEn: 'Steady (29.5%–44.6%)',
+    },
     status: 'pass',
     sparkline: [
       { year: 2015, value: 30.1 },
@@ -68,13 +100,31 @@ const DEFAULT_MSFT_TRIAGE = {
   shares: {
     id: 'share-dilution',
     title: 'Share Dilution',
+    titleHe: 'רכישה עצמית / דילול',
     value: 'Share Buybacks',
+    valueHe: '-7.4% מניות ב-9 ש׳',
     target: 'Target: Decreasing',
+    targetHe: 'תנאי למעבר: ירידה או יציבות במניות',
     latestValue: 7430000000,
     changePct: -0.8,
+    totalChangePct: -7.4,
     badge: 'Buybacks',
+    badgeHe: 'רכישה עצמית',
     detail: 'החברה רוכשת מניות חזרה',
-    metricSummary: 'ירידה שנתית בכמות המניות (חיובי למשקיעים)',
+    detailEn: 'Company consistently repurchasing shares',
+    metricSummary: 'Cumulative -7.4% share reduction (2015–2024)',
+    metricSummaryHe: 'שינוי מצטבר (2015–2024): -7.4% מניות',
+    sparklineUnit: 'sharesM',
+    historyMeta: {
+      startYear: 2015,
+      endYear: 2024,
+      avg: 7655,
+      minVal: 7430,
+      maxVal: 8027,
+      cycleType: 'steady',
+      cycleBadgeHe: 'מצטבר: -7.4%',
+      cycleBadgeEn: 'Cumulative: -7.4%',
+    },
     status: 'pass',
     sparkline: [
       { year: 2015, value: 8027 },
@@ -92,12 +142,29 @@ const DEFAULT_MSFT_TRIAGE = {
   currentRatio: {
     id: 'balance-sheet',
     title: 'Current Ratio (Liquidity)',
+    titleHe: 'יחס שוטף (נזילות)',
     value: '1.24x',
+    valueHe: '1.24x',
     target: 'Target: > 1.0',
+    targetHe: 'תנאי למעבר: מעל 1.0',
     latestValue: 1.24,
     badge: 'Safe (> 1.0)',
+    badgeHe: 'בטוח (> 1.0)',
     detail: 'Current Ratio תקין > 1',
+    detailEn: 'Healthy Current Ratio > 1.0',
     metricSummary: 'Solid liquidity, low solvency risk',
+    metricSummaryHe: 'נכסים שוטפים עולים על התחייבויות (טווח 1.2x–2.9x)',
+    sparklineUnit: 'x',
+    historyMeta: {
+      startYear: 2015,
+      endYear: 2024,
+      avg: 2.26,
+      minVal: 1.24,
+      maxVal: 2.92,
+      cycleType: 'steady',
+      cycleBadgeHe: 'טווח 1.2x–2.9x',
+      cycleBadgeEn: 'Range 1.2x–2.9x',
+    },
     status: 'pass',
     sparkline: [
       { year: 2015, value: 2.47 },
@@ -120,6 +187,105 @@ const DEFAULT_MSFT_TRIAGE = {
 
 function isNumeric(val) {
   return typeof val === 'number' && !isNaN(val) && isFinite(val);
+}
+
+function formatCompactUsd(amount) {
+  const abs = Math.abs(Number(amount) || 0);
+  if (abs >= 1e9) return `$${(abs / 1e9).toFixed(1)}B`;
+  if (abs >= 1e6) return `$${Math.round(abs / 1e6)}M`;
+  return `$${Math.round(abs / 1e3)}K`;
+}
+
+function analyzeSeriesShape(sparkline, kind = 'generic') {
+  if (!Array.isArray(sparkline) || sparkline.length === 0) {
+    return null;
+  }
+
+  const startYear = sparkline[0].year;
+  const endYear = sparkline[sparkline.length - 1].year;
+  const spanYears = Math.max(0, endYear - startYear);
+
+  let minVal = Infinity;
+  let maxVal = -Infinity;
+  let sum = 0;
+  let runningPeak = -Infinity;
+  let maxDrawdownPct = 0;
+  let downYears = 0;
+
+  for (let i = 0; i < sparkline.length; i++) {
+    const val = sparkline[i].value;
+    if (val < minVal) minVal = val;
+    if (val > maxVal) maxVal = val;
+    sum += val;
+
+    if (val > runningPeak) runningPeak = val;
+    if (runningPeak > 0 && val < runningPeak) {
+      const dd = ((runningPeak - val) / runningPeak) * 100;
+      if (dd > maxDrawdownPct) maxDrawdownPct = dd;
+    }
+
+    if (i > 0) {
+      const prev = sparkline[i - 1].value;
+      if (kind === 'margins') {
+        if (val <= prev - 1.5) downYears += 1;
+      } else if (kind === 'revenue') {
+        if (prev > 0 && val < prev * 0.98) downYears += 1;
+      }
+    }
+  }
+
+  const avg = Math.round((sum / sparkline.length) * 10) / 10;
+  const spread = Math.round((maxVal - minVal) * 10) / 10;
+
+  let cycleType = 'steady';
+  let cycleBadgeHe = `${startYear}–${endYear}`;
+  let cycleBadgeEn = `${startYear}–${endYear}`;
+
+  if (kind === 'revenue' && sparkline.length >= 3) {
+    if (downYears >= 3 || maxDrawdownPct >= 15) {
+      cycleType = 'cyclical';
+      cycleBadgeHe = downYears > 0 ? `מחזורי (${downYears} ש׳ ירידה)` : 'מחזורי';
+      cycleBadgeEn = downYears > 0 ? `Cyclical (${downYears} down yrs)` : 'Cyclical';
+    } else if (downYears >= 1 || maxDrawdownPct >= 5) {
+      cycleType = 'moderate';
+      cycleBadgeHe = downYears > 0 ? `תנודתי (${downYears} ירידות)` : 'תנודתי קלות';
+      cycleBadgeEn = downYears > 0 ? `${downYears} dip yr${downYears > 1 ? 's' : ''}` : 'Mild swing';
+    } else {
+      cycleType = 'steady';
+      cycleBadgeHe = 'עלייה רציפה';
+      cycleBadgeEn = 'Steady';
+    }
+  } else if (kind === 'margins' && sparkline.length >= 3) {
+    const hasNegativeYear = minVal < 0;
+    const swingRatio = Math.abs(avg) > 1 ? spread / Math.abs(avg) : spread / 5;
+    if (hasNegativeYear || downYears >= 2 || (spread >= 4 && swingRatio >= 0.4)) {
+      cycleType = 'cyclical';
+      cycleBadgeHe = `מחזורי (${minVal.toFixed(1)}%–${maxVal.toFixed(1)}%)`;
+      cycleBadgeEn = `Cyclical (${minVal.toFixed(1)}%–${maxVal.toFixed(1)}%)`;
+    } else if (downYears === 1 || spread >= 3) {
+      cycleType = 'moderate';
+      cycleBadgeHe = `טווח ${minVal.toFixed(1)}%–${maxVal.toFixed(1)}%`;
+      cycleBadgeEn = `Range ${minVal.toFixed(1)}%–${maxVal.toFixed(1)}%`;
+    } else {
+      cycleType = 'steady';
+      cycleBadgeHe = `יציב (${minVal.toFixed(1)}%–${maxVal.toFixed(1)}%)`;
+      cycleBadgeEn = `Steady (${minVal.toFixed(1)}%–${maxVal.toFixed(1)}%)`;
+    }
+  }
+
+  return {
+    startYear,
+    endYear,
+    spanYears,
+    avg,
+    minVal,
+    maxVal,
+    downYears,
+    maxDrawdownPct: Math.round(maxDrawdownPct),
+    cycleType,
+    cycleBadgeHe,
+    cycleBadgeEn,
+  };
 }
 
 function getMetricsObject(companyFacts) {
@@ -189,29 +355,68 @@ function calculateRevenueMetric(metrics) {
     yoy = ((latest.value - prior.value) / prior.value) * 100;
   }
 
-  // 5Y CAGR if available
-  const oldest5Y = allYears.length >= 5 ? allYears[allYears.length - 5] : allYears[0];
+  // True 5Y CAGR requires 6 annual data points (e.g. FY2020 -> FY2025 = 5 intervals)
+  const oldest5Y = allYears.length >= 6 ? allYears[allYears.length - 6] : allYears[0];
   const yearsDiff = latest.year - oldest5Y.year;
   const cagr =
     yearsDiff > 0 && oldest5Y.value > 0
       ? (Math.pow(latest.value / oldest5Y.value, 1 / yearsDiff) - 1) * 100
       : yoy;
 
-  // Status: Pass if positive growth (either latest YoY or 5Y trend)
+  // Full multi-year cycle CAGR (e.g. 9Y–14Y) when 7+ years of history exist
+  const fullFirst = allYears[0];
+  const fullSpanYears = latest.year - fullFirst.year;
+  const fullCagr =
+    fullSpanYears >= 7 && fullSpanYears !== yearsDiff && fullFirst.value > 0
+      ? (Math.pow(latest.value / fullFirst.value, 1 / fullSpanYears) - 1) * 100
+      : null;
+
+  const historyMeta = analyzeSeriesShape(sparkline, 'revenue');
+  const isCyclical = historyMeta?.cycleType === 'cyclical';
+
+  // Status: Pass if positive growth (either latest YoY or multi-year trend)
   const isPass = yoy > 0 || cagr > 0;
   const formattedGrowth = `${yoy >= 0 ? '+' : ''}${Math.round(yoy)}% YoY`;
+  const formattedGrowthHe = `${yoy >= 0 ? '+' : ''}${Math.round(yoy)}% בשנה`;
+
+  const badgeEn = isPass
+    ? isCyclical
+      ? 'Cyclical Growth'
+      : 'Consistent Growth'
+    : 'Revenue Decline';
+  const badgeHe = isPass
+    ? isCyclical
+      ? 'צמיחה מחזורית'
+      : 'צמיחה עקבית'
+    : 'ירידה בהכנסות';
+
+  const longEn = fullCagr !== null ? ` · ${fullSpanYears}Y ~${Math.round(fullCagr)}%` : '';
+  const longHe = fullCagr !== null ? ` · ${fullSpanYears} ש׳: ~${Math.round(fullCagr)}%` : '';
 
   return {
     id: 'revenue-growth',
     title: 'Revenue Growth',
+    titleHe: 'צמיחה בהכנסות',
     value: formattedGrowth,
+    valueHe: formattedGrowthHe,
     latestValue: latest.value,
     growthRate: Math.round(yoy * 10) / 10,
-    badge: isPass ? 'Consistent Growth' : 'Revenue Decline',
+    badge: badgeEn,
+    badgeHe,
     detail: isPass
-      ? `צמיחה עקבית של ~${Math.abs(Math.round(yoy || cagr))}% בשנה`
+      ? isCyclical
+        ? `צמיחה של ${yoy >= 0 ? '+' : ''}${Math.round(yoy)}% בשנה לצד מחזוריות (${historyMeta.downYears} ש׳ ירידה)`
+        : `צמיחה עקבית של ~${Math.abs(Math.round(yoy || cagr))}% בשנה`
       : `ירידה בהכנסות (${Math.round(yoy)}% YoY)`,
-    metricSummary: `${yearsDiff > 0 ? `${yearsDiff}Y` : 'Latest'} CAGR ~${Math.round(cagr)}%`,
+    detailEn: isPass
+      ? isCyclical
+        ? `${formattedGrowth} top-line with cyclical dips (${historyMeta.downYears} down yrs)`
+        : `Consistent ~${Math.abs(Math.round(yoy || cagr))}% annual revenue growth`
+      : `Revenue declined ${Math.round(yoy)}% YoY`,
+    metricSummary: `${yearsDiff > 0 ? `${yearsDiff}Y` : 'Latest'} CAGR ~${Math.round(cagr)}%${longEn}`,
+    metricSummaryHe: `CAGR ${yearsDiff > 0 ? `${yearsDiff} ש׳` : 'אחרון'}: ~${Math.round(cagr)}%${longHe}`,
+    sparklineUnit: '$M',
+    historyMeta,
     status: isPass ? 'pass' : 'fail',
     sparkline,
   };
@@ -266,17 +471,54 @@ function calculateOperatingMarginsMetric(metrics) {
 
   const latest = sortedPoints[sortedPoints.length - 1];
   const isPass = latest.value > 10; // Requirement: margins > 10%
+  const historyMeta = analyzeSeriesShape(sortedPoints, 'margins');
+  const isCyclical = historyMeta?.cycleType === 'cyclical';
+
+  const badgeEn = isPass
+    ? latest.value >= 25
+      ? 'High & Stable'
+      : isCyclical
+      ? 'Cyclical Margins'
+      : 'Healthy Margins'
+    : isCyclical
+    ? 'Low & Cyclical'
+    : 'Low Margins';
+
+  const badgeHe = isPass
+    ? latest.value >= 25
+      ? 'גבוהים ויציבים'
+      : isCyclical
+      ? 'תקינים ומחזוריים'
+      : 'שוליים תקינים'
+    : isCyclical
+    ? 'נמוכים ומחזוריים'
+    : 'שוליים נמוכים';
 
   return {
     id: 'operating-margins',
     title: 'Operating Margins',
+    titleHe: 'שולי רווח תפעולי',
     value: `${latest.value.toFixed(0)}%+`,
+    valueHe: `${latest.value.toFixed(1)}%`,
     latestValue: latest.value,
-    badge: isPass ? (latest.value >= 25 ? 'High & Stable' : 'Healthy Margins') : 'Low Margins',
+    badge: badgeEn,
+    badgeHe,
     detail: isPass
-      ? `שוליים יציבים מעל ${Math.min(40, Math.floor(latest.value / 10) * 10)}%`
+      ? isCyclical
+        ? `שוליים מעל 10% (${latest.value.toFixed(1)}%) אך תנודתיים בין ${historyMeta.minVal.toFixed(1)}% ל-${historyMeta.maxVal.toFixed(1)}%`
+        : `שוליים יציבים מעל ${Math.min(40, Math.floor(latest.value / 10) * 10)}%`
+      : isCyclical
+      ? `שולי רווח צרים ומחזוריים (${latest.value.toFixed(1)}%, נעו בטווח ${historyMeta.minVal.toFixed(1)}%–${historyMeta.maxVal.toFixed(1)}%)`
       : `שולי רווח נמוכים מ-10% (${latest.value.toFixed(1)}%)`,
-    metricSummary: `Operating Margin: ${latest.value.toFixed(1)}%`,
+    detailEn: isPass
+      ? `Operating margin ${latest.value.toFixed(1)}% (> 10% threshold)`
+      : `Operating margin ${latest.value.toFixed(1)}% (below 10% target)`,
+    metricSummary: `Operating Margin: ${latest.value.toFixed(1)}%${historyMeta ? ` · ${historyMeta.cycleBadgeEn}` : ''}`,
+    metricSummaryHe: historyMeta
+      ? `ממוצע רב-שנתי: ${historyMeta.avg.toFixed(1)}% · ${historyMeta.cycleBadgeHe}`
+      : `שולי רווח תפעולי: ${latest.value.toFixed(1)}%`,
+    sparklineUnit: '%',
+    historyMeta,
     status: isPass ? 'pass' : 'fail',
     sparkline: sortedPoints,
   };
@@ -317,12 +559,38 @@ function calculateShareDilutionMetric(metrics) {
     value: Math.round(value / 1000000), // In millions
   }));
 
+  const first = allYears[0];
   const latest = allYears[allYears.length - 1];
   const prior = allYears.length >= 2 ? allYears[allYears.length - 2] : null;
+  const spanYears = Math.max(0, latest.year - first.year);
 
   let annualChangePct = 0;
   if (prior && prior.value > 0) {
     annualChangePct = ((latest.value - prior.value) / prior.value) * 100;
+  }
+  const totalChangePct =
+    spanYears > 0 && first.value > 0 ? ((latest.value - first.value) / first.value) * 100 : 0;
+
+  // Optional SEC Cash Flow dollar buybacks extraction (PaymentsForRepurchaseOfCommonStock)
+  const rawRepurchases = Array.isArray(metrics?.stockRepurchases?.annual)
+    ? metrics.stockRepurchases.annual
+        .filter((r) => r && isNumeric(r.fiscalYear) && isNumeric(r.value) && Math.abs(r.value) > 0)
+        .sort((a, b) => a.fiscalYear - b.fiscalYear)
+    : [];
+  const repByYear = new Map();
+  for (const r of rawRepurchases) {
+    repByYear.set(r.fiscalYear, Math.abs(r.value));
+  }
+  const repYears = Array.from(repByYear.entries()).map(([year, value]) => ({ year, value }));
+  const latestBuybackUsd = repYears.length > 0 ? repYears[repYears.length - 1].value : null;
+  let buybackCagrPct = null;
+  if (repYears.length >= 2) {
+    const repLatest = repYears[repYears.length - 1];
+    const repBase = repYears.length >= 6 ? repYears[repYears.length - 6] : repYears[0];
+    const repSpan = repLatest.year - repBase.year;
+    if (repSpan > 0 && repBase.value > 0 && repLatest.value > 0) {
+      buybackCagrPct = (Math.pow(repLatest.value / repBase.value, 1 / repSpan) - 1) * 100;
+    }
   }
 
   // Financial Logic:
@@ -332,20 +600,69 @@ function calculateShareDilutionMetric(metrics) {
   const isFlat = Math.abs(annualChangePct) <= 0.2;
   const isPass = isDecreasing || isFlat;
 
+  const totalFmt = `${totalChangePct >= 0 ? '+' : ''}${totalChangePct.toFixed(1)}%`;
+  const annualFmt = `${annualChangePct >= 0 ? '+' : ''}${annualChangePct.toFixed(1)}%`;
+  const spendNoteHe = latestBuybackUsd
+    ? ` · רכישות אשתקד: ${formatCompactUsd(latestBuybackUsd)}${
+        buybackCagrPct !== null ? ` (CAGR ${buybackCagrPct >= 0 ? '+' : ''}${Math.round(buybackCagrPct)}%)` : ''
+      }`
+    : '';
+  const spendNoteEn = latestBuybackUsd
+    ? ` · Latest spend: ${formatCompactUsd(latestBuybackUsd)}${
+        buybackCagrPct !== null ? ` (${Math.round(buybackCagrPct)}% CAGR)` : ''
+      }`
+    : '';
+
+  const valueHe = isDecreasing
+    ? annualChangePct <= -0.1
+      ? `${annualFmt} מניות בשנה`
+      : `${totalFmt} מניות (${spanYears} ש׳)`
+    : isFlat
+    ? '~0% (כמות יציבה)'
+    : `${annualFmt} דילול בשנה`;
+
+  const historyMeta = analyzeSeriesShape(sparkline, 'shares');
+  if (historyMeta) {
+    historyMeta.cycleBadgeHe = spanYears > 0 ? `מצטבר: ${totalFmt}` : `${first.year}`;
+    historyMeta.cycleBadgeEn = spanYears > 0 ? `Cumulative: ${totalFmt}` : `${first.year}`;
+  }
+
   return {
     id: 'share-dilution',
     title: 'Share Dilution',
+    titleHe: 'רכישה עצמית / דילול',
     value: isDecreasing ? 'Share Buybacks' : (isFlat ? 'Flat Share Count' : `+${annualChangePct.toFixed(1)}% / yr`),
+    valueHe,
     target: 'Target: Decreasing',
+    targetHe: 'תנאי למעבר: ירידה או יציבות במניות',
     latestValue: latest.value,
     changePct: Math.round(annualChangePct * 10) / 10,
+    totalChangePct: Math.round(totalChangePct * 10) / 10,
+    latestBuybackUsd,
     badge: isDecreasing ? 'Buybacks' : (isFlat ? 'No Dilution' : 'Diluting'),
+    badgeHe: isDecreasing ? 'רכישה עצמית' : (isFlat ? 'ללא דילול' : 'דילול מניות'),
     detail: isDecreasing
       ? 'החברה רוכשת מניות חזרה'
       : (isFlat ? 'ללא דילול מניות משמעותי' : `הדפסת מניות ודילול משקיעים (+${annualChangePct.toFixed(1)}%)`),
-    metricSummary: isDecreasing
-      ? 'ירידה שנתית בכמות המניות - מגדיל את חלקנו ברווח'
-      : (isFlat ? 'כמות מניות יציבה' : 'עלייה בכמות המניות - מקטין את חלקנו ברווח'),
+    detailEn: isDecreasing
+      ? 'Net share count shrinking via buybacks'
+      : isFlat
+      ? 'Stable diluted share count (no material dilution)'
+      : `Share count expanding (+${annualChangePct.toFixed(1)}% YoY dilution)`,
+    metricSummary:
+      spanYears >= 1
+        ? `Cumulative (${first.year}–${latest.year}): ${totalFmt}${spendNoteEn}`
+        : isDecreasing
+        ? 'Decreasing share count increases ownership stake'
+        : 'Limited share history',
+    metricSummaryHe:
+      spanYears >= 1
+        ? `שינוי מצטבר (${first.year}–${latest.year}): ${totalFmt}${spendNoteHe}`
+        : isDecreasing
+        ? 'ירידה בכמות המניות מגדילה את חלקנו ברווח'
+        : 'כמות מניות יציבה',
+    sparklineUnit: 'sharesM',
+    historyMeta,
     status: isPass ? 'pass' : 'fail',
     sparkline,
   };
@@ -398,22 +715,39 @@ function calculateCurrentRatioMetric(metrics) {
     .slice(-15);
 
   const latest = sortedPoints[sortedPoints.length - 1];
+  const historyMeta = analyzeSeriesShape(sortedPoints, 'currentRatio');
+  if (historyMeta) {
+    historyMeta.cycleBadgeHe = `טווח ${historyMeta.minVal.toFixed(1)}x–${historyMeta.maxVal.toFixed(1)}x`;
+    historyMeta.cycleBadgeEn = `Range ${historyMeta.minVal.toFixed(1)}x–${historyMeta.maxVal.toFixed(1)}x`;
+  }
   // Requirement: יחס שוטף שגדול מ-1 מקבל ירוק (Pass). שקטן מ-1 מקבל אדום (Fail).
   const isPass = latest.value >= 1.0;
 
   return {
     id: 'balance-sheet',
     title: 'Current Ratio (Liquidity)',
+    titleHe: 'יחס שוטף (נזילות)',
     value: `${latest.value.toFixed(2)}x`,
+    valueHe: `${latest.value.toFixed(2)}x`,
     target: 'Target: > 1.0',
+    targetHe: 'תנאי למעבר: מעל 1.0',
     latestValue: latest.value,
     badge: isPass ? 'Safe (> 1.0)' : 'At Risk (< 1.0)',
+    badgeHe: isPass ? 'בטוח (> 1.0)' : 'סיכון (< 1.0)',
     detail: isPass
       ? 'Current Ratio תקין > 1'
       : `יחס שוטף נמוך מ-1.0 (${latest.value.toFixed(2)}x)`,
+    detailEn: isPass
+      ? `Healthy liquidity (${latest.value.toFixed(2)}x > 1.0)`
+      : `Low short-term liquidity (${latest.value.toFixed(2)}x < 1.0)`,
     metricSummary: isPass
-      ? 'נכסים שוטפים עולים על התחייבויות (חוסן פיננסי)'
+      ? `Current assets exceed liabilities (${historyMeta?.cycleBadgeEn || 'solid'})`
+      : `Short-term liabilities exceed current assets (${latest.value.toFixed(2)}x)`,
+    metricSummaryHe: isPass
+      ? `נכסים שוטפים עולים על התחייבויות (${historyMeta?.cycleBadgeHe || 'חוסן פיננסי'})`
       : 'התחייבויות שוטפות עולות על נכסים (סיכון נזילות)',
+    sparklineUnit: 'x',
+    historyMeta,
     status: isPass ? 'pass' : 'fail',
     sparkline: sortedPoints,
   };

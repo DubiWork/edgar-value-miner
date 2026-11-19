@@ -71,23 +71,37 @@ describe('Step1Triage Component', () => {
     expect(enMoatCats.textContent).toContain('Efficient Scale')
   })
 
-  it('renders the 4 Fast Fundamentals indicators with updated titles and target thresholds', () => {
+  it('renders the 4 Fast Fundamentals indicators in Hebrew by default with sparkline timelines and switches cleanly to English', () => {
     render(<Step1Triage company={mockCompany} />)
 
-    // Check all 4 indicator titles (including Current Ratio (Liquidity))
-    expect(screen.getByText('Revenue Growth')).toBeTruthy()
-    expect(screen.getByText('Operating Margins')).toBeTruthy()
-    expect(screen.getByText('Share Dilution')).toBeTruthy()
-    expect(screen.getByText('Current Ratio (Liquidity)')).toBeTruthy()
+    // Hebrew default Section 2 titles & targets
+    expect(screen.getByText(/בדיקת נתוני בסיס מהירה/)).toBeTruthy()
+    expect(screen.getByText('צמיחה בהכנסות')).toBeTruthy()
+    expect(screen.getByText('שולי רווח תפעולי')).toBeTruthy()
+    expect(screen.getByText('רכישה עצמית / דילול')).toBeTruthy()
+    expect(screen.getByText('יחס שוטף (נזילות)')).toBeTruthy()
+    expect(screen.getByText('4 מתוך 4 עברו')).toBeTruthy()
+    expect(screen.getByText('תנאי למעבר: מעל 1.0')).toBeTruthy()
 
-    // Check target baseline text
-    expect(screen.getByText('Target: > 1.0')).toBeTruthy()
+    // Minimalist year timeline shown under sparkline
+    const revTimeline = screen.getByTestId('sparkline-timeline-revenue-growth')
+    expect(revTimeline.textContent).toContain('2015')
+    expect(revTimeline.textContent).toContain('2024')
 
     // Check all 4 Hebrew descriptions
     expect(screen.getByText('צמיחה עקבית של ~14% בשנה')).toBeTruthy()
     expect(screen.getByText('שוליים יציבים מעל 40%')).toBeTruthy()
     expect(screen.getByText('החברה רוכשת מניות חזרה')).toBeTruthy()
     expect(screen.getByText('Current Ratio תקין > 1')).toBeTruthy()
+
+    // Switch to English -> Section 2 translates seamlessly too
+    fireEvent.click(screen.getByTestId('lang-btn-en'))
+    expect(screen.getByText('Instant Fundamentals Check')).toBeTruthy()
+    expect(screen.getByText('Revenue Growth')).toBeTruthy()
+    expect(screen.getByText('Operating Margins')).toBeTruthy()
+    expect(screen.getByText('Share Dilution')).toBeTruthy()
+    expect(screen.getByText('Current Ratio (Liquidity)')).toBeTruthy()
+    expect(screen.getByText('Target: > 1.0')).toBeTruthy()
   })
 
   it('renders educational tooltips with the required rationales for beginners', async () => {
@@ -122,7 +136,7 @@ describe('Step1Triage Component', () => {
 
     // 5. Operating Margins Tooltip
     expect(
-      screen.getByText(/שולי רווח תפעולי: המדד ליעילות ויציבות/i)
+      screen.getByText(/שולי רווח תפעולי: המדד ליעילות וכוח תמחור/i)
     ).toBeTruthy()
 
     // 6. Share Dilution Tooltip
@@ -168,13 +182,22 @@ describe('Step1Triage Component', () => {
 
     render(<Step1Triage company={mockCompany} companyFacts={customFacts} />)
 
-    // 2 of 4 passed (Revenue & Buybacks passed; Margins 5% & CR 0.89x failed)
+    // 2 of 4 passed in Hebrew default, and switch to English verifies English labels
+    expect(screen.getByText('2 מתוך 4 עברו')).toBeTruthy()
+    expect(screen.getByText('+25% בשנה')).toBeTruthy()
+    expect(screen.getByText('5.0%')).toBeTruthy()
+    expect(screen.getByText('שוליים נמוכים')).toBeTruthy()
+    expect(screen.getByText('-5.0% מניות בשנה')).toBeTruthy()
+    expect(screen.getByText('0.89x')).toBeTruthy()
+    expect(screen.getByText('סיכון (< 1.0)')).toBeTruthy()
+    expect(screen.getByText('תנאי למעבר: מעל 1.0')).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId('lang-btn-en'))
     expect(screen.getByText('2 of 4 Passed')).toBeTruthy()
     expect(screen.getByText('+25% YoY')).toBeTruthy()
     expect(screen.getByText('5%+')).toBeTruthy()
     expect(screen.getByText('Low Margins')).toBeTruthy()
     expect(screen.getByText('Share Buybacks')).toBeTruthy()
-    expect(screen.getByText('0.89x')).toBeTruthy()
     expect(screen.getByText('At Risk (< 1.0)')).toBeTruthy()
     expect(screen.getByText('Target: > 1.0')).toBeTruthy()
   })
@@ -211,7 +234,7 @@ describe('Step1Triage Component', () => {
     expect(screen.getByTestId('admin-edgar-source-badge').textContent).toContain('firestore')
   })
 
-  it('expands the Tear Sheet Blade (#319) to show segments, geography, Mermaid diagram, competitors, and moat breakdown', async () => {
+  it('expands the Tear Sheet Blade (#319) to show segments, geography, visual infographic, scaled competitors, jargon glossary, and omits redundant moat/mermaid-code blocks', async () => {
     render(<Step1Triage company={mockCompany} />)
 
     const toggleBtn = await screen.findByTestId('toggle-tear-sheet-btn')
@@ -228,9 +251,13 @@ describe('Step1Triage Component', () => {
     expect(screen.getByTestId('tear-sheet-expanded-content')).toBeTruthy()
     expect(screen.getByTestId('tear-sheet-segments-card')).toBeTruthy()
     expect(screen.getByTestId('tear-sheet-geo-card')).toBeTruthy()
-    expect(screen.getByTestId('tear-sheet-mermaid-diagram')).toBeTruthy()
+    expect(screen.getByTestId('tear-sheet-infographic')).toBeTruthy()
     expect(screen.getByTestId('tear-sheet-growth-engines-card')).toBeTruthy()
     expect(screen.getByTestId('tear-sheet-competitors-card')).toBeTruthy()
-    expect(screen.getByTestId('tear-sheet-moat-sources')).toBeTruthy()
+    expect(screen.getByTestId('tear-sheet-glossary-card')).toBeTruthy()
+
+    // Redundant Mermaid raw code toggle and duplicate moat card are removed cleanly
+    expect(screen.queryByText(/הצג קוד תרשים|View Mermaid Syntax/)).toBeNull()
+    expect(screen.queryByTestId('tear-sheet-moat-sources')).toBeNull()
   })
 })

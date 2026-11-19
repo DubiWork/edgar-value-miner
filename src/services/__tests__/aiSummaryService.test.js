@@ -24,6 +24,9 @@ import {
   setCachedSummary,
   invalidateCachedSummary,
   normalizeMoat,
+  normalizeBusinessInfographic,
+  normalizeCompetitors,
+  normalizeGlossary,
   resolveTraitDisplay,
   translateSummaryOnDemand,
   CANONICAL_MOAT_SOURCES,
@@ -302,5 +305,44 @@ describe('aiSummaryService', () => {
     expect(normalized.sources.find((s) => s.name === 'Switching Costs').rationale).toBe(
       'מעבר ספקים פשוט יחסית.'
     );
+  });
+
+  it('normalizes visual businessInfographic (from legacy mermaid or explicit stages), scaled competitors, and jargon glossary', () => {
+    const flowFromMermaid = normalizeBusinessInfographic(
+      null,
+      ['Parts Distribution', 'MRO'],
+      'AAR Corp',
+      'AIR',
+      'he',
+      'flowchart LR\n  A["חברות תעופה וממשל"] --> B["חלקי חילוף ו-MRO"]'
+    );
+    expect(flowFromMermaid).toHaveLength(4);
+    expect(flowFromMermaid[0].subtitle).toBe('חברות תעופה וממשל');
+    expect(flowFromMermaid[1].subtitle).toBe('חלקי חילוף ו-MRO');
+
+    const peers = normalizeCompetitors(
+      [
+        {
+          name: 'HEICO',
+          relativeSize: 'larger',
+          competeOnHe: 'חלקי חילוף תעופתיים',
+          competeOnEn: 'PMA & USM aviation parts',
+        },
+        'Legacy String Competitor',
+      ],
+      'he'
+    );
+    expect(peers).toHaveLength(2);
+    expect(peers[0].sizeShort).toBe('גדולה ↑');
+    expect(peers[0].competeOn).toBe('חלקי חילוף תעופתיים');
+    expect(peers[1].sizeShort).toBe('דומה ≈');
+
+    const terms = normalizeGlossary(
+      [
+        { term: 'MRO', definitionHe: 'תחזוקה, תיקון ושיפוץ כלי טיס', definitionEn: 'Maintenance, Repair & Overhaul' },
+      ],
+      'he'
+    );
+    expect(terms).toEqual([{ term: 'MRO', definition: 'תחזוקה, תיקון ושיפוץ כלי טיס' }]);
   });
 });

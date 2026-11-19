@@ -3,7 +3,7 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import type { CallableRequest, CallableOptions } from 'firebase-functions/v2/https';
 import {
   getOrFetchCompanyContext,
-  loadCachedCompanyContext,
+  checkAndRefreshCompanyContext,
   saveManualTranscriptForTicker,
   buildGroundedContextPromptBlock,
   type IngestionStatus,
@@ -48,6 +48,10 @@ export interface GenerateAiSummaryData {
     | 'getCompanyContextStatus'
     | 'refreshCompanyContext'
     | 'saveManualTranscript';
+  clientFilingDates?: {
+    tenKDate?: string | null;
+    eightKDate?: string | null;
+  } | null;
   manualTranscriptText?: string;
   manualTranscriptDate?: string;
 }
@@ -56,6 +60,11 @@ export interface GenerateAiSummaryResult {
   text: string;
   budget?: AiBudgetStatus;
   ingestionStatus?: IngestionStatus | null;
+  hasNewerFilings?: boolean;
+  latestFilingDates?: {
+    tenKDate: string | null;
+    eightKDate: string | null;
+  };
 }
 
 interface StoredBudgetRecord {
@@ -229,11 +238,15 @@ export async function generateAiSummaryHandler(
     if (!data.ticker) {
       throw new HttpsError('invalid-argument', 'ticker is required for getCompanyContextStatus');
     }
-    const cachedCtx = await loadCachedCompanyContext(data.ticker);
+    const freshness = await checkAndRefreshCompanyContext(data.ticker, {
+      clientFilingDates: data.clientFilingDates || null,
+    });
     return {
       text: '',
       budget: currentStatus,
-      ingestionStatus: cachedCtx?.ingestionStatus || null,
+      ingestionStatus: freshness.context?.ingestionStatus || null,
+      hasNewerFilings: freshness.hasNewerFilings,
+      latestFilingDates: freshness.latestFilingDates,
     };
   }
 

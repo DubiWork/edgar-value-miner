@@ -170,6 +170,222 @@ export function normalizeMoat(rawMoat, companyName = '', lang = 'he') {
   };
 }
 
+const INFOGRAPHIC_STAGES_META = [
+  {
+    stage: 1,
+    iconKey: 'customers',
+    defaultTitleHe: 'מי הלקוח ומה הצורך',
+    defaultTitleEn: 'Who Needs It',
+  },
+  {
+    stage: 2,
+    iconKey: 'engine',
+    defaultTitleHe: 'איך העסק פועל',
+    defaultTitleEn: 'How It Works',
+  },
+  {
+    stage: 3,
+    iconKey: 'revenue',
+    defaultTitleHe: 'איך הכסף נכנס',
+    defaultTitleEn: 'How Money Flows In',
+  },
+  {
+    stage: 4,
+    iconKey: 'profit',
+    defaultTitleHe: 'רווח וצמיחה חוזרת',
+    defaultTitleEn: 'Profit & Reinvestment',
+  },
+];
+
+const COMPETITOR_SIZE_MAP = {
+  larger: {
+    sizeLabelHe: 'גדולה יותר',
+    sizeLabelEn: 'Larger Peer',
+    sizeShortHe: 'גדולה ↑',
+    sizeShortEn: 'Larger ↑',
+  },
+  similar: {
+    sizeLabelHe: 'סדר גודל דומה',
+    sizeLabelEn: 'Similar Scale',
+    sizeShortHe: 'דומה ≈',
+    sizeShortEn: 'Similar ≈',
+  },
+  smaller: {
+    sizeLabelHe: 'קטנה יותר',
+    sizeLabelEn: 'Smaller Peer',
+    sizeShortHe: 'קטנה ↓',
+    sizeShortEn: 'Smaller ↓',
+  },
+};
+
+function parseLegacyMermaidLabels(mermaidCode) {
+  if (!mermaidCode || typeof mermaidCode !== 'string') return [];
+  const matches = Array.from(mermaidCode.matchAll(/\["([^"]+)"\]|\[([^\]]+)\]/g));
+  const seen = new Set();
+  const labels = [];
+  for (const m of matches) {
+    const label = (m[1] || m[2] || '').trim();
+    if (label && !seen.has(label)) {
+      seen.add(label);
+      labels.push(label);
+    }
+  }
+  return labels.slice(0, 4);
+}
+
+/**
+ * Normalizes a 4-stage plain-language visual Business Value Infographic.
+ */
+export function normalizeBusinessInfographic(
+  rawInfographic,
+  engines = [],
+  companyName = '',
+  normTicker = '',
+  lang = 'he',
+  legacyMermaid = ''
+) {
+  const isHe = lang === 'he';
+  if (Array.isArray(rawInfographic) && rawInfographic.length >= 2) {
+    return INFOGRAPHIC_STAGES_META.map((meta, idx) => {
+      const item = rawInfographic[idx] || rawInfographic[rawInfographic.length - 1] || {};
+      const title = isHe
+        ? item.titleHe || item.title || meta.defaultTitleHe
+        : item.titleEn || item.title || meta.defaultTitleEn;
+      const subtitle = isHe
+        ? item.subtitleHe || item.subtitle || item.descriptionHe || item.description || ''
+        : item.subtitleEn || item.subtitle || item.descriptionEn || item.description || '';
+      return {
+        stage: meta.stage,
+        iconKey: item.iconKey || meta.iconKey,
+        title: String(title).trim(),
+        subtitle: String(subtitle || (isHe ? meta.defaultTitleHe : meta.defaultTitleEn)).trim(),
+      };
+    });
+  }
+
+  const mermaidLabels = parseLegacyMermaidLabels(legacyMermaid);
+  const label = companyName || normTicker || 'החברה';
+  const mainEngine = engines[0] || (isHe ? 'מוצרי ושירותי הליבה' : 'Core Products & Services');
+  const secondaryEngine = engines[1] || (isHe ? 'שירותים משלימים' : 'Recurring & Aftermarket');
+
+  const defaultSubsHe = [
+    mermaidLabels[0] || `לקוחות קצה וארגונים הזקוקים ל-${mainEngine}`,
+    mermaidLabels[1] || `${label} מספקת ${mainEngine} ו-${secondaryEngine}`,
+    mermaidLabels[2] || 'תשלום במנויים, חוזים רב-שנתיים או מכירה ישירה',
+    mermaidLabels[3] || 'עודף המזומנים מופנה לצמיחה, פיתוח ורכישה עצמית',
+  ];
+  const defaultSubsEn = [
+    mermaidLabels[0] || `Enterprise & retail customers needing ${mainEngine}`,
+    mermaidLabels[1] || `${label} delivers ${mainEngine} & ${secondaryEngine}`,
+    mermaidLabels[2] || 'Revenue collected via subscriptions, contracts & direct sales',
+    mermaidLabels[3] || 'Operating cash flow funds reinvestment and shareholder returns',
+  ];
+
+  return INFOGRAPHIC_STAGES_META.map((meta, idx) => ({
+    stage: meta.stage,
+    iconKey: meta.iconKey,
+    title: isHe ? meta.defaultTitleHe : meta.defaultTitleEn,
+    subtitle: isHe ? defaultSubsHe[idx] : defaultSubsEn[idx],
+  }));
+}
+
+/**
+ * Normalizes competitor entries (either legacy string names or structured peers with scale & overlap).
+ */
+export function normalizeCompetitors(rawCompetitors = [], lang = 'he') {
+  if (!Array.isArray(rawCompetitors)) return [];
+  const isHe = lang === 'he';
+
+  return rawCompetitors
+    .map((item) => {
+      if (typeof item === 'string') {
+        const name = item.trim();
+        if (!name) return null;
+        return {
+          name,
+          relativeSize: 'similar',
+          sizeLabel: isHe ? COMPETITOR_SIZE_MAP.similar.sizeLabelHe : COMPETITOR_SIZE_MAP.similar.sizeLabelEn,
+          sizeShort: isHe ? COMPETITOR_SIZE_MAP.similar.sizeShortHe : COMPETITOR_SIZE_MAP.similar.sizeShortEn,
+          competeOn: isHe
+            ? 'מתחרה ישירה בפלחי השוק המרכזיים ובשימור לקוחות.'
+            : 'Direct peer competing across overlapping core product and customer segments.',
+        };
+      }
+      if (!item || !item.name) return null;
+      const sizeKey = ['larger', 'similar', 'smaller'].includes(String(item.relativeSize || '').toLowerCase())
+        ? String(item.relativeSize).toLowerCase()
+        : 'similar';
+      const sizeMeta = COMPETITOR_SIZE_MAP[sizeKey];
+      const competeOnText = isHe
+        ? item.competeOnHe || item.competeOn || item.competeOnEn || 'מתחרה בפלחי פעילות חופפים.'
+        : item.competeOnEn || item.competeOn || item.competeOnHe || 'Competes across overlapping core segments.';
+
+      return {
+        name: String(item.name).trim(),
+        relativeSize: sizeKey,
+        sizeLabel: isHe ? sizeMeta.sizeLabelHe : sizeMeta.sizeLabelEn,
+        sizeShort: isHe ? sizeMeta.sizeShortHe : sizeMeta.sizeShortEn,
+        competeOn: String(competeOnText).trim(),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+/**
+ * Normalizes a compact 3-5 term domain/business jargon glossary for non-expert readers.
+ */
+export function normalizeGlossary(rawGlossary = [], lang = 'he') {
+  const isHe = lang === 'he';
+  if (Array.isArray(rawGlossary) && rawGlossary.length > 0) {
+    const cleaned = rawGlossary
+      .map((item) => {
+        if (!item || !item.term) return null;
+        const definition = isHe
+          ? item.definitionHe || item.definition || item.definitionEn || ''
+          : item.definitionEn || item.definition || item.definitionHe || '';
+        if (!definition) return null;
+        return {
+          term: String(item.term).trim(),
+          definition: String(definition).trim(),
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 5);
+    if (cleaned.length > 0) return cleaned;
+  }
+
+  return isHe
+    ? [
+        {
+          term: '10-K / 8-K',
+          definition: 'הדוח השנתי המלא (10-K) ועדכוני תוצאות רבעוניים (8-K) המוגשים לרשות ני״ע האמריקאית.',
+        },
+        {
+          term: 'B2B / B2G',
+          definition: 'מכירה לעסקים וארגונים (B2B) או לממשלות וגופי ביטחון בחוזים רב-שנתיים (B2G).',
+        },
+        {
+          term: 'חפיר כלכלי (Moat)',
+          definition: 'יתרון תחרותי מתמשך המקשה על מתחרים לנגוס בנתח השוק או ברווחיות החברה.',
+        },
+      ]
+    : [
+        {
+          term: '10-K / 8-K',
+          definition: 'Audited annual SEC filing (10-K) and timely quarterly/earnings updates (8-K).',
+        },
+        {
+          term: 'B2B / B2G',
+          definition: 'Sales to commercial businesses (B2B) or government and defense agencies (B2G).',
+        },
+        {
+          term: 'Economic Moat',
+          definition: 'Durable competitive advantage protecting market share and pricing power from rivals.',
+        },
+      ];
+}
+
 const EXACT_TRAIT_META = {
   'b2b enterprise': {
     labelHe: 'מכירה לארגונים (B2B Enterprise)',
@@ -374,14 +590,99 @@ const PRESET_MOCKS = {
       { region: 'United States', pct: 51 },
       { region: 'International (EMEA, APAC, Americas)', pct: 49 },
     ],
-    mermaidDiagram:
-      'flowchart LR\n  A["Enterprise & Consumers"] --> B["M365 SaaS & Azure Cloud"]\n  B --> C["$245B Recurring Revenue"]\n  C --> D["44% Operating Margin"]',
+    businessInfographic: [
+      {
+        stage: 1,
+        iconKey: 'customers',
+        titleHe: 'מי הלקוח ומה הצורך',
+        subtitleHe: 'ארגונים וחברות שזקוקים לענן מאובטח וכלי עבודה משרדיים',
+        titleEn: 'Who Needs It',
+        subtitleEn: 'Enterprises & workers needing secure cloud and daily productivity tools',
+      },
+      {
+        stage: 2,
+        iconKey: 'engine',
+        titleHe: 'איך העסק פועל',
+        subtitleHe: 'מפעילה את ענן Azure, חבילת Office 365 וכלי AI (Copilot)',
+        titleEn: 'How It Works',
+        subtitleEn: 'Operates Azure hyperscale cloud, M365 software & Copilot AI',
+      },
+      {
+        stage: 3,
+        iconKey: 'revenue',
+        titleHe: 'איך הכסף נכנס',
+        subtitleHe: 'מנויים חודשיים צפויים מראש (SaaS) וחיוב לפי שימוש בענן',
+        titleEn: 'How Money Flows In',
+        subtitleEn: 'Predictable monthly SaaS seats + usage-based cloud billing',
+      },
+      {
+        stage: 4,
+        iconKey: 'profit',
+        titleHe: 'רווח וצמיחה חוזרת',
+        subtitleHe: '~44% רווח תפעולי שמושקע בשרתי AI והחזר מניות לבעלים',
+        titleEn: 'Profit & Reinvestment',
+        subtitleEn: '~44% operating margin reinvested in AI capacity & buybacks',
+      },
+    ],
     growthEngines: [
       'התרחבות Azure AI ואימוץ Copilot בקרב לקוחות ארגוניים (Fortune 500)',
       'מעבר לקוחות לחבילות פרימיום E5 ב-Microsoft 365 והעלאות מחיר תקופתיות',
       'צמיחת פרסום ב-LinkedIn ורכישת Activision Blizzard ב-Game Pass',
     ],
-    competitors: ['Amazon AWS', 'Google Cloud & Workspace', 'Salesforce', 'Apple', 'Sony'],
+    competitors: [
+      {
+        name: 'Amazon AWS',
+        relativeSize: 'similar',
+        competeOnHe: 'תשתיות ענן ומחשוב ארגוני (Cloud Infrastructure)',
+        competeOnEn: 'Enterprise cloud compute and AI infrastructure',
+      },
+      {
+        name: 'Google Cloud & Workspace',
+        relativeSize: 'similar',
+        competeOnHe: 'שירותי ענן, AI וכלי עבודה ושיתוף למשרדים',
+        competeOnEn: 'Cloud AI workloads and workplace productivity suites',
+      },
+      {
+        name: 'Salesforce',
+        relativeSize: 'smaller',
+        competeOnHe: 'תוכנות ארגוניות לניהול לקוחות (Dynamics vs CRM)',
+        competeOnEn: 'Enterprise CRM and workflow SaaS applications',
+      },
+      {
+        name: 'Apple',
+        relativeSize: 'similar',
+        competeOnHe: 'מערכות הפעלה וחומרת קצה למשתמשים וארגונים',
+        competeOnEn: 'Desktop/enterprise OS ecosystem and endpoint devices',
+      },
+      {
+        name: 'Sony',
+        relativeSize: 'smaller',
+        competeOnHe: 'קונסולות גיימינג ומנויי תוכן דיגיטליים (PlayStation vs Xbox)',
+        competeOnEn: 'Gaming consoles, studios, and subscription ecosystems',
+      },
+    ],
+    glossary: [
+      {
+        term: 'SaaS',
+        definitionHe: 'תוכנה כשירות — מודל מנויים חודשי/שנתי במקום קנייה חד-פעמית, שמבטיח הכנסות צפויות.',
+        definitionEn: 'Software-as-a-Service — recurring subscription software delivering predictable revenue.',
+      },
+      {
+        term: 'OEM',
+        definitionHe: 'יצרניות מחשבים מקוריות (כמו Dell ו-HP) המשלמות על רישיונות Windows בכל מחשב חדש.',
+        definitionEn: 'Original Equipment Manufacturers (Dell, HP) bundling Windows pre-installed on PCs.',
+      },
+      {
+        term: 'Hyperscale Cloud',
+        definitionHe: 'תשתיות ענן ענקיות ויקרות להקמה שבהן העלות ללקוח יורדת משמעותית ככל שהגודל עולה.',
+        definitionEn: 'Massive global data-center networks whose unit cost drops sharply with scale.',
+      },
+      {
+        term: 'Switching Costs',
+        definitionHe: 'עלויות מעבר — הקושי הטכני והכספי להחליף מערכת ארגונית שכבר מוטמעת בכל החברה.',
+        definitionEn: 'Technical and operational friction making customers reluctant to switch vendors.',
+      },
+    ],
     moat: {
       rating: 'Wide Moat',
       score: '4/5',
@@ -487,14 +788,94 @@ const PRESET_MOCKS = {
       { region: 'Greater China', pct: 17 },
       { region: 'Japan & Rest of Asia Pacific', pct: 14 },
     ],
-    mermaidDiagram:
-      'flowchart LR\n  A["Premium Hardware (iPhone/Mac)"] --> B["2.2B+ Installed Base"]\n  B --> C["Recurring Services (App Store/iCloud)"]\n  C --> D["$100B+ Annual Free Cash Flow"]',
+    businessInfographic: [
+      {
+        stage: 1,
+        iconKey: 'customers',
+        titleHe: 'מי הלקוח ומה הצורך',
+        subtitleHe: 'מעל 2.2 מיליארד מכשירי קצה של צרכנים נאמנים ברחבי העולם',
+        titleEn: 'Who Needs It',
+        subtitleEn: 'Over 2.2B active consumer devices anchored to iOS',
+      },
+      {
+        stage: 2,
+        iconKey: 'engine',
+        titleHe: 'איך העסק פועל',
+        subtitleHe: 'מוכרת חומרת פרימיום (iPhone/Mac) שמכניסה משתמשים לאקוסיסטם',
+        titleEn: 'How It Works',
+        subtitleEn: 'Sells flagship hardware pulling users into a sticky ecosystem',
+      },
+      {
+        stage: 3,
+        iconKey: 'revenue',
+        titleHe: 'איך הכסף נכנס',
+        subtitleHe: 'מכירות מכשירים + עמלות קבועות מ-App Store, iCloud ו-Apple Pay',
+        titleEn: 'How Money Flows In',
+        subtitleEn: 'Hardware sales + high-margin recurring App Store & iCloud fees',
+      },
+      {
+        stage: 4,
+        iconKey: 'profit',
+        titleHe: 'רווח וצמיחה חוזרת',
+        subtitleHe: 'מעל $100B תזרים חופשי בשנה המופנה לפיתוח שבבים ובייבאקס',
+        titleEn: 'Profit & Reinvestment',
+        subtitleEn: '$100B+ annual FCF funding Apple Silicon R&D and buybacks',
+      },
+    ],
     growthEngines: [
       'צמיחה דו-ספרתית בחטיבת ה-Services עם שולי רווח גולמי של מעל 70%',
       'מחזורי שדרוג מכשירים מבוססי Apple Intelligence על גבי בסיס של 2.2 מיליארד מכשירים',
       'חדירה לשווקים מתעוררים (הודו ודרום-מזרח אסיה) והרחבת שירותי פינטק (Apple Pay)',
     ],
-    competitors: ['Samsung', 'Google Android', 'Xiaomi & Huawei', 'Microsoft', 'Spotify'],
+    competitors: [
+      {
+        name: 'Samsung',
+        relativeSize: 'smaller',
+        competeOnHe: 'סמארטפונים וטאבלטים במגזר הפרימיום והשוק העולמי',
+        competeOnEn: 'Flagship smartphones, tablets, and wearables worldwide',
+      },
+      {
+        name: 'Google Android',
+        relativeSize: 'similar',
+        competeOnHe: 'מערכת הפעלה לניידים, חנות אפליקציות ושירותי ענן/תשלום',
+        competeOnEn: 'Mobile OS ecosystem, app store fees, and Pixel hardware',
+      },
+      {
+        name: 'Xiaomi & Huawei',
+        relativeSize: 'smaller',
+        competeOnHe: 'מכשירי סמארטפון ותחרות מחירים בשווקים מתעוררים ובסין',
+        competeOnEn: 'Handset market share across China and emerging markets',
+      },
+      {
+        name: 'Microsoft',
+        relativeSize: 'similar',
+        competeOnHe: 'מחשבים אישיים, מערכות הפעלה (macOS vs Windows) ושירותי AI',
+        competeOnEn: 'Desktop computing ecosystems (macOS vs Windows)',
+      },
+      {
+        name: 'Spotify',
+        relativeSize: 'smaller',
+        competeOnHe: 'מנויי מוזיקה וסטרימינג דיגיטלי על גבי iOS (Apple Music)',
+        competeOnEn: 'Digital audio streaming subscriptions (Apple Music vs Spotify)',
+      },
+    ],
+    glossary: [
+      {
+        term: 'Installed Base',
+        definitionHe: 'בסיס המכשירים הפעיל — כל האייפונים והמק-ים שנמצאים בשימוש כיום ומזמינים שירותים חוזרים.',
+        definitionEn: 'Active devices in consumers’ hands generating ongoing Services revenue.',
+      },
+      {
+        term: 'Services Margin',
+        definitionHe: 'רווחיות משירותים דיגיטליים (~74% גולמי), הגבוהה כמעט פי שניים ממכירת החומרה.',
+        definitionEn: 'Gross margin (~74%) on App Store, iCloud & licensing — nearly double hardware.',
+      },
+      {
+        term: 'Apple Silicon',
+        definitionHe: 'שבבים שאפל מתכננת בעצמה (סדרת M ו-A) כדי להוזיל עלויות ולהאריך חיי סוללה.',
+        definitionEn: 'In-house custom chips cutting component costs and boosting battery efficiency.',
+      },
+    ],
     moat: {
       rating: 'Wide Moat',
       score: '4/5',
@@ -918,6 +1299,43 @@ function enrichWithTearSheetDefaults(baseObj, normTicker, companyName) {
     !rawEn?._isFallbackTranslation &&
     !String(rawEn.summary).includes(LEGACY_EN_FALLBACK_MARKER);
   const isFallbackEn = !hasCuratedOrLiveEn;
+
+  const heInfographic = normalizeBusinessInfographic(
+    baseObj.businessInfographic,
+    engines,
+    companyName,
+    normTicker,
+    'he',
+    baseObj.mermaidDiagram
+  );
+  const enInfographic = normalizeBusinessInfographic(
+    rawEn?.businessInfographic || baseObj.businessInfographic,
+    engines,
+    companyName,
+    normTicker,
+    'en',
+    baseObj.mermaidDiagram
+  );
+  const heCompetitors = normalizeCompetitors(
+    baseObj.competitors || [
+      `${normTicker} Sector Peers`,
+      'Global Industry Leaders',
+      'Specialized Disruptors',
+    ],
+    'he'
+  );
+  const enCompetitors = normalizeCompetitors(
+    rawEn?.competitors ||
+      baseObj.competitors || [
+        `${normTicker} Sector Peers`,
+        'Global Industry Leaders',
+        'Specialized Disruptors',
+      ],
+    'en'
+  );
+  const heGlossary = normalizeGlossary(baseObj.glossary, 'he');
+  const enGlossary = normalizeGlossary(rawEn?.glossary || baseObj.glossary, 'en');
+
   const enrichedTranslations = {
     ...(baseObj.translations || {}),
     en: {
@@ -930,6 +1348,9 @@ function enrichWithTearSheetDefaults(baseObj, normTicker, companyName) {
         'Operating margin expansion driven by scale and recurring revenue mix',
         'International market penetration and new product innovation',
       ],
+      businessInfographic: enInfographic,
+      competitors: enCompetitors,
+      glossary: enGlossary,
       moat: normalizedEnMoat,
     },
   };
@@ -949,19 +1370,16 @@ function enrichWithTearSheetDefaults(baseObj, normTicker, companyName) {
       { region: 'United States / Domestic', pct: 60 },
       { region: 'International Markets', pct: 40 },
     ],
-    mermaidDiagram: `flowchart LR\n  A["Customers & Enterprises"] --> B["${engines[0] || normTicker}"]\n  B --> C["Recurring & Product Revenue"]\n  C --> D["Operating Cash Flow"]`,
     growthEngines: [
       `הרחבת אימוץ ${engines[0] || 'מוצרי הליבה'} בקרב לקוחות קיימים וחדשים`,
       `שיפור שולי הרווח התפעולי באמצעות יתרון לגודל ומינוף תפעולי`,
       `חדירה לשווקים בינלאומיים והשקת שירותים משלימים`,
     ],
-    competitors: [
-      `${normTicker} Sector Peers`,
-      'Global Industry Leaders',
-      'Specialized Disruptors',
-    ],
     ...baseObj,
     keyEngines: engines,
+    businessInfographic: heInfographic,
+    competitors: heCompetitors,
+    glossary: heGlossary,
     moat: normalizedMoat,
     translations: enrichedTranslations,
   };
@@ -1034,13 +1452,56 @@ async function callLlmApi(ticker, companyProfile, apiKey, options = {}) {
     { "region": "United States", "pct": 55 },
     { "region": "International", "pct": 45 }
   ],
-  "mermaidDiagram": "flowchart LR\\n  A[\\"Customers\\"] --> B[\\"Core Platform\\"] --> C[\\"Revenue Streams\\"] --> D[\\"Operating Profit\\"]",
+  "businessInfographic": [
+    {
+      "stage": 1,
+      "titleHe": "מי הלקוח ומה הצורך",
+      "subtitleHe": "משפט קצר מאוד בעברית פשוטה ללא ז׳רגון על הלקוח והבעיה שהחברה פותרת",
+      "titleEn": "Who Needs It",
+      "subtitleEn": "Plain-language 1-line summary of customer & need"
+    },
+    {
+      "stage": 2,
+      "titleHe": "איך העסק פועל",
+      "subtitleHe": "משפט קצר ופשוט על המוצר/השירות המרכזי (בגובה העיניים)",
+      "titleEn": "How It Works",
+      "subtitleEn": "Plain-language 1-line summary of core product or service"
+    },
+    {
+      "stage": 3,
+      "titleHe": "איך הכסף נכנס",
+      "subtitleHe": "איך הלקוחות משלמים (חוזים ארוכי טווח / מנויים / מכירת חלפים וכו׳)",
+      "titleEn": "How Money Flows In",
+      "subtitleEn": "How customers pay (recurring contracts, usage, units)"
+    },
+    {
+      "stage": 4,
+      "titleHe": "רווח וצמיחה חוזרת",
+      "subtitleHe": "מה הרווח שנשאר ולאן הוא מופנה בעסק",
+      "titleEn": "Profit & Reinvestment",
+      "subtitleEn": "How cash flow compounds growth and returns"
+    }
+  ],
   "growthEngines": [
     "מנוע צמיחה 1 קצר וממוקד בעברית מתוך ה-10-K/שיחת הוועידה",
     "מנוע צמיחה 2 קצר וממוקד בעברית",
     "מנוע צמיחה 3 קצר וממוקד בעברית"
   ],
-  "competitors": ["Competitor 1", "Competitor 2", "Competitor 3", "Competitor 4"],
+  "competitors": [
+    {
+      "name": "Competitor 1",
+      "relativeSize": "larger | similar | smaller (ביחס לגודל החברה הנסקרת)",
+      "competeOnHe": "משפט קצר: באיזה תחום או פלח מתחרות",
+      "competeOnEn": "Short phrase on exact competitive overlap"
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Short Jargon Term / Acronym (e.g. MRO, OEM, USM — 3 to 5 unfamiliar industry terms used above)",
+      "definitionHe": "הסבר של שורה אחת בעברית פשוטה למי שאינו מהתחום",
+      "definitionEn": "1-line plain English definition for non-specialists"
+    }
+  ],
   "moat": {
     "rating": "Wide Moat | Narrow Moat | No Moat (הערכה איכותנית לפי מתודולוגיית Morningstar/באפט — בהתחשב בעוצמת התחרות בענף וביריבים כמו דואופול, לא ספירה מכנית בלבד. דרג Narrow Moat אם מתחרים חזקים יכולים לנגוס בנתח שוק או בתמחור, ו-No Moat רק אם אין אף מקור חפיר פעיל)",
     "score": "X/5 (חייב להתאים למספר ה-active: true למטה; ב-No Moat חובה 0 active)",
@@ -1079,6 +1540,9 @@ async function callLlmApi(ticker, companyProfile, apiKey, options = {}) {
       ...(Array.isArray(parsed.geoBreakdown)
         ? { geoBreakdown: parsed.geoBreakdown.slice(0, 5) }
         : {}),
+      ...(Array.isArray(parsed.businessInfographic)
+        ? { businessInfographic: parsed.businessInfographic.slice(0, 4) }
+        : {}),
       ...(typeof parsed.mermaidDiagram === 'string' && parsed.mermaidDiagram.trim()
         ? { mermaidDiagram: parsed.mermaidDiagram.trim() }
         : {}),
@@ -1087,6 +1551,9 @@ async function callLlmApi(ticker, companyProfile, apiKey, options = {}) {
         : {}),
       ...(Array.isArray(parsed.competitors)
         ? { competitors: parsed.competitors.slice(0, 6) }
+        : {}),
+      ...(Array.isArray(parsed.glossary)
+        ? { glossary: parsed.glossary.slice(0, 5) }
         : {}),
       ...(parsed.moat && typeof parsed.moat === 'object' ? { moat: parsed.moat } : {}),
       ...(parsed._ingestionStatus ? { ingestionStatus: parsed._ingestionStatus } : {}),
@@ -1118,13 +1585,27 @@ export async function translateSummaryOnDemand(ticker, summaryObj, targetLang = 
   const provider = llmFactory.getProvider();
 
   try {
+    const normalizedPeers = normalizeCompetitors(summaryObj.competitors || [], 'he');
+    const normalizedFlow = normalizeBusinessInfographic(
+      summaryObj.businessInfographic,
+      summaryObj.keyEngines || [],
+      normTicker,
+      normTicker,
+      'he',
+      summaryObj.mermaidDiagram
+    );
+    const normalizedTerms = normalizeGlossary(summaryObj.glossary || [], 'he');
+
     const compactPayload = {
       summary: summaryObj.summary,
       growthEngines: summaryObj.growthEngines || [],
+      businessInfographic: normalizedFlow.map((s) => ({ stage: s.stage, subtitle: s.subtitle })),
+      competitors: normalizedPeers.map((c) => ({ name: c.name, competeOn: c.competeOn })),
+      glossary: normalizedTerms.map((g) => ({ term: g.term, definition: g.definition })),
       moat: summaryObj.moat || null,
     };
 
-    const translatePrompt = `Translate the following structured investment Tear Sheet JSON fields into clear, professional English for value investors. Return ONLY valid JSON with the exact same keys ("summary", "growthEngines", "moat") preserving all 5 moat sources:
+    const translatePrompt = `Translate the following structured investment Tear Sheet JSON fields into clear, professional English for value investors. Return ONLY valid JSON with the keys ("summary", "growthEngines", "businessInfographic", "competitors", "glossary", "moat") preserving all 5 moat sources, competitor names, and glossary terms:
 ${JSON.stringify(compactPayload)}`;
 
     const translated = await provider.generateJSON(translatePrompt, apiKey);
@@ -1160,8 +1641,52 @@ ${JSON.stringify(compactPayload)}`;
         mergedMoat = normalizeMoat(mergedMoat, normTicker, 'en');
       }
 
+      const mergedInfographic = Array.isArray(translated.businessInfographic)
+        ? INFOGRAPHIC_STAGES_META.map((meta, idx) => ({
+            stage: meta.stage,
+            iconKey: meta.iconKey,
+            titleEn: meta.defaultTitleEn,
+            subtitleEn:
+              translated.businessInfographic[idx]?.subtitle ||
+              translated.businessInfographic[idx]?.subtitleEn ||
+              normalizedFlow[idx]?.subtitle,
+          }))
+        : undefined;
+
+      const trPeersByName = new Map(
+        (Array.isArray(translated.competitors) ? translated.competitors : []).map((c) => [
+          String(c?.name || '').toLowerCase(),
+          c,
+        ])
+      );
+      const mergedCompetitors = normalizedPeers.map((orig) => ({
+        name: orig.name,
+        relativeSize: orig.relativeSize,
+        competeOnEn:
+          trPeersByName.get(orig.name.toLowerCase())?.competeOn ||
+          trPeersByName.get(orig.name.toLowerCase())?.competeOnEn ||
+          orig.competeOn,
+      }));
+
+      const trGlossaryByTerm = new Map(
+        (Array.isArray(translated.glossary) ? translated.glossary : []).map((g) => [
+          String(g?.term || '').toLowerCase(),
+          g,
+        ])
+      );
+      const mergedGlossary = normalizedTerms.map((orig) => ({
+        term: orig.term,
+        definitionEn:
+          trGlossaryByTerm.get(orig.term.toLowerCase())?.definition ||
+          trGlossaryByTerm.get(orig.term.toLowerCase())?.definitionEn ||
+          orig.definition,
+      }));
+
       const normalizedTranslated = {
         ...translated,
+        ...(mergedInfographic ? { businessInfographic: mergedInfographic } : {}),
+        ...(mergedCompetitors.length > 0 ? { competitors: mergedCompetitors } : {}),
+        ...(mergedGlossary.length > 0 ? { glossary: mergedGlossary } : {}),
         ...(mergedMoat ? { moat: mergedMoat } : {}),
       };
       const updated = {
@@ -1234,11 +1759,13 @@ export async function getAiBudgetStatus() {
 }
 
 /**
- * Fetches the 10-K / Transcript / 8-K ingestion status for a ticker from Firestore via Cloud Function.
+ * Fetches the 10-K / Transcript / 8-K ingestion status for a ticker from Firestore via Cloud Function,
+ * optionally validating cached filing dates cleanly without redundant SEC/LLM calls.
  * @param {string} ticker
+ * @param {{ tenKDate?: string|null, eightKDate?: string|null }|null} [clientFilingDates]
  * @returns {Promise<Object|null>}
  */
-export async function getCompanyContextStatus(ticker) {
+export async function getCompanyContextStatus(ticker, clientFilingDates = null) {
   try {
     const functions = firebaseLib.functions;
     if (!functions || !ticker) return null;
@@ -1246,9 +1773,17 @@ export async function getCompanyContextStatus(ticker) {
     const response = await callable({
       action: 'getCompanyContextStatus',
       ticker: ticker.toUpperCase().trim(),
+      ...(clientFilingDates ? { clientFilingDates } : {}),
     });
     const payload = response?.data ?? response;
-    return payload?.ingestionStatus || null;
+    if (!payload?.ingestionStatus) return null;
+    return {
+      ...payload.ingestionStatus,
+      ...(typeof payload.hasNewerFilings === 'boolean'
+        ? { hasNewerFilings: payload.hasNewerFilings }
+        : {}),
+      ...(payload.latestFilingDates ? { latestFilingDates: payload.latestFilingDates } : {}),
+    };
   } catch {
     return null;
   }
@@ -1397,6 +1932,9 @@ export default {
   translateSummaryOnDemand,
   CANONICAL_MOAT_SOURCES,
   normalizeMoat,
+  normalizeBusinessInfographic,
+  normalizeCompetitors,
+  normalizeGlossary,
   resolveTraitDisplay,
   translateMoatRating,
 };

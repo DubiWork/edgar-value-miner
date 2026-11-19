@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import PropTypes from 'prop-types'
 import {
   TrendingUp,
@@ -7,14 +7,26 @@ import {
   ShieldCheck,
   CheckCircle2,
   ArrowRight,
+  ArrowLeft,
   Check,
   Clock,
   RefreshCw,
   Database,
   ShieldAlert,
   Trash2,
+  Users,
+  Package,
+  Banknote,
+  BookOpen,
 } from 'lucide-react'
-import { ResponsiveContainer, LineChart, Line, YAxis } from 'recharts'
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  YAxis,
+  Tooltip,
+  ReferenceLine,
+} from 'recharts'
 import { calculateTriageMetrics } from '../../utils/triageCalculator.js'
 import {
   getOrFetchCompanySummary,
@@ -26,6 +38,9 @@ import {
   translateSummaryOnDemand,
   resolveTraitDisplay,
   translateMoatRating,
+  normalizeBusinessInfographic,
+  normalizeCompetitors,
+  normalizeGlossary,
 } from '../../services/aiSummaryService.js'
 
 /**
@@ -233,23 +248,70 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading) {
   }
 }
 
-/**
- * Parses a Mermaid `flowchart LR` / `graph LR` string into ordered flow nodes
- * so it can render as a crisp, zero-CDN interactive flowchart in the Tear Sheet.
- */
-function parseMermaidFlowNodes(mermaidCode) {
-  if (!mermaidCode || typeof mermaidCode !== 'string') return []
-  const labelMatches = Array.from(mermaidCode.matchAll(/\["([^"]+)"\]|\[([^\]]+)\]/g))
-  const seen = new Set()
-  const nodes = []
-  for (const m of labelMatches) {
-    const label = (m[1] || m[2] || '').trim()
-    if (label && !seen.has(label)) {
-      seen.add(label)
-      nodes.push(label)
-    }
+function formatSparklinePointValue(value, unit, isHe) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return String(value ?? '')
+  if (unit === '$M') {
+    return Math.abs(value) >= 1000
+      ? `$${(value / 1000).toFixed(1)}B`
+      : `$${Math.round(value).toLocaleString()}M`
   }
-  return nodes
+  if (unit === '%') {
+    return `${value.toFixed(1)}%`
+  }
+  if (unit === 'sharesM') {
+    const formatted = value >= 1000 ? `${(value / 1000).toFixed(2)}B` : `${Math.round(value)}M`
+    return isHe ? `${formatted} מניות` : `${formatted} sh`
+  }
+  if (unit === 'x') {
+    return `${value.toFixed(2)}x`
+  }
+  return String(value)
+}
+
+/**
+ * Minimalist dark hover pill for Section 2 micro sparklines showing exact FY year and formatted value.
+ */
+function SparklineTooltip({ active, payload, unit, isHe }) {
+  if (!active || !Array.isArray(payload) || payload.length === 0) return null
+  const pt = payload[0]?.payload
+  if (!pt) return null
+
+  return (
+    <div
+      dir="ltr"
+      className="px-2 py-1 rounded-md bg-slate-900/95 dark:bg-slate-950/95 text-white text-[11px] font-medium shadow-md border border-slate-700/70 whitespace-nowrap"
+    >
+      <span className="text-slate-400 mr-1.5">FY{pt.year}:</span>
+      <span className="font-bold">{formatSparklinePointValue(pt.value, unit, isHe)}</span>
+    </div>
+  )
+}
+
+SparklineTooltip.propTypes = {
+  active: PropTypes.bool,
+  payload: PropTypes.array,
+  unit: PropTypes.string,
+  isHe: PropTypes.bool,
+}
+
+const INFOGRAPHIC_ICON_MAP = {
+  customers: Users,
+  engine: Package,
+  revenue: Banknote,
+  profit: TrendingUp,
+}
+
+const INFOGRAPHIC_TONES = [
+  'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20',
+  'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
+  'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+  'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+]
+
+const COMPETITOR_SCALE_STYLES = {
+  larger: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/25',
+  similar: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25',
+  smaller: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/25',
 }
 
 /**
@@ -354,7 +416,7 @@ export function Step1Triage({
   const [isBladeOpen, setIsBladeOpen] = useState(false)
   const [lang, setLang] = useState('he')
   const [isTranslating, setIsTranslating] = useState(false)
-  const [showRawMermaid, setShowRawMermaid] = useState(false)
+  const autoRefreshedTickerRef = useRef(null)
 
   const ticker = company?.ticker || companyFacts?.ticker || 'MSFT'
   const companyName = company?.name || companyFacts?.companyName || ticker
@@ -393,7 +455,53 @@ export function Step1Triage({
       .then(async (result) => {
         if (isCancelled) return
         setAiSummary(result)
-        if (result?.ingestionStatus) {
+        setIsLoadingSummary(false)
+
+        if (result?.source === 'cache') {
+          const clientDates = {
+            tenKDate: result?.ingestionStatus?.tenK?.date || null,
+            eightKDate: result?.ingestionStatus?.eightK?.date || null,
+          }
+          const ctxStatus = await getCompanyContextStatus(ticker, clientDates)
+          if (isCancelled) return
+          if (ctxStatus) {
+            setIngestionStatus(ctxStatus)
+            const origSrc = result?.originalSource || result?.source
+            const serverHasSec =
+              ctxStatus?.tenK?.status === 'ok' || ctxStatus?.eightK?.status === 'ok'
+            const cachedMissedTenK =
+              result?.ingestionStatus?.tenK?.status !== 'ok' && ctxStatus?.tenK?.status === 'ok'
+            const cachedMissedEightK =
+              result?.ingestionStatus?.eightK?.status !== 'ok' && ctxStatus?.eightK?.status === 'ok'
+            const cachedWasMock =
+              (origSrc === 'mock-dynamic' || origSrc === 'mock-preset') && serverHasSec
+            const needsUpgrade =
+              cachedMissedTenK ||
+              cachedMissedEightK ||
+              cachedWasMock ||
+              Boolean(ctxStatus?.hasNewerFilings)
+
+            if (needsUpgrade && autoRefreshedTickerRef.current !== ticker) {
+              autoRefreshedTickerRef.current = ticker
+              try {
+                await invalidateCachedSummary(ticker)
+                const upgraded = await getOrFetchCompanySummary(
+                  ticker,
+                  { name: companyName, sector: company?.sector },
+                  { forceRefresh: true }
+                )
+                if (!isCancelled && upgraded) {
+                  setAiSummary(upgraded)
+                  if (upgraded.ingestionStatus) {
+                    setIngestionStatus(upgraded.ingestionStatus)
+                  }
+                }
+              } catch {
+                // Keep cached summary cleanly if live upgrade or budget fails
+              }
+            }
+          }
+        } else if (result?.ingestionStatus) {
           setIngestionStatus(result.ingestionStatus)
         } else {
           const ctxStatus = await getCompanyContextStatus(ticker)
@@ -401,6 +509,7 @@ export function Step1Triage({
             setIngestionStatus(ctxStatus)
           }
         }
+
         setIsLoadingSummary(false)
         if (isAdmin) {
           refreshAdminBudget()
@@ -496,60 +605,100 @@ export function Step1Triage({
     {
       id: 'revenue-growth',
       title: triageData.revenue.title,
+      titleHe: triageData.revenue.titleHe || 'צמיחה בהכנסות',
       status: triageData.revenue.status,
       value: triageData.revenue.value,
+      valueHe: triageData.revenue.valueHe || triageData.revenue.value,
       target: triageData.revenue.target,
+      targetHe: triageData.revenue.targetHe,
       badge: triageData.revenue.badge,
+      badgeHe: triageData.revenue.badgeHe || triageData.revenue.badge,
       detail: triageData.revenue.detail,
+      detailEn: triageData.revenue.detailEn || triageData.revenue.detail,
       metricSummary: triageData.revenue.metricSummary,
+      metricSummaryHe: triageData.revenue.metricSummaryHe || triageData.revenue.metricSummary,
       sparkline: triageData.revenue.sparkline,
+      sparklineUnit: triageData.revenue.sparklineUnit || '$M',
+      historyMeta: triageData.revenue.historyMeta,
       tooltip:
-        'צמיחה בהכנסות: עסק בריא הוא עסק שצומח. אנחנו מחפשים חברות שמצליחות להגדיל את ההכנסות (Top Line) בעקביות, מה שמעיד על ביקוש גובר למוצרים שלהן.',
+        'צמיחה בהכנסות: עסק בריא הוא עסק שצומח. אנחנו מחפשים חברות שמצליחות להגדיל את ההכנסות (Top Line) בעקביות. הגרף מציג עד 15 שנות היסטוריה כדי לחשוף מחזוריות, בעוד קצב הצמיחה השנתי (CAGR) מחושב ל-5 השנים האחרונות ולטווח המלא.',
+      tooltipEn:
+        'Revenue Growth: Healthy businesses expand top-line demand consistently. The sparkline covers up to 15 years to surface cyclicality alongside 5Y CAGR momentum.',
       tooltipAlign: 'left',
       icon: TrendingUp,
     },
     {
       id: 'operating-margins',
       title: triageData.margins.title,
+      titleHe: triageData.margins.titleHe || 'שולי רווח תפעולי',
       status: triageData.margins.status,
       value: triageData.margins.value,
+      valueHe: triageData.margins.valueHe || triageData.margins.value,
       target: triageData.margins.target,
+      targetHe: triageData.margins.targetHe,
       badge: triageData.margins.badge,
+      badgeHe: triageData.margins.badgeHe || triageData.margins.badge,
       detail: triageData.margins.detail,
+      detailEn: triageData.margins.detailEn || triageData.margins.detail,
       metricSummary: triageData.margins.metricSummary,
+      metricSummaryHe: triageData.margins.metricSummaryHe || triageData.margins.metricSummary,
       sparkline: triageData.margins.sparkline,
+      sparklineUnit: triageData.margins.sparklineUnit || '%',
+      historyMeta: triageData.margins.historyMeta,
       tooltip:
-        'שולי רווח תפעולי: המדד ליעילות ויציבות. שולי רווח יציבים (או צומחים) לאורך זמן מעידים על חפיר כלכלי (יתרון תחרותי) חזק וכוח תמחור אל מול המתחרים.',
+        'שולי רווח תפעולי: המדד ליעילות וכוח תמחור. קו האמצע המקווקו בגרף מסמן את הממוצע הרב-שנתי כדי שתוכל לזהות במבט ראשון האם השוליים יציבים או מחזוריים.',
+      tooltipEn:
+        'Operating Margins: Measures operational efficiency and pricing power. The dashed baseline marks the multi-year average to spot cyclical swings quickly.',
       tooltipAlign: 'left',
       icon: Percent,
     },
     {
       id: 'share-dilution',
       title: triageData.shares.title,
+      titleHe: triageData.shares.titleHe || 'רכישה עצמית / דילול',
       status: triageData.shares.status,
       value: triageData.shares.value,
+      valueHe: triageData.shares.valueHe || triageData.shares.value,
       target: triageData.shares.target,
+      targetHe: triageData.shares.targetHe || 'תנאי למעבר: ירידה או יציבות במניות',
       badge: triageData.shares.badge,
+      badgeHe: triageData.shares.badgeHe || triageData.shares.badge,
       detail: triageData.shares.detail,
+      detailEn: triageData.shares.detailEn || triageData.shares.detail,
       metricSummary: triageData.shares.metricSummary,
+      metricSummaryHe: triageData.shares.metricSummaryHe || triageData.shares.metricSummary,
       sparkline: triageData.shares.sparkline,
+      sparklineUnit: triageData.shares.sparklineUnit || 'sharesM',
+      historyMeta: triageData.shares.historyMeta,
       tooltip:
-        'דילול מניות: כשהחברה מנפיקה עוד מניות, הנתח שלנו כמשקיעים קטן (דילול). באידיאל, נחפש חברות שלא מדללות באגרסיביות, או עדיף - חברות שרוכשות מניות חזרה (Buybacks) ומגדילות את חלקנו ברווח.',
+        'דילול מניות: כשהחברה מנפיקה עוד מניות, הנתח שלנו כמשקיעים קטן (דילול). באידיאל, נחפש חברות שלא מדללות באגרסיביות, או עדיף - חברות שרוכשות מניות חזרה (Buybacks) ומקטינות את כמות המניות נטו לאורך זמן.',
+      tooltipEn:
+        'Share Dilution: Issuing shares dilutes your ownership stake. Ideally we favor companies retiring shares net of compensation via disciplined buybacks.',
       tooltipAlign: 'right',
       icon: Coins,
     },
     {
       id: 'balance-sheet',
       title: triageData.currentRatio.title,
+      titleHe: triageData.currentRatio.titleHe || 'יחס שוטף (נזילות)',
       status: triageData.currentRatio.status,
       value: triageData.currentRatio.value,
+      valueHe: triageData.currentRatio.valueHe || triageData.currentRatio.value,
       target: triageData.currentRatio.target,
+      targetHe: triageData.currentRatio.targetHe || 'תנאי למעבר: מעל 1.0',
       badge: triageData.currentRatio.badge,
+      badgeHe: triageData.currentRatio.badgeHe || triageData.currentRatio.badge,
       detail: triageData.currentRatio.detail,
+      detailEn: triageData.currentRatio.detailEn || triageData.currentRatio.detail,
       metricSummary: triageData.currentRatio.metricSummary,
+      metricSummaryHe: triageData.currentRatio.metricSummaryHe || triageData.currentRatio.metricSummary,
       sparkline: triageData.currentRatio.sparkline,
+      sparklineUnit: triageData.currentRatio.sparklineUnit || 'x',
+      historyMeta: triageData.currentRatio.historyMeta,
       tooltip:
         'יחס שוטף (Current Ratio): אנחנו רוצים לישון בשקט בלילה. יחס שוטף מעל 1 אומר שלחברה יש מספיק נכסים נזילים כדי לכסות את התחייבויותיה הקרובות, ומונע סיכון מיידי של פשיטת רגל.',
+      tooltipEn:
+        'Current Ratio: Measures short-term solvency. A ratio above 1.0 confirms liquid assets exceed near-term liabilities.',
       tooltipAlign: 'right',
       icon: ShieldCheck,
     },
@@ -599,9 +748,41 @@ export function Step1Triage({
     [aiSummary, ingestionStatus, lang, isLoadingSummary]
   )
 
-  const mermaidNodes = useMemo(
-    () => parseMermaidFlowNodes(aiSummary?.mermaidDiagram),
-    [aiSummary?.mermaidDiagram]
+  const activeInfographic = useMemo(
+    () =>
+      normalizeBusinessInfographic(
+        lang === 'en' && Array.isArray(aiSummary?.translations?.en?.businessInfographic)
+          ? aiSummary.translations.en.businessInfographic
+          : aiSummary?.businessInfographic,
+        aiSummary?.keyEngines || [],
+        companyName,
+        ticker,
+        lang,
+        aiSummary?.mermaidDiagram
+      ),
+    [aiSummary, companyName, ticker, lang]
+  )
+
+  const activeCompetitors = useMemo(
+    () =>
+      normalizeCompetitors(
+        lang === 'en' && Array.isArray(aiSummary?.translations?.en?.competitors)
+          ? aiSummary.translations.en.competitors
+          : aiSummary?.competitors || [],
+        lang
+      ),
+    [aiSummary, lang]
+  )
+
+  const activeGlossary = useMemo(
+    () =>
+      normalizeGlossary(
+        lang === 'en' && Array.isArray(aiSummary?.translations?.en?.glossary)
+          ? aiSummary.translations.en.glossary
+          : aiSummary?.glossary || [],
+        lang
+      ),
+    [aiSummary, lang]
   )
 
   const handleContinue = () => {
@@ -1362,55 +1543,58 @@ export function Step1Triage({
               </div>
             </div>
 
-            {/* 3. Business Flow Diagram (Generative UI — Mermaid.js Flowchart) */}
-            {aiSummary?.mermaidDiagram && (
+            {/* 3. Plain-Language 4-Stage Visual Business Flow Infographic */}
+            {activeInfographic.length > 0 && (
               <div
-                data-testid="tear-sheet-mermaid-diagram"
+                data-testid="tear-sheet-infographic"
                 className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/70 p-4 space-y-3"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
                     {lang === 'he'
-                      ? 'תרשים זרימת הכסף בעסק (מודל ההכנסות)'
-                      : 'Business Flow Diagram (Generative UI · Mermaid.js)'}
+                      ? 'איך הכסף עובד בעסק (4 שלבים פשוטים)'
+                      : 'How Money Flows Through the Business'}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowRawMermaid((prev) => !prev)}
-                    className="text-xs text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
-                  >
-                    {showRawMermaid
-                      ? lang === 'he'
-                        ? 'הסתר קוד תרשים'
-                        : 'Hide Mermaid Source'
-                      : lang === 'he'
-                      ? 'הצג קוד תרשים'
-                      : 'View Mermaid Syntax'}
-                  </button>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-center gap-2 py-2" dir="ltr">
-                  {mermaidNodes.map((nodeLabel, idx) => (
-                    <div key={nodeLabel} className="flex items-center gap-2">
-                      <div className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-sky-500/30 text-xs font-semibold text-slate-800 dark:text-slate-100 shadow-2xs">
-                        {nodeLabel}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {activeInfographic.map((step, idx) => {
+                    const StageIcon = INFOGRAPHIC_ICON_MAP[step.iconKey] || TrendingUp
+                    const toneClass = INFOGRAPHIC_TONES[idx % INFOGRAPHIC_TONES.length]
+                    const FlowArrow = lang === 'he' ? ArrowLeft : ArrowRight
+                    return (
+                      <div key={step.stage} className="relative flex items-stretch gap-2">
+                        <div className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 space-y-1.5 shadow-2xs">
+                          <div className="flex items-center justify-between gap-2">
+                            <span
+                              className={`inline-flex items-center justify-center w-7 h-7 rounded-lg border ${toneClass}`}
+                            >
+                              <StageIcon className="w-3.5 h-3.5" />
+                            </span>
+                            <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">
+                              0{step.stage}
+                            </span>
+                          </div>
+                          <div className="text-xs font-bold text-slate-900 dark:text-white">
+                            {step.title}
+                          </div>
+                          <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
+                            {step.subtitle}
+                          </p>
+                        </div>
+                        {idx < activeInfographic.length - 1 && (
+                          <div className="hidden lg:flex items-center text-slate-300 dark:text-slate-600 shrink-0">
+                            <FlowArrow className="w-3.5 h-3.5" />
+                          </div>
+                        )}
                       </div>
-                      {idx < mermaidNodes.length - 1 && (
-                        <ArrowRight className="w-4 h-4 text-sky-500 shrink-0" />
-                      )}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
-
-                {showRawMermaid && (
-                  <pre dir="ltr" className="p-3 rounded-lg bg-slate-900 text-slate-200 text-xs overflow-x-auto font-mono">
-                    {aiSummary.mermaidDiagram}
-                  </pre>
-                )}
               </div>
             )}
 
-            {/* 4. Compact Cards Grid: Growth Engines, Competitive Landscape & Economic Moat */}
+            {/* 4. Compact Cards Grid: Growth Engines & Competitive Landscape */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Growth Engines Card */}
               <div
@@ -1430,102 +1614,84 @@ export function Step1Triage({
                 </ul>
               </div>
 
-              {/* Competitive Landscape (Competitor Chips/Tags) */}
+              {/* Competitive Landscape (Compact Peer Chips with Relative Scale & Hover Overlap) */}
               <div
                 data-testid="tear-sheet-competitors-card"
                 className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-4 space-y-2.5"
               >
-                <h3 className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                  {lang === 'he'
-                    ? 'מפת תחרות ומתחרים עיקריים (10-K)'
-                    : 'Competitive Landscape (10-K Peers)'}
-                </h3>
-                <div className="flex flex-wrap gap-2" dir="ltr">
-                  {aiSummary?.competitors?.map((comp) => (
-                    <span
-                      key={comp}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25"
-                    >
-                      {comp}
-                    </span>
-                  ))}
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                    {lang === 'he'
+                      ? 'מפת תחרות ומתחרים עיקריים'
+                      : 'Competitive Landscape (10-K Peers)'}
+                  </h3>
+                  <span className="text-[11px] text-slate-400">
+                    {lang === 'he' ? 'רחף להשוואת מיקוד' : 'Hover for focus'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {activeCompetitors.map((comp) => {
+                    const scaleClass =
+                      COMPETITOR_SCALE_STYLES[comp.relativeSize] || COMPETITOR_SCALE_STYLES.similar
+                    return (
+                      <div key={comp.name} className="relative group/peer">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/25 hover:border-amber-500/50 transition-colors cursor-help focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        >
+                          <span dir="ltr">{comp.name}</span>
+                          <span
+                            className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold border ${scaleClass}`}
+                          >
+                            {comp.sizeShort}
+                          </span>
+                        </button>
+                        <div
+                          role="tooltip"
+                          dir={lang === 'he' ? 'rtl' : 'ltr'}
+                          className={`pointer-events-none absolute bottom-full mb-2 start-0 w-60 p-2.5 text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 rounded-xl shadow-xl border border-slate-700/60 ${
+                            lang === 'he' ? 'text-right' : 'text-left'
+                          } opacity-0 invisible group-hover/peer:opacity-100 group-hover/peer:visible group-focus-within/peer:opacity-100 group-focus-within/peer:visible transition-all duration-150 z-50 space-y-1`}
+                        >
+                          <div className="font-bold text-amber-300">
+                            {comp.name} · {comp.sizeLabel}
+                          </div>
+                          <div className="text-slate-200">{comp.competeOn}</div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </div>
 
-            {/* 5. Detailed Economic Moat Sources (All 5 Categories) & SEC Filing Citations */}
-            {Array.isArray(activeMoat?.sources) && activeMoat.sources.length > 0 && (
+            {/* 5. Compact Jargon & Industry Glossary Card (Zero-Clutter Plain Definitions) */}
+            {activeGlossary.length > 0 && (
               <div
-                data-testid="tear-sheet-moat-sources"
-                className="rounded-xl border border-emerald-500/25 bg-emerald-50/30 dark:bg-emerald-950/15 p-4 space-y-3"
+                data-testid="tear-sheet-glossary-card"
+                className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-4 space-y-2.5"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400">
                     {lang === 'he'
-                      ? `פירוט 5 מקורות החפיר הכלכלי (${translateMoatRating(activeMoat.rating, 'he')} · ${activeMoat.score})`
-                      : `Economic Moat Breakdown (${activeMoat.rating} · ${activeMoat.score})`}
+                      ? 'מילון מושגים וז׳רגון מהדוח (בקצרה)'
+                      : 'Key Industry Jargon (Plain English)'}
                   </h3>
-                  {ingestionStatus?.tenK?.url && !grounding.isMock && (
-                    <a
-                      href={ingestionStatus.tenK.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      dir="ltr"
-                      className="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline"
-                    >
-                      SEC {ingestionStatus.tenK.form || '10-K'} ({ingestionStatus.tenK.date}) ↗
-                    </a>
-                  )}
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {activeMoat.sources.map((src) => {
-                    const sourceTitle =
-                      lang === 'he'
-                        ? `${src.labelHe || src.name} (${src.name})`
-                        : src.labelEn || src.name
-                    const sourceDesc =
-                      lang === 'he' ? src.descriptionHe : src.descriptionEn
-                    return (
-                      <div
-                        key={src.name}
-                        className={`p-3 rounded-lg border space-y-1.5 ${
-                          src.active
-                            ? 'bg-white dark:bg-slate-900 border-emerald-500/25'
-                            : 'bg-slate-50/80 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 opacity-85'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2 text-xs">
-                          <span className="font-bold text-slate-900 dark:text-white">
-                            {sourceTitle}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded-full font-semibold shrink-0 ${
-                              src.active
-                                ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                                : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
-                            }`}
-                          >
-                            {src.active
-                              ? lang === 'he'
-                                ? 'פעיל ✓'
-                                : 'Active ✓'
-                              : lang === 'he'
-                              ? 'לא זוהה ✕'
-                              : 'Inactive'}
-                          </span>
-                        </div>
-                        {sourceDesc && (
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                            {sourceDesc}
-                          </p>
-                        )}
-                        <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                          {src.rationale}
-                        </p>
-                      </div>
-                    )
-                  })}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {activeGlossary.map((item) => (
+                    <div
+                      key={item.term}
+                      className="rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 px-3 py-2 text-xs leading-relaxed"
+                    >
+                      <span dir="ltr" className="font-bold text-slate-900 dark:text-white">
+                        {item.term}
+                      </span>
+                      <span className="text-slate-400 mx-1.5">&mdash;</span>
+                      <span className="text-slate-700 dark:text-slate-300">{item.definition}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -1534,17 +1700,22 @@ export function Step1Triage({
       </div>
 
       {/* SECTION 2: Fast Fundamentals Indicators (4 Grid Cards with Sparklines) */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
+      <div dir={lang === 'he' ? 'rtl' : 'ltr'}>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white">
-              Instant Fundamentals Check
+              {lang === 'he'
+                ? 'בדיקת נתוני בסיס מהירה (Fundamentals Check)'
+                : 'Instant Fundamentals Check'}
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              4 quick health checks with 10-15 year trendlines to eliminate weak candidates in under 10 seconds
+              {lang === 'he'
+                ? '4 בדיקות חוסן מהירות עם גרפים ל-10–15 שנה לסינון מועמדות חלשות תוך 10 שניות'
+                : '4 quick health checks with 10-15 year trendlines to eliminate weak candidates in under 10 seconds'}
             </p>
           </div>
           <div
+            data-testid="fundamentals-passed-badge"
             className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
               passedCount === 4
                 ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500/20'
@@ -1554,7 +1725,7 @@ export function Step1Triage({
             }`}
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
-            {passedCount} of 4 Passed
+            {lang === 'he' ? `${passedCount} מתוך 4 עברו` : `${passedCount} of 4 Passed`}
           </div>
         </div>
 
@@ -1563,10 +1734,13 @@ export function Step1Triage({
             const Icon = indicator.icon
             const isPass = indicator.status === 'pass'
             const sparklineColor = isPass ? '#10b981' : '#f43f5e'
+            const meta = indicator.historyMeta
+            const isCyclical = meta?.cycleType === 'cyclical'
 
             return (
               <div
                 key={indicator.id}
+                data-testid={`fundamental-card-${indicator.id}`}
                 className="group relative rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-4 sm:p-5 hover:border-slate-300 dark:hover:border-slate-700 transition-all shadow-xs flex flex-col justify-between"
               >
                 <div>
@@ -1593,63 +1767,109 @@ export function Step1Triage({
                           isPass ? 'bg-emerald-500' : 'bg-rose-500'
                         }`}
                       />
-                      {indicator.badge}
+                      {lang === 'he' ? indicator.badgeHe : indicator.badge}
                     </span>
                   </div>
 
                   {/* Title + Info Tooltip */}
                   <div className="flex items-center gap-1.5">
-                    <h4 className="text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                      {indicator.title}
+                    <h4 className="text-xs font-medium tracking-wide text-slate-600 dark:text-slate-400">
+                      {lang === 'he' ? indicator.titleHe : indicator.title}
                     </h4>
-                    <InfoTooltip text={indicator.tooltip} align={indicator.tooltipAlign} />
+                    <InfoTooltip
+                      text={lang === 'he' ? indicator.tooltip : indicator.tooltipEn || indicator.tooltip}
+                      align={indicator.tooltipAlign}
+                      dir={lang === 'he' ? 'rtl' : 'ltr'}
+                    />
                   </div>
 
                   {/* Highlight Value + Target Baseline */}
                   <div className="mt-0.5">
                     <div className="text-lg font-bold text-slate-900 dark:text-white">
-                      {indicator.value}
+                      {lang === 'he' ? indicator.valueHe : indicator.value}
                     </div>
-                    {indicator.target && (
+                    {(lang === 'he' ? indicator.targetHe : indicator.target) && (
                       <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                        {indicator.target}
+                        {lang === 'he' ? indicator.targetHe : indicator.target}
                       </div>
                     )}
                   </div>
 
-                  {/* Micro Sparkline (10-15 Year Clean Trendline with YAxis domain) */}
+                  {/* Minimalist Interactive Sparkline with Mean Reference Line, Hover Data & Timeline */}
                   {indicator.sparkline && indicator.sparkline.length > 1 && (
-                    <div className="h-10 w-full my-2.5" aria-hidden="true">
-                      <ResponsiveContainer width="100%" height={40}>
-                        <LineChart
-                          data={indicator.sparkline}
-                          margin={{ top: 3, right: 2, bottom: 3, left: 2 }}
+                    <div className="my-2.5">
+                      <div className="h-12 w-full">
+                        <ResponsiveContainer width="100%" height={48}>
+                          <LineChart
+                            data={indicator.sparkline}
+                            margin={{ top: 4, right: 3, bottom: 4, left: 3 }}
+                          >
+                            <YAxis domain={['dataMin', 'dataMax']} hide />
+                            {typeof meta?.avg === 'number' && (
+                              <ReferenceLine
+                                y={meta.avg}
+                                stroke={sparklineColor}
+                                strokeOpacity={0.3}
+                                strokeDasharray="3 3"
+                              />
+                            )}
+                            <Tooltip
+                              content={
+                                <SparklineTooltip
+                                  unit={indicator.sparklineUnit}
+                                  isHe={lang === 'he'}
+                                />
+                              }
+                              cursor={{
+                                stroke: sparklineColor,
+                                strokeWidth: 1,
+                                strokeOpacity: 0.45,
+                              }}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="value"
+                              stroke={sparklineColor}
+                              strokeWidth={2}
+                              dot={false}
+                              activeDot={{ r: 3.5 }}
+                              isAnimationActive={false}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                      {meta && (
+                        <div
+                          dir="ltr"
+                          data-testid={`sparkline-timeline-${indicator.id}`}
+                          className="flex items-center justify-between gap-1 text-[10px] text-slate-400 dark:text-slate-500 mt-0.5"
                         >
-                          <YAxis domain={['dataMin', 'dataMax']} hide />
-                          <Line
-                            type="monotone"
-                            dataKey="value"
-                            stroke={sparklineColor}
-                            strokeWidth={2}
-                            dot={false}
-                            isAnimationActive={false}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
+                          <span className="font-mono">{meta.startYear}</span>
+                          {meta.cycleBadgeHe && (
+                            <span
+                              className={`truncate px-1.5 py-0.2 rounded-sm font-medium ${
+                                isCyclical
+                                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                                  : 'text-slate-500 dark:text-slate-400'
+                              }`}
+                            >
+                              {lang === 'he' ? meta.cycleBadgeHe : meta.cycleBadgeEn}
+                            </span>
+                          )}
+                          <span className="font-mono">{meta.endYear}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
 
-                {/* Hebrew Quick Detail / Explanation */}
+                {/* Quick Detail / Explanation */}
                 <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
-                  <p
-                    dir="rtl"
-                    className="text-xs font-medium text-slate-700 dark:text-slate-300 text-right leading-relaxed"
-                  >
-                    {indicator.detail}
+                  <p className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
+                    {lang === 'he' ? indicator.detail : indicator.detailEn || indicator.detail}
                   </p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                    {indicator.metricSummary}
+                    {lang === 'he' ? indicator.metricSummaryHe : indicator.metricSummary}
                   </p>
                 </div>
               </div>

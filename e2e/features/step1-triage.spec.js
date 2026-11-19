@@ -26,7 +26,16 @@ test.describe('Step 1 Triage Feature E2E (#310)', () => {
     await expect(page.locator('[data-testid="tear-sheet-blade"]')).toBeVisible();
     await expect(page.getByText('בהירות עסקית (מעגל הכשירות)')).toBeVisible();
 
-    // Section 2: 4 Instant Fundamentals Checks
+    // Section 2: 4 Instant Fundamentals Checks (Hebrew default + sparkline timeline)
+    await expect(page.getByText(/בדיקת נתוני בסיס מהירה/)).toBeVisible();
+    await expect(page.getByText('צמיחה בהכנסות')).toBeVisible();
+    await expect(page.getByText('שולי רווח תפעולי')).toBeVisible();
+    await expect(page.getByText('רכישה עצמית / דילול')).toBeVisible();
+    await expect(page.getByText('יחס שוטף (נזילות)')).toBeVisible();
+    await expect(page.locator('[data-testid="sparkline-timeline-revenue-growth"]')).toBeVisible();
+
+    // Toggling EN translates both Tear Sheet and Section 2 cleanly
+    await page.locator('[data-testid="lang-btn-en"]').click();
     await expect(page.getByText('Instant Fundamentals Check')).toBeVisible();
     await expect(page.getByText('Revenue Growth')).toBeVisible();
     await expect(page.getByText('Operating Margins')).toBeVisible();

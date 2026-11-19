@@ -4,6 +4,7 @@ import {
   extract10KSections,
   findLatestSecFilings,
   getOrFetchCompanyContext,
+  checkAndRefreshCompanyContext,
   saveManualTranscriptForTicker,
   buildGroundedContextPromptBlock,
   resetInMemoryContextForTesting,
@@ -145,5 +146,68 @@ describe('companyContext (#318 — 10-K & Earnings Call Data Pipeline)', () => {
     expect(updated.ingestionStatus.transcript.status).toBe('manual');
     expect(updated.earnings?.source).toBe('manual');
     expect(updated.earnings?.text).toContain('Satya Nadella: Copilot adoption');
+  });
+
+  it('cheaply detects newer 8-K/10-K filing dates on SEC EDGAR after cooldown without redundant HTML fetches when unchanged', async () => {
+    const padding = 'Business segment performance and cloud growth commentary. '.repeat(30);
+    let eightKDate = '2026-04-25';
+    let htmlFetchCount = 0;
+
+    const mockFetcher = vi.fn(async (url: string) => {
+      if (url.includes('company_tickers.json')) {
+        return JSON.stringify({
+          '0': { cik_str: 789019, ticker: 'MSFT', title: 'MICROSOFT CORP' },
+        });
+      }
+      if (url.includes('submissions/CIK0000789019.json')) {
+        return JSON.stringify({
+          filings: {
+            recent: {
+              form: ['8-K', '10-K'],
+              accessionNumber: ['0000789019-26-000008', '0000789019-25-000001'],
+              filingDate: [eightKDate, '2025-07-30'],
+              primaryDocument: ['earnings.htm', 'msft-10k.htm'],
+              items: ['2.02,9.01', ''],
+            },
+          },
+        });
+      }
+      if (url.includes('msft-10k.htm')) {
+        htmlFetchCount += 1;
+        return `<p>ITEM 1. BUSINESS</p><p>Azure and Office 365 recurring SaaS model. ${padding}</p>`;
+      }
+      if (url.includes('earnings.htm')) {
+        htmlFetchCount += 1;
+        return `<p>Earnings release dated ${eightKDate}. ${padding}</p>`;
+      }
+      throw new Error('404 Not Found');
+    });
+
+    await getOrFetchCompanyContext('MSFT', { fetcher: mockFetcher });
+    const countAfterInit = htmlFetchCount;
+
+    // 1. After 13h cooldown, filing dates still match -> checks submissions JSON only, 0 HTML re-fetches
+    const thirteenHoursLater = Date.now() + 13 * 60 * 60 * 1000;
+    const sameCheck = await checkAndRefreshCompanyContext('MSFT', {
+      fetcher: mockFetcher,
+      nowMs: thirteenHoursLater,
+      clientFilingDates: { tenKDate: '2025-07-30', eightKDate: '2026-04-25' },
+    });
+    expect(sameCheck.refreshed).toBe(false);
+    expect(sameCheck.hasNewerFilings).toBe(false);
+    expect(htmlFetchCount).toBe(countAfterInit);
+
+    // 2. Suppose SEC EDGAR now has a newer 8-K AND client summary was grounded on old date -> auto-refreshes!
+    eightKDate = '2026-07-29';
+    const twentySixHoursLater = Date.now() + 26 * 60 * 60 * 1000;
+    const newerCheck = await checkAndRefreshCompanyContext('MSFT', {
+      fetcher: mockFetcher,
+      nowMs: twentySixHoursLater,
+      clientFilingDates: { tenKDate: '2025-07-30', eightKDate: '2026-04-25' },
+    });
+    expect(newerCheck.refreshed).toBe(true);
+    expect(newerCheck.hasNewerFilings).toBe(true);
+    expect(newerCheck.latestFilingDates.eightKDate).toBe('2026-07-29');
+    expect(htmlFetchCount).toBeGreaterThan(countAfterInit);
   });
 });

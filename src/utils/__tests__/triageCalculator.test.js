@@ -143,4 +143,72 @@ describe('triageCalculator', () => {
     expect(result.currentRatio.value).toBe('0.50x');
     expect(result.currentRatio.badge).toBe('At Risk (< 1.0)');
   });
+
+  it('computes true 5Y CAGR without off-by-one (no 4Y shift) and detects cyclical low margins + buyback dollar spend', () => {
+    const facts = {
+      metrics: {
+        revenue: {
+          // 10 years: 2016..2025. 5Y CAGR compares 2020 -> 2025 (5 years exact), 9Y compares 2016 -> 2025.
+          annual: [
+            { fiscalYear: 2016, value: 1000000000 },
+            { fiscalYear: 2017, value: 1100000000 },
+            { fiscalYear: 2018, value: 1200000000 },
+            { fiscalYear: 2019, value: 1300000000 },
+            { fiscalYear: 2020, value: 1000000000 }, // COVID cyclical dip
+            { fiscalYear: 2021, value: 900000000 },
+            { fiscalYear: 2022, value: 1150000000 },
+            { fiscalYear: 2023, value: 1350000000 },
+            { fiscalYear: 2024, value: 1500000000 },
+            { fiscalYear: 2025, value: 1610510000 }, // 1.61051x 2020 => exact 10% 5Y CAGR
+          ],
+        },
+        operatingIncome: {
+          // Narrow margins swinging 2% -> 7% (cyclical even though latest is 7%)
+          annual: [
+            { fiscalYear: 2016, value: 60000000 }, // 6.0%
+            { fiscalYear: 2017, value: 66000000 }, // 6.0%
+            { fiscalYear: 2018, value: 72000000 }, // 6.0%
+            { fiscalYear: 2019, value: 84500000 }, // 6.5%
+            { fiscalYear: 2020, value: 20000000 }, // 2.0% cyclical trough
+            { fiscalYear: 2021, value: 27000000 }, // 3.0%
+            { fiscalYear: 2022, value: 69000000 }, // 6.0%
+            { fiscalYear: 2023, value: 67500000 }, // 5.0% (drop)
+            { fiscalYear: 2024, value: 105000000 }, // 7.0%
+            { fiscalYear: 2025, value: 112735700 }, // 7.0%
+          ],
+        },
+        weightedAverageSharesDiluted: {
+          annual: [
+            { fiscalYear: 2024, value: 100000000 },
+            { fiscalYear: 2025, value: 95000000 }, // -5.0% share reduction YoY
+          ],
+        },
+        stockRepurchases: {
+          annual: [
+            { fiscalYear: 2024, value: 40000000 },
+            { fiscalYear: 2025, value: 50000000 }, // $50M buybacks
+          ],
+        },
+        currentAssets: { annual: [{ fiscalYear: 2025, value: 250000000 }] },
+        currentLiabilities: { annual: [{ fiscalYear: 2025, value: 100000000 }] },
+      },
+    };
+
+    const result = calculateTriageMetrics(facts);
+
+    // Must show 5Y CAGR (~10%), NOT 4Y!
+    expect(result.revenue.metricSummary).toContain('5Y CAGR ~10%');
+    expect(result.revenue.metricSummaryHe).toContain('5 ש׳: ~10%');
+    expect(result.revenue.historyMeta.startYear).toBe(2016);
+    expect(result.revenue.historyMeta.endYear).toBe(2025);
+
+    // Narrow cyclical margins flagged as cyclical with min-max range
+    expect(result.margins.historyMeta.cycleType).toBe('cyclical');
+    expect(result.margins.historyMeta.cycleBadgeHe).toContain('מחזורי');
+    expect(result.margins.historyMeta.cycleBadgeHe).toContain('2.0%–7.0%');
+
+    // Buybacks % and USD spend surfaced cleanly
+    expect(result.shares.valueHe).toBe('-5.0% מניות בשנה');
+    expect(result.shares.metricSummaryHe).toContain('$50M');
+  });
 });
