@@ -314,6 +314,14 @@ const COMPETITOR_SCALE_STYLES = {
   smaller: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/25',
 }
 
+const FUNDAMENTAL_TREND_TONE_STYLES = {
+  improving: 'text-emerald-600 dark:text-emerald-400',
+  worsening: 'text-rose-600 dark:text-rose-400',
+  slowing: 'text-amber-600 dark:text-amber-400',
+  steady: 'text-slate-500 dark:text-slate-400',
+  neutral: 'text-slate-500 dark:text-slate-400',
+}
+
 /**
  * InfoTooltip Component
  * Subtle info ("i") icon with a floating dark tooltip bubble on hover/focus.
@@ -661,6 +669,9 @@ export function Step1Triage({
       valueHe: triageData.shares.valueHe || triageData.shares.value,
       target: triageData.shares.target,
       targetHe: triageData.shares.targetHe || 'תנאי למעבר: ירידה או יציבות במניות',
+      trendLabelHe: triageData.shares.trendLabelHe,
+      trendLabelEn: triageData.shares.trendLabelEn,
+      trendTone: triageData.shares.trendTone,
       badge: triageData.shares.badge,
       badgeHe: triageData.shares.badgeHe || triageData.shares.badge,
       detail: triageData.shares.detail,
@@ -1783,15 +1794,27 @@ export function Step1Triage({
                     />
                   </div>
 
-                  {/* Highlight Value + Target Baseline */}
+                  {/* Highlight Value + Trend or Target Baseline */}
                   <div className="mt-0.5">
                     <div className="text-lg font-bold text-slate-900 dark:text-white">
                       {lang === 'he' ? indicator.valueHe : indicator.value}
                     </div>
-                    {(lang === 'he' ? indicator.targetHe : indicator.target) && (
-                      <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                        {lang === 'he' ? indicator.targetHe : indicator.target}
+                    {(indicator.trendLabelHe || indicator.trendLabelEn) ? (
+                      <div
+                        data-testid={`fundamental-trend-${indicator.id}`}
+                        className={`text-[11px] font-semibold ${
+                          FUNDAMENTAL_TREND_TONE_STYLES[indicator.trendTone] ||
+                          FUNDAMENTAL_TREND_TONE_STYLES.neutral
+                        }`}
+                      >
+                        {lang === 'he' ? indicator.trendLabelHe : indicator.trendLabelEn}
                       </div>
+                    ) : (
+                      (lang === 'he' ? indicator.targetHe : indicator.target) && (
+                        <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                          {lang === 'he' ? indicator.targetHe : indicator.target}
+                        </div>
+                      )
                     )}
                   </div>
 

@@ -83,10 +83,11 @@ describe('Step1Triage Component', () => {
     expect(screen.getByText('4 מתוך 4 עברו')).toBeTruthy()
     expect(screen.getByText('תנאי למעבר: מעל 1.0')).toBeTruthy()
 
-    // Minimalist year timeline shown under sparkline
+    // Minimalist year timeline shown under sparkline + share buyback pace trend
     const revTimeline = screen.getByTestId('sparkline-timeline-revenue-growth')
     expect(revTimeline.textContent).toContain('2015')
     expect(revTimeline.textContent).toContain('2024')
+    expect(screen.getByTestId('fundamental-trend-share-dilution').textContent).toContain('מגמת הבייבאקס:')
 
     // Check all 4 Hebrew descriptions
     expect(screen.getByText('צמיחה עקבית של ~14% בשנה')).toBeTruthy()
@@ -102,6 +103,7 @@ describe('Step1Triage Component', () => {
     expect(screen.getByText('Share Dilution')).toBeTruthy()
     expect(screen.getByText('Current Ratio (Liquidity)')).toBeTruthy()
     expect(screen.getByText('Target: > 1.0')).toBeTruthy()
+    expect(screen.getByTestId('fundamental-trend-share-dilution').textContent).toContain('Buyback trend:')
   })
 
   it('renders educational tooltips with the required rationales for beginners', async () => {
@@ -187,7 +189,8 @@ describe('Step1Triage Component', () => {
     expect(screen.getByText('+25% בשנה')).toBeTruthy()
     expect(screen.getByText('5.0%')).toBeTruthy()
     expect(screen.getByText('שוליים נמוכים')).toBeTruthy()
-    expect(screen.getByText('-5.0% מניות בשנה')).toBeTruthy()
+    expect(screen.getByText('↓ -5.0% מניות (בייבאק)')).toBeTruthy()
+    expect(screen.getByTestId('fundamental-trend-share-dilution').textContent).toContain('מגמת בייבאקס:')
     expect(screen.getByText('0.89x')).toBeTruthy()
     expect(screen.getByText('סיכון (< 1.0)')).toBeTruthy()
     expect(screen.getByText('תנאי למעבר: מעל 1.0')).toBeTruthy()

@@ -208,7 +208,105 @@ describe('triageCalculator', () => {
     expect(result.margins.historyMeta.cycleBadgeHe).toContain('2.0%–7.0%');
 
     // Buybacks % and USD spend surfaced cleanly
-    expect(result.shares.valueHe).toBe('-5.0% מניות בשנה');
+    expect(result.shares.valueHe).toBe('↓ -5.0% מניות (בייבאק)');
     expect(result.shares.metricSummaryHe).toContain('$50M');
+  });
+
+  it('detects share dilution and buyback pace trends (accelerating, slowing, steady)', () => {
+    const buildFactsWithShares = (series) => ({
+      metrics: {
+        weightedAverageSharesDiluted: {
+          annual: series.map(([fiscalYear, value]) => ({ fiscalYear, value })),
+        },
+      },
+    });
+
+    // 1. Slowing dilution (Shopify-style: high early SBC dilution -> slowing recent dilution)
+    const slowingDilution = calculateTriageMetrics(
+      buildFactsWithShares([
+        [2020, 100],
+        [2021, 106], // +6%
+        [2022, 112], // +5.66%
+        [2023, 113], // +0.89%
+        [2024, 113.4], // +0.35% -> still diluting > 0.2% vs +5.8% prior
+      ])
+    );
+    expect(slowingDilution.shares.valueHe).toBe('↑ +0.4% מניות (דילול)');
+    expect(slowingDilution.shares.trendDirection).toBe('slowing');
+    expect(slowingDilution.shares.trendTone).toBe('improving');
+    expect(slowingDilution.shares.trendLabelHe).toBe('מגמת הדילול: בירידה ↓ (משתפר)');
+
+    // 2. Accelerating dilution (worsening)
+    const acceleratingDilution = calculateTriageMetrics(
+      buildFactsWithShares([
+        [2020, 100],
+        [2021, 101], // +1%
+        [2022, 102], // +0.99%
+        [2023, 107], // +4.9%
+        [2024, 115], // +7.48%
+      ])
+    );
+    expect(acceleratingDilution.shares.valueHe).toBe('↑ +7.5% מניות (דילול)');
+    expect(acceleratingDilution.shares.trendDirection).toBe('accelerating');
+    expect(acceleratingDilution.shares.trendTone).toBe('worsening');
+    expect(acceleratingDilution.shares.trendLabelHe).toBe('מגמת הדילול: בעלייה ↑ (מחמיר)');
+
+    // 3. Steady dilution
+    const steadyDilution = calculateTriageMetrics(
+      buildFactsWithShares([
+        [2020, 100.0],
+        [2021, 102.0], // +2.0%
+        [2022, 104.04], // +2.0%
+        [2023, 106.12], // +2.0%
+        [2024, 108.24], // +2.0%
+      ])
+    );
+    expect(steadyDilution.shares.trendDirection).toBe('steady');
+    expect(steadyDilution.shares.trendTone).toBe('steady');
+    expect(steadyDilution.shares.trendLabelHe).toBe('מגמת הדילול: קצב יציב →');
+
+    // 4. Accelerating buybacks (improving)
+    const acceleratingBuybacks = calculateTriageMetrics(
+      buildFactsWithShares([
+        [2020, 100],
+        [2021, 99], // -1%
+        [2022, 98], // -1.01%
+        [2023, 94], // -4.08%
+        [2024, 89], // -5.32%
+      ])
+    );
+    expect(acceleratingBuybacks.shares.valueHe).toBe('↓ -5.3% מניות (בייבאק)');
+    expect(acceleratingBuybacks.shares.trendDirection).toBe('accelerating');
+    expect(acceleratingBuybacks.shares.trendTone).toBe('improving');
+    expect(acceleratingBuybacks.shares.trendLabelHe).toBe('מגמת הבייבאקס: בעלייה ↑ (משתפר)');
+
+    // 5. Slowing buybacks
+    const slowingBuybacks = calculateTriageMetrics(
+      buildFactsWithShares([
+        [2020, 100],
+        [2021, 95], // -5%
+        [2022, 90], // -5.26%
+        [2023, 89.5], // -0.56%
+        [2024, 89.0], // -0.56%
+      ])
+    );
+    expect(slowingBuybacks.shares.valueHe).toBe('↓ -0.6% מניות (בייבאק)');
+    expect(slowingBuybacks.shares.trendDirection).toBe('slowing');
+    expect(slowingBuybacks.shares.trendTone).toBe('slowing');
+    expect(slowingBuybacks.shares.trendLabelHe).toBe('מגמת הבייבאקס: בירידה ↓ (האטה)');
+
+    // 6. Steady buybacks
+    const steadyBuybacks = calculateTriageMetrics(
+      buildFactsWithShares([
+        [2020, 100.0],
+        [2021, 98.0], // -2%
+        [2022, 96.04], // -2%
+        [2023, 94.12], // -2%
+        [2024, 92.24], // -2%
+      ])
+    );
+    expect(steadyBuybacks.shares.trendDirection).toBe('steady');
+    expect(steadyBuybacks.shares.trendTone).toBe('steady');
+    expect(steadyBuybacks.shares.trendLabelHe).toBe('מגמת הבייבאקס: קצב יציב →');
   });
 });

@@ -102,9 +102,13 @@ const DEFAULT_MSFT_TRIAGE = {
     title: 'Share Dilution',
     titleHe: 'רכישה עצמית / דילול',
     value: 'Share Buybacks',
-    valueHe: '-7.4% מניות ב-9 ש׳',
+    valueHe: '↓ -7.4% מניות ב-9 ש׳',
     target: 'Target: Decreasing',
     targetHe: 'תנאי למעבר: ירידה או יציבות במניות',
+    trendDirection: 'slowing',
+    trendTone: 'slowing',
+    trendLabelHe: 'מגמת הבייבאקס: בירידה ↓ (האטה)',
+    trendLabelEn: 'Buyback trend: Slowing ↓',
     latestValue: 7430000000,
     changePct: -0.8,
     totalChangePct: -7.4,
@@ -525,6 +529,133 @@ function calculateOperatingMarginsMetric(metrics) {
 }
 
 /**
+ * Detects whether dilution or share buyback pace is accelerating, steady, or slowing over time
+ * by comparing recent YoY share-count % changes against earlier years.
+ */
+function calculateShareRateTrend(allYears, { isDecreasing, isFlat }) {
+  const yoyChanges = [];
+  for (let i = 1; i < allYears.length; i++) {
+    const prev = allYears[i - 1].value;
+    const curr = allYears[i].value;
+    if (prev > 0) {
+      yoyChanges.push(((curr - prev) / prev) * 100);
+    }
+  }
+
+  if (yoyChanges.length < 2) {
+    if (isDecreasing) {
+      return {
+        trendDirection: 'single',
+        trendTone: 'neutral',
+        trendLabelHe: 'מגמת בייבאקס: נתון שנתי יחיד',
+        trendLabelEn: 'Buyback trend: Single-year data',
+      };
+    }
+    if (isFlat) {
+      return {
+        trendDirection: 'steady',
+        trendTone: 'steady',
+        trendLabelHe: 'מגמה: כמות מניות יציבה',
+        trendLabelEn: 'Trend: Stable share count',
+      };
+    }
+    return {
+      trendDirection: 'single',
+      trendTone: 'neutral',
+      trendLabelHe: 'מגמת דילול: נתון שנתי יחיד',
+      trendLabelEn: 'Dilution trend: Single-year data',
+    };
+  }
+
+  const recentWindow = yoyChanges.length >= 4 ? yoyChanges.slice(-2) : yoyChanges.slice(-1);
+  const priorWindow =
+    yoyChanges.length >= 4
+      ? yoyChanges.slice(Math.max(0, yoyChanges.length - 6), -2)
+      : yoyChanges.slice(0, -1);
+
+  const avg = (arr) => arr.reduce((sum, v) => sum + v, 0) / arr.length;
+  const recentAvg = avg(recentWindow);
+  const priorAvg = avg(priorWindow);
+  const THRESHOLD = 0.3;
+
+  if (isDecreasing) {
+    const recentPace = -recentAvg;
+    const priorPace = -priorAvg;
+    if (recentPace >= priorPace + THRESHOLD) {
+      return {
+        trendDirection: 'accelerating',
+        trendTone: 'improving',
+        trendLabelHe: 'מגמת הבייבאקס: בעלייה ↑ (משתפר)',
+        trendLabelEn: 'Buyback trend: Accelerating ↑ (improving)',
+      };
+    }
+    if (recentPace <= priorPace - THRESHOLD) {
+      return {
+        trendDirection: 'slowing',
+        trendTone: 'slowing',
+        trendLabelHe: 'מגמת הבייבאקס: בירידה ↓ (האטה)',
+        trendLabelEn: 'Buyback trend: Slowing ↓',
+      };
+    }
+    return {
+      trendDirection: 'steady',
+      trendTone: 'steady',
+      trendLabelHe: 'מגמת הבייבאקס: קצב יציב →',
+      trendLabelEn: 'Buyback trend: Steady pace →',
+    };
+  }
+
+  if (isFlat) {
+    if (priorAvg > 0.5) {
+      return {
+        trendDirection: 'slowing',
+        trendTone: 'improving',
+        trendLabelHe: 'מגמת הדילול: בירידה ↓ (התייצבות)',
+        trendLabelEn: 'Dilution trend: Declining ↓ (stabilized)',
+      };
+    }
+    if (priorAvg < -0.5) {
+      return {
+        trendDirection: 'slowing',
+        trendTone: 'slowing',
+        trendLabelHe: 'מגמת הבייבאקס: בירידה ↓ (התייצבות)',
+        trendLabelEn: 'Buyback trend: Slowed ↓ (flat)',
+      };
+    }
+    return {
+      trendDirection: 'steady',
+      trendTone: 'steady',
+      trendLabelHe: 'מגמה: כמות מניות יציבה →',
+      trendLabelEn: 'Trend: Stable share count →',
+    };
+  }
+
+  // Active dilution regime
+  if (recentAvg >= priorAvg + THRESHOLD) {
+    return {
+      trendDirection: 'accelerating',
+      trendTone: 'worsening',
+      trendLabelHe: 'מגמת הדילול: בעלייה ↑ (מחמיר)',
+      trendLabelEn: 'Dilution trend: Accelerating ↑ (worsening)',
+    };
+  }
+  if (recentAvg <= priorAvg - THRESHOLD) {
+    return {
+      trendDirection: 'slowing',
+      trendTone: 'improving',
+      trendLabelHe: 'מגמת הדילול: בירידה ↓ (משתפר)',
+      trendLabelEn: 'Dilution trend: Slowing ↓ (improving)',
+    };
+  }
+  return {
+    trendDirection: 'steady',
+    trendTone: 'steady',
+    trendLabelHe: 'מגמת הדילול: קצב יציב →',
+    trendLabelEn: 'Dilution trend: Steady pace →',
+  };
+}
+
+/**
  * 3. Share Dilution (Financial logic: Buybacks / decreasing = GREEN / Pass; Dilution / increasing = RED / Fail)
  */
 function calculateShareDilutionMetric(metrics) {
@@ -615,11 +746,13 @@ function calculateShareDilutionMetric(metrics) {
 
   const valueHe = isDecreasing
     ? annualChangePct <= -0.1
-      ? `${annualFmt} מניות בשנה`
-      : `${totalFmt} מניות (${spanYears} ש׳)`
+      ? `↓ ${annualFmt} מניות (בייבאק)`
+      : `↓ ${totalFmt} מניות (${spanYears} ש׳)`
     : isFlat
-    ? '~0% (כמות יציבה)'
-    : `${annualFmt} דילול בשנה`;
+    ? '~0% מניות (יציב)'
+    : `↑ ${annualFmt} מניות (דילול)`;
+
+  const shareTrend = calculateShareRateTrend(allYears, { isDecreasing, isFlat });
 
   const historyMeta = analyzeSeriesShape(sparkline, 'shares');
   if (historyMeta) {
@@ -635,6 +768,7 @@ function calculateShareDilutionMetric(metrics) {
     valueHe,
     target: 'Target: Decreasing',
     targetHe: 'תנאי למעבר: ירידה או יציבות במניות',
+    ...shareTrend,
     latestValue: latest.value,
     changePct: Math.round(annualChangePct * 10) / 10,
     totalChangePct: Math.round(totalChangePct * 10) / 10,
