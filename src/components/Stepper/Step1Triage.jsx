@@ -322,63 +322,162 @@ const FUNDAMENTAL_TREND_TONE_STYLES = {
   neutral: 'text-slate-500 dark:text-slate-400',
 }
 
-/**
- * InfoTooltip Component
- * Subtle info ("i") icon with a floating dark tooltip bubble on hover/focus.
- */
-function InfoTooltip({ text, align = 'center', dir = 'rtl' }) {
-  const alignClasses = {
-    left: 'left-0 sm:-left-3',
-    right: 'right-0 sm:-right-3',
-    start: 'start-0',
-    end: 'end-0',
-    center: 'left-1/2 -translate-x-1/2',
-  }[align] || 'left-1/2 -translate-x-1/2'
+const DESKTOP_TOOLTIP_ALIGN_MAP = {
+  left: 'sm:-left-3',
+  right: 'sm:-right-3',
+  start: 'sm:start-0',
+  end: 'sm:end-0',
+  center: 'sm:left-1/2 sm:-translate-x-1/2',
+}
 
-  const arrowClasses = {
-    left: 'left-3 sm:left-4',
-    right: 'right-3 sm:right-4',
-    start: 'start-3',
-    end: 'end-3',
-    center: 'left-1/2 -translate-x-1/2',
-  }[align] || 'left-1/2 -translate-x-1/2'
+const DESKTOP_TOOLTIP_ARROW_MAP = {
+  left: 'sm:left-4',
+  right: 'sm:right-4',
+  start: 'sm:start-3',
+  end: 'sm:end-3',
+  center: 'sm:left-1/2 sm:-translate-x-1/2',
+}
+
+/**
+ * ResponsiveTooltip Component
+ * Desktop (`sm:`+): floats above/below trigger on hover/focus with logical RTL/LTR alignment.
+ * Mobile (`< 640px`): clamps cleanly inside the viewport (`fixed inset-x-4 bottom-4`) and supports tap-to-toggle.
+ */
+function ResponsiveTooltip({
+  trigger,
+  children,
+  placement = 'top',
+  align = 'start',
+  widthClass = 'sm:w-72',
+  dir = 'rtl',
+  showArrow = false,
+  className = '',
+  wrapperClass = 'relative inline-flex items-center group/rtooltip',
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    if (!isOpen) return undefined
+
+    const handlePointerDown = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false)
+      }
+    }
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
+
+  const onToggle = useCallback(() => {
+    setIsOpen((prev) => !prev)
+  }, [])
+
+  const desktopPlacementClass =
+    placement === 'bottom'
+      ? 'sm:top-full sm:bottom-auto sm:mt-2'
+      : 'sm:bottom-full sm:top-auto sm:mb-2'
+  const desktopAlignClass = DESKTOP_TOOLTIP_ALIGN_MAP[align] || DESKTOP_TOOLTIP_ALIGN_MAP.start
+  const arrowAlignClass = DESKTOP_TOOLTIP_ARROW_MAP[align] || DESKTOP_TOOLTIP_ARROW_MAP.start
+
+  const visibilityClass = isOpen
+    ? 'opacity-100 visible pointer-events-auto sm:pointer-events-none'
+    : 'opacity-0 invisible pointer-events-none group-hover/rtooltip:opacity-100 group-hover/rtooltip:visible group-focus-within/rtooltip:opacity-100 group-focus-within/rtooltip:visible'
 
   return (
-    <span className="relative inline-flex items-center group/tooltip">
-      <button
-        type="button"
-        aria-label="Educational rationale"
-        className="text-slate-400 hover:text-sky-500 dark:text-slate-500 dark:hover:text-sky-400 transition-colors p-0.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-help"
-      >
-        <svg
-          className="w-3.5 h-3.5"
-          viewBox="0 0 16 16"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-        >
-          <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.25" />
-          <path d="M8 7v4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          <circle cx="8" cy="4.5" r="0.85" fill="currentColor" />
-        </svg>
-      </button>
+    <span ref={containerRef} className={wrapperClass}>
+      {trigger({ isOpen, onToggle })}
 
-      {/* Floating Tooltip Bubble */}
       <span
         role="tooltip"
         dir={dir}
-        className={`pointer-events-none absolute bottom-full mb-2 ${alignClasses} w-64 sm:w-72 p-3 text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-xl shadow-xl border border-slate-700/60 dark:border-slate-800 ${
+        className={`fixed inset-x-4 bottom-4 w-auto max-w-[calc(100vw-2rem)] max-h-[60vh] overflow-y-auto p-3.5 shadow-2xl sm:inset-x-auto sm:bottom-auto sm:absolute ${desktopPlacementClass} ${desktopAlignClass} ${widthClass} sm:max-h-none sm:overflow-visible sm:p-3 sm:shadow-xl text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-xl border border-slate-700/60 dark:border-slate-800 ${
           dir === 'rtl' ? 'text-right' : 'text-left'
-        } opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible group-focus-within/tooltip:opacity-100 group-focus-within/tooltip:visible transition-all duration-200 z-50 font-sans font-normal normal-case tracking-normal`}
+        } ${visibilityClass} transition-all duration-150 z-50 font-sans font-normal normal-case tracking-normal ${className}`}
       >
-        {text}
-        {/* Tooltip Downward Arrow */}
-        <span
-          className={`absolute top-full ${arrowClasses} border-4 border-transparent border-t-slate-900/95 dark:border-t-slate-950/95`}
-          aria-hidden="true"
-        />
+        {isOpen && (
+          <button
+            type="button"
+            aria-label={dir === 'rtl' ? 'סגור הסבר' : 'Close tooltip'}
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsOpen(false)
+            }}
+            className="sm:hidden float-end ms-2 mb-1 px-1.5 py-0.5 rounded-md text-[11px] font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 hover:text-white cursor-pointer"
+          >
+            ✕
+          </button>
+        )}
+        {children}
+        {showArrow && placement === 'top' && (
+          <span
+            className={`hidden sm:block absolute top-full ${arrowAlignClass} border-4 border-transparent border-t-slate-900/95 dark:border-t-slate-950/95`}
+            aria-hidden="true"
+          />
+        )}
       </span>
     </span>
+  )
+}
+
+ResponsiveTooltip.propTypes = {
+  trigger: PropTypes.func.isRequired,
+  children: PropTypes.node.isRequired,
+  placement: PropTypes.oneOf(['top', 'bottom']),
+  align: PropTypes.oneOf(['left', 'right', 'start', 'end', 'center']),
+  widthClass: PropTypes.string,
+  dir: PropTypes.oneOf(['rtl', 'ltr']),
+  showArrow: PropTypes.bool,
+  className: PropTypes.string,
+  wrapperClass: PropTypes.string,
+}
+
+/**
+ * InfoTooltip Component
+ * Subtle info ("i") icon with a viewport-safe dark tooltip bubble on hover, focus, or tap.
+ */
+function InfoTooltip({ text, align = 'center', dir = 'rtl' }) {
+  return (
+    <ResponsiveTooltip
+      placement="top"
+      align={align}
+      widthClass="sm:w-72"
+      dir={dir}
+      showArrow
+      trigger={({ isOpen, onToggle }) => (
+        <button
+          type="button"
+          aria-label="Educational rationale"
+          aria-expanded={isOpen}
+          onClick={onToggle}
+          className="text-slate-400 hover:text-sky-500 dark:text-slate-500 dark:hover:text-sky-400 transition-colors p-0.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-help"
+        >
+          <svg
+            className="w-3.5 h-3.5"
+            viewBox="0 0 16 16"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.25" />
+            <path d="M8 7v4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <circle cx="8" cy="4.5" r="0.85" fill="currentColor" />
+          </svg>
+        </button>
+      )}
+    >
+      {text}
+    </ResponsiveTooltip>
   )
 }
 
@@ -632,7 +731,7 @@ export function Step1Triage({
         'צמיחה בהכנסות: עסק בריא הוא עסק שצומח. אנחנו מחפשים חברות שמצליחות להגדיל את ההכנסות (Top Line) בעקביות. הגרף מציג עד 15 שנות היסטוריה כדי לחשוף מחזוריות, בעוד קצב הצמיחה השנתי (CAGR) מחושב ל-5 השנים האחרונות ולטווח המלא.',
       tooltipEn:
         'Revenue Growth: Healthy businesses expand top-line demand consistently. The sparkline covers up to 15 years to surface cyclicality alongside 5Y CAGR momentum.',
-      tooltipAlign: 'left',
+      tooltipAlign: 'start',
       icon: TrendingUp,
     },
     {
@@ -657,7 +756,7 @@ export function Step1Triage({
         'שולי רווח תפעולי: המדד ליעילות וכוח תמחור. קו האמצע המקווקו בגרף מסמן את הממוצע הרב-שנתי כדי שתוכל לזהות במבט ראשון האם השוליים יציבים או מחזוריים.',
       tooltipEn:
         'Operating Margins: Measures operational efficiency and pricing power. The dashed baseline marks the multi-year average to spot cyclical swings quickly.',
-      tooltipAlign: 'left',
+      tooltipAlign: 'start',
       icon: Percent,
     },
     {
@@ -685,7 +784,7 @@ export function Step1Triage({
         'דילול מניות: כשהחברה מנפיקה עוד מניות, הנתח שלנו כמשקיעים קטן (דילול). באידיאל, נחפש חברות שלא מדללות באגרסיביות, או עדיף - חברות שרוכשות מניות חזרה (Buybacks) ומקטינות את כמות המניות נטו לאורך זמן.',
       tooltipEn:
         'Share Dilution: Issuing shares dilutes your ownership stake. Ideally we favor companies retiring shares net of compensation via disciplined buybacks.',
-      tooltipAlign: 'right',
+      tooltipAlign: 'end',
       icon: Coins,
     },
     {
@@ -710,7 +809,7 @@ export function Step1Triage({
         'יחס שוטף (Current Ratio): אנחנו רוצים לישון בשקט בלילה. יחס שוטף מעל 1 אומר שלחברה יש מספיק נכסים נזילים כדי לכסות את התחייבויותיה הקרובות, ומונע סיכון מיידי של פשיטת רגל.',
       tooltipEn:
         'Current Ratio: Measures short-term solvency. A ratio above 1.0 confirms liquid assets exceed near-term liabilities.',
-      tooltipAlign: 'right',
+      tooltipAlign: 'end',
       icon: ShieldCheck,
     },
   ]
@@ -832,7 +931,7 @@ export function Step1Triage({
         </div>
 
         {/* Mini Step Pills */}
-        <div className="flex items-center gap-1.5 self-start sm:self-center bg-slate-100 dark:bg-slate-800/60 p-1.5 rounded-full border border-slate-200 dark:border-slate-700/60 text-xs">
+        <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-center max-w-full bg-slate-100 dark:bg-slate-800/60 p-1.5 rounded-2xl sm:rounded-full border border-slate-200 dark:border-slate-700/60 text-xs">
           <span className="px-3 py-1 font-semibold rounded-full bg-white dark:bg-slate-700 text-slate-900 dark:text-white border border-slate-200/80 dark:border-slate-600/50 shadow-xs">
             1. Triage
           </span>
@@ -1093,7 +1192,7 @@ export function Step1Triage({
       <div
         data-testid="tear-sheet-blade"
         dir={lang === 'he' ? 'rtl' : 'ltr'}
-        className="relative rounded-2xl border border-sky-500/20 bg-linear-to-b from-sky-50/50 via-white to-white dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900 shadow-sm p-6 sm:p-7"
+        className="relative rounded-2xl border border-sky-500/20 bg-linear-to-b from-sky-50/50 via-white to-white dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900 shadow-sm p-4 sm:p-7"
       >
         <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
@@ -1133,43 +1232,45 @@ export function Step1Triage({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Economic Moat Summary Badge (Informational Pill + Hover Qualitative AI & 5-Pillar Explanation) */}
+            {/* Economic Moat Summary Badge (Informational Pill + Hover/Tap Qualitative AI & 5-Pillar Explanation) */}
             {!isLoadingSummary && activeMoat?.rating && (
-              <div className="relative group/moatbadge">
-                <button
-                  type="button"
-                  data-testid="moat-summary-badge"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border cursor-help ${moatTheme.badge}`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${moatTheme.dot}`} />
-                  <span>
-                    {translateMoatRating(activeMoat.rating, lang)}
-                    {activeMoat.score
-                      ? lang === 'he'
-                        ? ` (${activeMoat.score} מקורות)`
-                        : ` (${activeMoat.score} Sources)`
-                      : ''}
-                  </span>
-                </button>
-                <div
-                  role="tooltip"
-                  dir={lang === 'he' ? 'rtl' : 'ltr'}
-                  className={`pointer-events-none absolute top-full mt-2 end-0 w-72 sm:w-80 p-3 text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-xl shadow-xl border border-slate-700/60 ${
-                    lang === 'he' ? 'text-right' : 'text-left'
-                  } opacity-0 invisible group-hover/moatbadge:opacity-100 group-hover/moatbadge:visible group-focus-within/moatbadge:opacity-100 group-focus-within/moatbadge:visible transition-all duration-200 z-50 space-y-1.5`}
-                >
-                  <div className={`font-bold ${moatTheme.tooltipTitle}`}>
-                    {lang === 'he'
-                      ? 'דירוג החפיר הכלכלי (הערכת AI איכותנית + 5 מקורות):'
-                      : 'Economic Moat Rating (Qualitative AI + 5 Pillars):'}
-                  </div>
-                  <p className="text-slate-300 text-[11px]">
-                    {lang === 'he'
-                      ? 'הדירוג (רחב / צר / ללא חפיר) נקבע בהערכה איכותנית של ה-AI לגבי עמידות היתרון התחרותי מול המתחרים בענף, לצד בדיקת 5 מקורות החפיר: עלויות מעבר, אפקט רשת, יתרון עלות וגודל, נכסים בלתי מוחשיים ויעילות קנה מידה.'
-                      : 'Assessed qualitatively by AI based on durable competitive advantage against industry rivals, alongside the 5 classic moat pillars: Switching Costs, Network Effects, Cost Advantage, Intangible Assets, and Efficient Scale.'}
-                  </p>
-                </div>
-              </div>
+              <ResponsiveTooltip
+                placement="bottom"
+                align="end"
+                widthClass="sm:w-80"
+                dir={lang === 'he' ? 'rtl' : 'ltr'}
+                className="space-y-1.5"
+                trigger={({ isOpen, onToggle }) => (
+                  <button
+                    type="button"
+                    data-testid="moat-summary-badge"
+                    aria-expanded={isOpen}
+                    onClick={onToggle}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border cursor-help ${moatTheme.badge}`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${moatTheme.dot}`} />
+                    <span>
+                      {translateMoatRating(activeMoat.rating, lang)}
+                      {activeMoat.score
+                        ? lang === 'he'
+                          ? ` (${activeMoat.score} מקורות)`
+                          : ` (${activeMoat.score} Sources)`
+                        : ''}
+                    </span>
+                  </button>
+                )}
+              >
+                <span className={`block font-bold ${moatTheme.tooltipTitle}`}>
+                  {lang === 'he'
+                    ? 'דירוג החפיר הכלכלי (הערכת AI איכותנית + 5 מקורות):'
+                    : 'Economic Moat Rating (Qualitative AI + 5 Pillars):'}
+                </span>
+                <span className="block text-slate-300 text-[11px]">
+                  {lang === 'he'
+                    ? 'הדירוג (רחב / צר / ללא חפיר) נקבע בהערכה איכותנית של ה-AI לגבי עמידות היתרון התחרותי מול המתחרים בענף, לצד בדיקת 5 מקורות החפיר: עלויות מעבר, אפקט רשת, יתרון עלות וגודל, נכסים בלתי מוחשיים ויעילות קנה מידה.'
+                    : 'Assessed qualitatively by AI based on durable competitive advantage against industry rivals, alongside the 5 classic moat pillars: Switching Costs, Network Effects, Cost Advantage, Intangible Assets, and Efficient Scale.'}
+                </span>
+              </ResponsiveTooltip>
             )}
 
             {/* On-Demand Language Toggle (HE | EN) */}
@@ -1210,43 +1311,54 @@ export function Step1Triage({
                 {lang === 'he' ? 'מנתח...' : 'AI Thinking...'}
               </span>
             ) : (
-              <div className="relative group/grounding">
-                <button
-                  type="button"
-                  data-testid="data-grounding-badge"
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border cursor-help transition-colors ${grounding.toneClass}`}
-                >
-                  <span>{grounding.badgeLabel}</span>
-                </button>
-                <div
-                  role="tooltip"
-                  dir={lang === 'he' ? 'rtl' : 'ltr'}
-                  className={`pointer-events-none absolute top-full mt-2 end-0 w-72 sm:w-80 p-3.5 text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-xl shadow-xl border border-slate-700/60 ${
-                    lang === 'he' ? 'text-right' : 'text-left'
-                  } opacity-0 invisible group-hover/grounding:opacity-100 group-hover/grounding:visible group-focus-within/grounding:opacity-100 group-focus-within/grounding:visible transition-all duration-200 z-50 space-y-2`}
-                >
-                  <div className="font-bold text-sky-300 border-b border-slate-700/70 pb-1.5">
-                    {lang === 'he'
-                      ? 'שקיפות מקורות מידע וביסוס הניתוח:'
-                      : 'Data Grounding & Source Verification:'}
-                  </div>
-                  <ul className="space-y-1.5">
-                    {grounding.checks.map((item) => (
-                      <li key={item.id} className="flex items-start justify-between gap-2 text-[11px]">
-                        <span className="flex items-center gap-1.5 text-slate-200">
-                          <span className={item.ok ? 'text-emerald-400 font-bold' : 'text-slate-500'}>
-                            {item.ok ? '✓' : '✕'}
-                          </span>
-                          <span>{item.label}</span>
+              <ResponsiveTooltip
+                placement="bottom"
+                align="end"
+                widthClass="sm:w-80"
+                dir={lang === 'he' ? 'rtl' : 'ltr'}
+                className="space-y-2 sm:p-3.5"
+                trigger={({ isOpen, onToggle }) => (
+                  <button
+                    type="button"
+                    data-testid="data-grounding-badge"
+                    aria-expanded={isOpen}
+                    onClick={onToggle}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border cursor-help transition-colors ${grounding.toneClass}`}
+                  >
+                    <span>{grounding.badgeLabel}</span>
+                  </button>
+                )}
+              >
+                <span className="block font-bold text-sky-300 border-b border-slate-700/70 pb-1.5">
+                  {lang === 'he'
+                    ? 'שקיפות מקורות מידע וביסוס הניתוח:'
+                    : 'Data Grounding & Source Verification:'}
+                </span>
+                <span className="block space-y-1.5">
+                  {grounding.checks.map((item) => (
+                    <span
+                      key={item.id}
+                      className="flex items-start justify-between gap-2 text-[11px]"
+                    >
+                      <span className="flex items-center gap-1.5 text-slate-200">
+                        <span className={item.ok ? 'text-emerald-400 font-bold' : 'text-slate-500'}>
+                          {item.ok ? '✓' : '✕'}
                         </span>
-                        <span className={item.ok ? 'text-emerald-300 font-medium shrink-0' : 'text-slate-400 shrink-0'}>
-                          {item.detail}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
+                        <span>{item.label}</span>
+                      </span>
+                      <span
+                        className={
+                          item.ok
+                            ? 'text-emerald-300 font-medium shrink-0'
+                            : 'text-slate-400 shrink-0'
+                        }
+                      >
+                        {item.detail}
+                      </span>
+                    </span>
+                  ))}
+                </span>
+              </ResponsiveTooltip>
             )}
           </div>
         </div>
@@ -1279,27 +1391,38 @@ export function Step1Triage({
             Array.isArray(aiSummary?.businessModelTraits) &&
             aiSummary.businessModelTraits.map((rawTrait) => {
               const traitInfo = resolveTraitDisplay(rawTrait, lang)
-              return (
-                <div key={traitInfo.key} className="relative group/trait inline-flex">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 hover:bg-sky-500/20 transition-colors cursor-help focus:outline-none focus:ring-1 focus:ring-sky-500"
+              if (!traitInfo.explanation) {
+                return (
+                  <span
+                    key={traitInfo.key}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20"
                   >
                     <span>{traitInfo.displayLabel}</span>
-                    <span className="text-[10px] opacity-65 font-normal">ⓘ</span>
-                  </button>
-                  {traitInfo.explanation && (
-                    <span
-                      role="tooltip"
-                      dir={lang === 'he' ? 'rtl' : 'ltr'}
-                      className={`pointer-events-none absolute bottom-full mb-2 start-0 w-64 p-2.5 text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-xl shadow-xl border border-slate-700/60 ${
-                        lang === 'he' ? 'text-right' : 'text-left'
-                      } opacity-0 invisible group-hover/trait:opacity-100 group-hover/trait:visible group-focus-within/trait:opacity-100 group-focus-within/trait:visible transition-all duration-200 z-50 font-normal`}
+                  </span>
+                )
+              }
+              return (
+                <ResponsiveTooltip
+                  key={traitInfo.key}
+                  placement="top"
+                  align="start"
+                  widthClass="sm:w-64"
+                  dir={lang === 'he' ? 'rtl' : 'ltr'}
+                  className="sm:p-2.5"
+                  trigger={({ isOpen, onToggle }) => (
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      onClick={onToggle}
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 hover:bg-sky-500/20 transition-colors cursor-help focus:outline-none focus:ring-1 focus:ring-sky-500"
                     >
-                      {traitInfo.explanation}
-                    </span>
+                      <span>{traitInfo.displayLabel}</span>
+                      <span className="text-[10px] opacity-65 font-normal">ⓘ</span>
+                    </button>
                   )}
-                </div>
+                >
+                  {traitInfo.explanation}
+                </ResponsiveTooltip>
               )
             })
           )}
@@ -1351,36 +1474,41 @@ export function Step1Triage({
                       const defText =
                         lang === 'he' ? src.descriptionHe : src.descriptionEn
                       return (
-                        <div key={src.name} className="relative group/moatcat inline-flex">
-                          <button
-                            type="button"
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-medium cursor-help transition-colors focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
-                              src.active
-                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
-                                : 'bg-slate-100 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700/70'
-                            }`}
-                          >
-                            <span>{src.active ? '✓' : '✕'}</span>
-                            <span>{label}</span>
-                          </button>
-                          <div
-                            role="tooltip"
-                            dir={lang === 'he' ? 'rtl' : 'ltr'}
-                            className={`pointer-events-none absolute bottom-full mb-2 start-0 w-64 sm:w-72 p-3 text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-xl shadow-xl border border-slate-700/60 ${
-                              lang === 'he' ? 'text-right' : 'text-left'
-                            } opacity-0 invisible group-hover/moatcat:opacity-100 group-hover/moatcat:visible group-focus-within/moatcat:opacity-100 group-focus-within/moatcat:visible transition-all duration-200 z-50 space-y-1`}
-                          >
-                            <div className="font-bold text-emerald-300">
-                              {label} ({src.name})
-                            </div>
-                            {defText && <div className="text-slate-400 text-[11px]">{defText}</div>}
-                            {src.rationale && (
-                              <div className="text-slate-100 pt-1 border-t border-slate-800">
-                                {src.rationale}
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                        <ResponsiveTooltip
+                          key={src.name}
+                          placement="top"
+                          align="start"
+                          widthClass="sm:w-72"
+                          dir={lang === 'he' ? 'rtl' : 'ltr'}
+                          className="space-y-1"
+                          trigger={({ isOpen, onToggle }) => (
+                            <button
+                              type="button"
+                              aria-expanded={isOpen}
+                              onClick={onToggle}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border font-medium cursor-help transition-colors focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
+                                src.active
+                                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                                  : 'bg-slate-100 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700/70'
+                              }`}
+                            >
+                              <span>{src.active ? '✓' : '✕'}</span>
+                              <span>{label}</span>
+                            </button>
+                          )}
+                        >
+                          <span className="block font-bold text-emerald-300">
+                            {label} ({src.name})
+                          </span>
+                          {defText && (
+                            <span className="block text-slate-400 text-[11px]">{defText}</span>
+                          )}
+                          {src.rationale && (
+                            <span className="block text-slate-100 pt-1 border-t border-slate-800">
+                              {src.rationale}
+                            </span>
+                          )}
+                        </ResponsiveTooltip>
                       )
                     })}
                   </div>
@@ -1637,7 +1765,7 @@ export function Step1Triage({
                       : 'Competitive Landscape (10-K Peers)'}
                   </h3>
                   <span className="text-[11px] text-slate-400">
-                    {lang === 'he' ? 'רחף להשוואת מיקוד' : 'Hover for focus'}
+                    {lang === 'he' ? 'לחץ/רחף למיקוד' : 'Tap/hover for focus'}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1645,31 +1773,34 @@ export function Step1Triage({
                     const scaleClass =
                       COMPETITOR_SCALE_STYLES[comp.relativeSize] || COMPETITOR_SCALE_STYLES.similar
                     return (
-                      <div key={comp.name} className="relative group/peer">
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/25 hover:border-amber-500/50 transition-colors cursor-help focus:outline-none focus:ring-1 focus:ring-amber-500"
-                        >
-                          <span dir="ltr">{comp.name}</span>
-                          <span
-                            className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold border ${scaleClass}`}
+                      <ResponsiveTooltip
+                        key={comp.name}
+                        placement="top"
+                        align="start"
+                        widthClass="sm:w-60"
+                        dir={lang === 'he' ? 'rtl' : 'ltr'}
+                        className="space-y-1 sm:p-2.5"
+                        trigger={({ isOpen, onToggle }) => (
+                          <button
+                            type="button"
+                            aria-expanded={isOpen}
+                            onClick={onToggle}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/25 hover:border-amber-500/50 transition-colors cursor-help focus:outline-none focus:ring-1 focus:ring-amber-500"
                           >
-                            {comp.sizeShort}
-                          </span>
-                        </button>
-                        <div
-                          role="tooltip"
-                          dir={lang === 'he' ? 'rtl' : 'ltr'}
-                          className={`pointer-events-none absolute bottom-full mb-2 start-0 w-60 p-2.5 text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 rounded-xl shadow-xl border border-slate-700/60 ${
-                            lang === 'he' ? 'text-right' : 'text-left'
-                          } opacity-0 invisible group-hover/peer:opacity-100 group-hover/peer:visible group-focus-within/peer:opacity-100 group-focus-within/peer:visible transition-all duration-150 z-50 space-y-1`}
-                        >
-                          <div className="font-bold text-amber-300">
-                            {comp.name} · {comp.sizeLabel}
-                          </div>
-                          <div className="text-slate-200">{comp.competeOn}</div>
-                        </div>
-                      </div>
+                            <span dir="ltr">{comp.name}</span>
+                            <span
+                              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold border ${scaleClass}`}
+                            >
+                              {comp.sizeShort}
+                            </span>
+                          </button>
+                        )}
+                      >
+                        <span className="block font-bold text-amber-300">
+                          {comp.name} · {comp.sizeLabel}
+                        </span>
+                        <span className="block text-slate-200">{comp.competeOn}</span>
+                      </ResponsiveTooltip>
                     )
                   })}
                 </div>
@@ -1837,6 +1968,8 @@ export function Step1Triage({
                               />
                             )}
                             <Tooltip
+                              allowEscapeViewBox={{ x: false, y: true }}
+                              wrapperStyle={{ zIndex: 40, pointerEvents: 'none' }}
                               content={
                                 <SparklineTooltip
                                   unit={indicator.sparklineUnit}

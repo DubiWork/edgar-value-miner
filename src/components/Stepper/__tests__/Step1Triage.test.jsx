@@ -263,4 +263,37 @@ describe('Step1Triage Component', () => {
     expect(screen.queryByText(/הצג קוד תרשים|View Mermaid Syntax/)).toBeNull()
     expect(screen.queryByTestId('tear-sheet-moat-sources')).toBeNull()
   })
+
+  it('supports tap-to-toggle mobile tooltips clamped to viewport width and closes on close button or Escape', async () => {
+    render(<Step1Triage company={mockCompany} />)
+
+    const moatBadge = await screen.findByTestId('moat-summary-badge')
+    const allTooltips = screen.getAllByRole('tooltip')
+    expect(allTooltips.length).toBeGreaterThan(0)
+    for (const tip of allTooltips) {
+      expect(tip.className).toContain('fixed')
+      expect(tip.className).toContain('inset-x-4')
+      expect(tip.className).toContain('bottom-4')
+    }
+
+    // Tap first educational info button -> opens its tooltip cleanly
+    const infoButtons = screen.getAllByRole('button', { name: /educational rationale/i })
+    fireEvent.click(infoButtons[0])
+    const closeBtn = await screen.findByRole('button', { name: 'סגור הסבר' })
+    const firstTooltip = infoButtons[0].parentElement.querySelector('[role="tooltip"]')
+    expect(firstTooltip.className).toContain('opacity-100')
+
+    // Tapping close button dismisses it cleanly
+    fireEvent.click(closeBtn)
+    expect(firstTooltip.className).toContain('opacity-0')
+
+    // Tapping moat badge opens its tooltip without expanding Tear Sheet, and Escape closes it
+    fireEvent.click(moatBadge)
+    const moatTooltip = moatBadge.parentElement.querySelector('[role="tooltip"]')
+    expect(moatTooltip.className).toContain('opacity-100')
+    expect(screen.queryByTestId('tear-sheet-expanded-content')).toBeNull()
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(moatTooltip.className).toContain('opacity-0')
+  })
 })

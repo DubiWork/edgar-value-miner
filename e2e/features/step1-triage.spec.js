@@ -56,4 +56,50 @@ test.describe('Step 1 Triage Feature E2E (#310)', () => {
       page.getByRole('heading', { name: 'Apple Inc.' }),
     ).toBeVisible();
   });
+
+  test('renders mobile-safe Step 1 Triage tooltips within 375px phone viewport without horizontal overflow', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+
+    const input = page.locator('[data-testid="ticker-search-input"]').first();
+    await input.click();
+    await input.fill('AAPL');
+    await input.press('Enter');
+
+    await expect(page.locator('[data-testid="tear-sheet-blade"]')).toBeVisible({
+      timeout: 15_000,
+    });
+
+    const horizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(horizontalOverflow).toBeLessThanOrEqual(1);
+
+    // Tap first Educational rationale button -> tooltip must fit inside 375px width
+    const infoBtn = page.locator('button[aria-label="Educational rationale"]').first();
+    await infoBtn.click();
+    const openInfoTooltip = infoBtn.locator('..').locator('[role="tooltip"]');
+    await expect(openInfoTooltip).toBeVisible();
+    const infoBox = await openInfoTooltip.boundingBox();
+    expect(infoBox).not.toBeNull();
+    expect(infoBox.x).toBeGreaterThanOrEqual(0);
+    expect(infoBox.x + infoBox.width).toBeLessThanOrEqual(375);
+
+    await page.locator('button[aria-label="סגור הסבר"]').click();
+    await expect(openInfoTooltip).toBeHidden();
+
+    // Tap moat badge -> tooltip must also fit cleanly within 375px viewport
+    const moatBadge = page.locator('[data-testid="moat-summary-badge"]');
+    await moatBadge.click();
+    const openMoatTooltip = moatBadge.locator('..').locator('[role="tooltip"]');
+    await expect(openMoatTooltip).toBeVisible();
+    const moatBox = await openMoatTooltip.boundingBox();
+    expect(moatBox).not.toBeNull();
+    expect(moatBox.x).toBeGreaterThanOrEqual(0);
+    expect(moatBox.x + moatBox.width).toBeLessThanOrEqual(375);
+
+    await page.keyboard.press('Escape');
+    await expect(openMoatTooltip).toBeHidden();
+  });
 });
