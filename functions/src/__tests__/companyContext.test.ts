@@ -210,4 +210,30 @@ describe('companyContext (#318 — 10-K & Earnings Call Data Pipeline)', () => {
     expect(newerCheck.latestFilingDates.eightKDate).toBe('2026-07-29');
     expect(htmlFetchCount).toBeGreaterThan(countAfterInit);
   });
+
+  it('safely strips spaced script/style/ix:header end tags and avoids double-unescaping entities', () => {
+    const trickyHtml = `
+      <div>
+        <!-- Hidden comment <p>ignored</p> -->
+        <script type="text/javascript">const x = "1 > 0";</script >
+        <SCRIPT>alert(1)</script\t\n>
+        <style>.hidden { color: red; }</style >
+        <ix:header><ix:hidden>XBRL secret</ix:hidden></ix:header >
+        <p data-note="a > b">Revenue &lt; $5B and Operating Margin &gt; 20% for R&amp;D &quot;core&quot; &apos;v1&#39;.</p>
+        <p>Literal prose: Revenue < $5B and margins > 20%.</p>
+        <p>Double-encoded sequence: &amp;lt;script&amp;gt; and &amp;quot;safe&amp;quot; remain escaped.</p>
+      </div>
+    `;
+
+    const cleaned = cleanFilingHtmlToText(trickyHtml);
+
+    expect(cleaned).not.toContain('alert(1)');
+    expect(cleaned).not.toContain('Hidden comment');
+    expect(cleaned).not.toContain('.hidden');
+    expect(cleaned).not.toContain('XBRL secret');
+    expect(cleaned).not.toContain('data-note');
+    expect(cleaned).toContain(`Revenue < $5B and Operating Margin > 20% for R&D "core" 'v1'.`);
+    expect(cleaned).toContain('Literal prose: Revenue < $5B and margins > 20%.');
+    expect(cleaned).toContain('Double-encoded sequence: &lt;script&gt; and &quot;safe&quot; remain escaped.');
+  });
 });

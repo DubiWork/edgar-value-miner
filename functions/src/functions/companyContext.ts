@@ -145,26 +145,186 @@ export function httpsGetRaw(
   });
 }
 
+const BLOCK_HTML_TAGS = new Set([
+  'p',
+  'div',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'tr',
+  'li',
+  'section',
+  'br',
+]);
+
+const SKIP_CONTENT_TAGS = new Set(['script', 'style', 'ix:header']);
+
+const HTML_ENTITY_MAP: Record<string, string> = {
+  nbsp: ' ',
+  '#160': ' ',
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  '#39': "'",
+  apos: "'",
+};
+
+function isAsciiAlpha(code: number): boolean {
+  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+}
+
+function isTagNameChar(code: number): boolean {
+  return (
+    isAsciiAlpha(code) ||
+    (code >= 48 && code <= 57) || // 0-9
+    code === 58 || // :
+    code === 45 // -
+  );
+}
+
+function isAsciiWhitespace(code: number): boolean {
+  return code === 32 || code === 9 || code === 10 || code === 13 || code === 12;
+}
+
+function findTagEnd(html: string, openIndex: number): number {
+  const len = html.length;
+  const maxScan = Math.min(len, openIndex + 16384);
+  let quote = 0;
+
+  for (let pos = openIndex + 1; pos < maxScan; pos++) {
+    const code = html.charCodeAt(pos);
+    if (quote !== 0) {
+      if (code === quote) {
+        quote = 0;
+      }
+      continue;
+    }
+    if (code === 34 || code === 39) {
+      quote = code;
+    } else if (code === 62) {
+      return pos;
+    }
+  }
+
+  const fallbackEnd = html.indexOf('>', openIndex + 1);
+  return fallbackEnd === -1 ? len : fallbackEnd;
+}
+
+function skipUntilClosingTag(lowerHtml: string, fromIndex: number, tagName: string): number {
+  const needle = `</${tagName}`;
+  let searchFrom = fromIndex;
+
+  while (searchFrom < lowerHtml.length) {
+    const matchIndex = lowerHtml.indexOf(needle, searchFrom);
+    if (matchIndex === -1) {
+      return lowerHtml.length;
+    }
+    const afterNameIndex = matchIndex + needle.length;
+    if (afterNameIndex >= lowerHtml.length) {
+      return lowerHtml.length;
+    }
+    const nextCode = lowerHtml.charCodeAt(afterNameIndex);
+    if (nextCode === 62 || nextCode === 47 || isAsciiWhitespace(nextCode)) {
+      const closeBracket = lowerHtml.indexOf('>', afterNameIndex);
+      return closeBracket === -1 ? lowerHtml.length : closeBracket + 1;
+    }
+    searchFrom = afterNameIndex;
+  }
+
+  return lowerHtml.length;
+}
+
 /**
- * Strips HTML/XBRL tags, scripts, styles, and collapses whitespace into clean prose.
+ * Strips HTML/XBRL tags, scripts, styles, and collapses whitespace into clean prose
+ * using a deterministic single-pass scanner and single-pass entity decoder.
  */
 export function cleanFilingHtmlToText(html: string): string {
   if (!html) return '';
 
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<ix:header[\s\S]*?<\/ix:header>/gi, ' ')
-    .replace(/<\/(p|div|h1|h2|h3|h4|h5|h6|tr|li|section|br)>/gi, '\n')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;|&#160;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
+  const len = html.length;
+  const chunks: string[] = [];
+  let lowerHtml: string | null = null;
+  let i = 0;
+
+  while (i < len) {
+    const ltIndex = html.indexOf('<', i);
+    if (ltIndex === -1) {
+      chunks.push(html.slice(i));
+      break;
+    }
+
+    if (ltIndex > i) {
+      chunks.push(html.slice(i, ltIndex));
+    }
+
+    if (html.startsWith('<!--', ltIndex)) {
+      const commentEnd = html.indexOf('-->', ltIndex + 4);
+      chunks.push(' ');
+      i = commentEnd === -1 ? len : commentEnd + 3;
+      continue;
+    }
+
+    const nextCode = ltIndex + 1 < len ? html.charCodeAt(ltIndex + 1) : 0;
+    const startsTag =
+      isAsciiAlpha(nextCode) ||
+      nextCode === 33 || // !
+      nextCode === 63 || // ?
+      (nextCode === 47 && ltIndex + 2 < len && isAsciiAlpha(html.charCodeAt(ltIndex + 2)));
+
+    if (!startsTag) {
+      chunks.push('<');
+      i = ltIndex + 1;
+      continue;
+    }
+
+    const tagEnd = findTagEnd(html, ltIndex);
+    let cursor = ltIndex + 1;
+    const isClosing = html.charCodeAt(cursor) === 47;
+    if (isClosing) {
+      cursor++;
+    }
+
+    const nameStart = cursor;
+    while (cursor < tagEnd && isTagNameChar(html.charCodeAt(cursor))) {
+      cursor++;
+    }
+    const tagName = html.slice(nameStart, cursor).toLowerCase();
+
+    let scanBack = tagEnd < len ? tagEnd - 1 : len - 1;
+    while (scanBack > ltIndex && isAsciiWhitespace(html.charCodeAt(scanBack))) {
+      scanBack--;
+    }
+    const isSelfClosing = !isClosing && scanBack > ltIndex && html.charCodeAt(scanBack) === 47;
+
+    if (!isClosing && !isSelfClosing && SKIP_CONTENT_TAGS.has(tagName)) {
+      lowerHtml ??= html.toLowerCase();
+      chunks.push(' ');
+      i = tagEnd < len ? skipUntilClosingTag(lowerHtml, tagEnd + 1, tagName) : len;
+      continue;
+    }
+
+    chunks.push(
+      (isClosing && BLOCK_HTML_TAGS.has(tagName)) || (!isClosing && tagName === 'br')
+        ? '\n'
+        : ' '
+    );
+    i = tagEnd < len ? tagEnd + 1 : len;
+  }
+
+  const decoded = chunks.join('').replace(
+    /&(nbsp|#160|amp|lt|gt|quot|#39|apos);/gi,
+    (match, entity: string) => HTML_ENTITY_MAP[entity.toLowerCase()] ?? match
+  );
+
+  return decoded
+    .replace(/\r\n?/g, '\n')
     .replace(/[ \t]+/g, ' ')
-    .replace(/\n\s*\n+/g, '\n\n')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
