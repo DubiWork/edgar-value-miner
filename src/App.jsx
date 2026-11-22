@@ -27,8 +27,11 @@ import { calculateMargins } from './utils/calculateMargins'
 
 function App() {
   const [currentStep, setCurrentStep] = useState(1)
+  const [dismissedAuthError, setDismissedAuthError] = useState(null)
   const { data, loading, error, metadata, searchCompany, clearError } = useCompanySearch()
-  const { user, isAdmin, signInWithGoogle, signOutUser, isFirebaseAvailable } = useAdminAuth()
+  const { user, isAdmin, authError, signInWithGoogle, signOutUser, isFirebaseAvailable } = useAdminAuth()
+
+  const activeAuthError = authError && authError !== dismissedAuthError ? authError : null
 
   // Fetch live stock quote from FMP API when company data is available
   const { data: stockQuote, loading: priceLoading } = useStockQuote(data?.ticker)
@@ -151,6 +154,44 @@ function App() {
           </div>
         </div>
       </header>
+
+      {/* Auth error banner (e.g. Firebase unauthorized-domain on PR preview or popup blocked) */}
+      {activeAuthError && (
+        <div
+          dir="rtl"
+          role="alert"
+          data-testid="auth-error-banner"
+          className="border-b border-rose-500/30 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 text-xs sm:text-sm"
+        >
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-3">
+            <span>
+              {/unauthorized-domain/i.test(activeAuthError) ? (
+                <>
+                  התחברות Google נחסמה בדומיין זה ב-Firebase (יש להוסיף את הדומיין לרשימת ה-Authorized Domains). בינתיים ניתן להתחבר דרך סביבת{' '}
+                  <a
+                    href="https://edgar-value-miner-staging.web.app"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline font-semibold"
+                  >
+                    Staging (edgar-value-miner-staging.web.app)
+                  </a>
+                  .
+                </>
+              ) : (
+                <>שגיאת התחברות: {activeAuthError}</>
+              )}
+            </span>
+            <button
+              type="button"
+              onClick={() => setDismissedAuthError(activeAuthError)}
+              className="px-2 py-0.5 rounded hover:bg-rose-500/15 font-semibold shrink-0 cursor-pointer"
+            >
+              סגור
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

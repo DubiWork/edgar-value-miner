@@ -120,25 +120,22 @@ export function useTickerAutocomplete() {
     const prefixMatches = [];
     const nameMatches = [];
 
+    // Full scan ensures exact/prefix ticker matches later in the alphabet (e.g. BA)
+    // are never skipped when earlier company names contain the query substring.
     for (let i = 0; i < tickerArrayRef.current.length; i++) {
       const entry = tickerArrayRef.current[i];
 
-      // Exact ticker match
       if (entry.ticker === upperQuery) {
         exactMatches.push(entry);
-      }
-      // Ticker prefix match
-      else if (entry.ticker.startsWith(upperQuery)) {
-        prefixMatches.push(entry);
-      }
-      // Company name substring match (case-insensitive)
-      else if ((entry.name || '').toLowerCase().includes(lowerQuery)) {
+      } else if (entry.ticker.startsWith(upperQuery)) {
+        if (prefixMatches.length < MAX_SUGGESTIONS) {
+          prefixMatches.push(entry);
+        }
+      } else if (
+        nameMatches.length < MAX_SUGGESTIONS &&
+        (entry.name || '').toLowerCase().includes(lowerQuery)
+      ) {
         nameMatches.push(entry);
-      }
-
-      // Early exit once we have enough results across all categories
-      if (exactMatches.length + prefixMatches.length + nameMatches.length >= MAX_SUGGESTIONS * 2) {
-        break;
       }
     }
 

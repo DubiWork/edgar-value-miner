@@ -17,7 +17,7 @@ import { functions } from '../../lib/firebase.js';
  * @param {string} prompt - The prompt text requesting a JSON response.
  * @returns {Promise<Object>} Parsed JSON response from the LLM.
  */
-export async function generateJSON(prompt) {
+export async function generateJSON(prompt, _apiKey, options = {}) {
   if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
     throw new Error('Prompt is required');
   }
@@ -27,7 +27,12 @@ export async function generateJSON(prompt) {
   }
 
   const generateAiSummary = httpsCallable(functions, 'generateAiSummary');
-  const response = await generateAiSummary({ prompt: prompt.trim() });
+  const requestPayload = {
+    prompt: prompt.trim(),
+    ...(options?.ticker ? { ticker: options.ticker } : {}),
+    ...(options?.forceRefreshContext ? { forceRefreshContext: true } : {}),
+  };
+  const response = await generateAiSummary(requestPayload);
 
   const payload = response?.data ?? response;
   const rawText = typeof payload === 'string' ? payload : payload?.text;
@@ -42,7 +47,11 @@ export async function generateJSON(prompt) {
     .replace(/\s*```$/i, '')
     .trim();
 
-  return JSON.parse(cleanedText);
+  const parsed = JSON.parse(cleanedText);
+  if (parsed && typeof parsed === 'object' && payload?.ingestionStatus) {
+    parsed._ingestionStatus = payload.ingestionStatus;
+  }
+  return parsed;
 }
 
 export default {
