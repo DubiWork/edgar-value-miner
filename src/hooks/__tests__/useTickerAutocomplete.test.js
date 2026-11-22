@@ -388,4 +388,32 @@ describe('useTickerAutocomplete', () => {
     // But should have found results
     expect(result.current.suggestions.length).toBeGreaterThan(0);
   });
+
+  it('finds exact ticker BA even when 20+ earlier A-prefix companies contain "ba" in their name (Boeing bug)', async () => {
+    const baMap = {};
+    for (let i = 0; i < 20; i++) {
+      const t = `A${String(i).padStart(2, '0')}`;
+      baMap[t] = { cik: 200000 + i, name: `ALIBABA PARTNER ${i} CORP`, ticker: t };
+    }
+    baMap.BA = { cik: 12927, name: 'BOEING CO', ticker: 'BA' };
+
+    fetchCompanyTickers.mockResolvedValue(baMap);
+    const { result } = renderHook(() => useTickerAutocomplete());
+
+    await act(async () => {
+      result.current.loadTickers();
+    });
+
+    act(() => {
+      result.current.setQuery('BA');
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+
+    expect(result.current.suggestions.length).toBeGreaterThan(0);
+    expect(result.current.suggestions[0].ticker).toBe('BA');
+    expect(result.current.suggestions[0].name).toBe('BOEING CO');
+  });
 });

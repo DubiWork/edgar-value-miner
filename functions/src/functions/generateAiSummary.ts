@@ -1,10 +1,17 @@
 import { getApps } from 'firebase-admin/app';
 import { HttpsError } from 'firebase-functions/v2/https';
 import type { CallableRequest, CallableOptions } from 'firebase-functions/v2/https';
+import {
+  getOrFetchCompanyContext,
+  checkAndRefreshCompanyContext,
+  saveManualTranscriptForTicker,
+  buildGroundedContextPromptBlock,
+  type IngestionStatus,
+} from './companyContext';
 
 export const GENERATE_AI_SUMMARY_OPTIONS: CallableOptions = {
-  memory: '256MiB',
-  timeoutSeconds: 60,
+  memory: '512MiB',
+  timeoutSeconds: 120,
 };
 
 export const DEFAULT_VERTEX_MODEL = 'gemini-3.8-flash';
@@ -34,12 +41,30 @@ export interface AiBudgetStatus {
 
 export interface GenerateAiSummaryData {
   prompt?: string;
-  action?: 'getBudgetStatus';
+  ticker?: string;
+  forceRefreshContext?: boolean;
+  action?:
+    | 'getBudgetStatus'
+    | 'getCompanyContextStatus'
+    | 'refreshCompanyContext'
+    | 'saveManualTranscript';
+  clientFilingDates?: {
+    tenKDate?: string | null;
+    eightKDate?: string | null;
+  } | null;
+  manualTranscriptText?: string;
+  manualTranscriptDate?: string;
 }
 
 export interface GenerateAiSummaryResult {
   text: string;
   budget?: AiBudgetStatus;
+  ingestionStatus?: IngestionStatus | null;
+  hasNewerFilings?: boolean;
+  latestFilingDates?: {
+    tenKDate: string | null;
+    eightKDate: string | null;
+  };
 }
 
 interface StoredBudgetRecord {
@@ -183,8 +208,15 @@ export async function generateAiSummaryHandler(
     throw new HttpsError('invalid-argument', 'Request data is required');
   }
 
+  const adminActions = new Set([
+    'getBudgetStatus',
+    'getCompanyContextStatus',
+    'refreshCompanyContext',
+    'saveManualTranscript',
+  ]);
+
   if (
-    data.action !== 'getBudgetStatus' &&
+    (!data.action || !adminActions.has(data.action)) &&
     (!data.prompt || typeof data.prompt !== 'string' || !data.prompt.trim())
   ) {
     throw new HttpsError('invalid-argument', 'prompt is required and must be a non-empty string');
@@ -202,6 +234,55 @@ export async function generateAiSummaryHandler(
     };
   }
 
+  if (data.action === 'getCompanyContextStatus') {
+    if (!data.ticker) {
+      throw new HttpsError('invalid-argument', 'ticker is required for getCompanyContextStatus');
+    }
+    const freshness = await checkAndRefreshCompanyContext(data.ticker, {
+      clientFilingDates: data.clientFilingDates || null,
+    });
+    return {
+      text: '',
+      budget: currentStatus,
+      ingestionStatus: freshness.context?.ingestionStatus || null,
+      hasNewerFilings: freshness.hasNewerFilings,
+      latestFilingDates: freshness.latestFilingDates,
+    };
+  }
+
+  if (data.action === 'refreshCompanyContext') {
+    if (!data.ticker) {
+      throw new HttpsError('invalid-argument', 'ticker is required for refreshCompanyContext');
+    }
+    const refreshedCtx = await getOrFetchCompanyContext(data.ticker, {
+      forceRefresh: true,
+    });
+    return {
+      text: '',
+      budget: currentStatus,
+      ingestionStatus: refreshedCtx.ingestionStatus,
+    };
+  }
+
+  if (data.action === 'saveManualTranscript') {
+    if (!data.ticker || !data.manualTranscriptText) {
+      throw new HttpsError(
+        'invalid-argument',
+        'ticker and manualTranscriptText are required for saveManualTranscript'
+      );
+    }
+    const updatedCtx = await saveManualTranscriptForTicker(
+      data.ticker,
+      data.manualTranscriptText,
+      data.manualTranscriptDate
+    );
+    return {
+      text: '',
+      budget: currentStatus,
+      ingestionStatus: updatedCtx.ingestionStatus,
+    };
+  }
+
   // Automatic Outgoing Call Circuit Breaker when budget is exhausted
   if (currentStatus.status === 'exhausted') {
     const resetDateFormatted = currentStatus.resetsAt.slice(0, 10);
@@ -211,7 +292,20 @@ export async function generateAiSummaryHandler(
     );
   }
 
-  const prompt = (data.prompt ?? '').trim();
+  // If ticker is provided, load or fetch 10-K (Item 1, 1A, 7) + Transcript/8-K context from L2 cache
+  let companyCtx = null;
+  if (data.ticker && typeof data.ticker === 'string' && data.ticker.trim()) {
+    try {
+      companyCtx = await getOrFetchCompanyContext(data.ticker, {
+        forceRefresh: Boolean(data.forceRefreshContext),
+      });
+    } catch {
+      companyCtx = null;
+    }
+  }
+
+  const contextBlock = buildGroundedContextPromptBlock(companyCtx);
+  const prompt = `${(data.prompt ?? '').trim()}${contextBlock}`;
   const project =
     process.env.GCLOUD_PROJECT ||
     process.env.GOOGLE_CLOUD_PROJECT ||
@@ -277,7 +371,12 @@ export async function generateAiSummaryHandler(
       exhaustedReason: hitLimit ? 'budget_limit' : null,
     });
 
-    return { text: generatedText };
+    return {
+      text: generatedText,
+      ...(companyCtx?.ingestionStatus
+        ? { ingestionStatus: companyCtx.ingestionStatus }
+        : {}),
+    };
   } catch (err) {
     if (err instanceof HttpsError) {
       throw err;

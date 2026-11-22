@@ -153,7 +153,8 @@ test.describe('Dashboard smoke tests', () => {
 
     // Step 1 Triage renders first as Gatekeeper
     await expect(page.getByText('Step 1 of 5')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('Business Clarity (Circle of Competence)')).toBeVisible();
+    await expect(page.locator('[data-testid="tear-sheet-blade"]')).toBeVisible();
+    await expect(page.getByText('בהירות עסקית (מעגל הכשירות)')).toBeVisible();
     const continueBtn = page.getByRole('button', {
       name: /I understand how this company makes money - Continue/i,
     });
