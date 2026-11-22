@@ -236,4 +236,14 @@ describe('companyContext (#318 — 10-K & Earnings Call Data Pipeline)', () => {
     expect(cleaned).toContain('Literal prose: Revenue < $5B and margins > 20%.');
     expect(cleaned).toContain('Double-encoded sequence: &lt;script&gt; and &quot;safe&quot; remain escaped.');
   });
+
+  it('preserves prose after self-closing skip tags and drops unclosed trailing scripts', () => {
+    const htmlWithSelfClosing =
+      '<p>Lead summary.</p><script src="bundle.js" /><p>Trailing prose preserved.</p><script>const leaked = true;';
+    const cleaned = cleanFilingHtmlToText(htmlWithSelfClosing);
+
+    expect(cleaned).toContain('Lead summary.');
+    expect(cleaned).toContain('Trailing prose preserved.');
+    expect(cleaned).not.toContain('leaked');
+  });
 });
