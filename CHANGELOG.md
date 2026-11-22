@@ -13,12 +13,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 - Step 1 Triage Gatekeeper UI, Vertex AI `generateAiSummary` Cloud Function, and admin cache/ingestion controls (`PR #316`).
+- Step 1 `10-K`/`8-K` & transcript SEC grounding pipeline with Firestore L2 cache and filing freshness check (`#318`, `PR #320`).
+- Step 1 Generative UI Tear Sheet Blade with Hebrew RTL/LTR toggle, 4-stage Business Flow Infographic, relative-scale peer chips, Industry Jargon Glossary, and Moat rating guardrails (`#319`, `PR #320`).
+- Hebrew Fundamentals Check localization, true `5Y CAGR` & long-span CAGR fix, cyclical sparklines, unambiguous dilution/buyback pace trends, and mobile viewport-safe tooltips (`#322`, `#323`, `PR #320`).
 - Repository governance & release tracking documentation: `ROADMAP.md`, `CHANGELOG.md`, `AGENTS.md`, `.github/pull_request_template.md`, refreshed `README.md`, and synchronized SemVer `1.2.0` (`#337`, part of `#335`).
-- _(Note: PR `#320` changes — `10-K`/`8-K` context pipeline, Generative UI Tear Sheet Blade, Hebrew Fundamentals Check, cyclical sparklines, and mobile tooltips for `#318`, `#319`, `#321`, `#322`, `#323` — are tracked under `#335` and will be recorded here upon merge.)_
 
 ### Changed
 - Standardized package name to `edgar-value-miner` and synchronized `1.2.0` SemVer across root frontend and `functions/` manifests (`#337`).
-- Pinned Playwright E2E workflow runners to `ubuntu-24.04` (`PR #316`).
+- Pinned Playwright E2E workflow runners to `ubuntu-24.04` (`PR #316`) and enabled `CodeQL Advanced` on `develop` (`PR #320`).
+
+### Fixed
+- Tailwind v4 light-mode contrast, short-ticker autocomplete (`BA`), duplicate clear button, and Firebase auth error banner (`#321`, `PR #320`).
+
+### Security
+- Replaced HTML filtering regexes and chained entity unescaping in `companyContext.ts` with a deterministic single-pass HTML scanner and single-pass entity decoder, resolving CodeQL `js/bad-tag-filter` and `js/double-escaping` alerts (`PR #320`).
 
 ---
 

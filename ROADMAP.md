@@ -12,7 +12,7 @@
 | :--- | :--- | :--- | :--- |
 | **`v1.0.0`** | `2026-03-11` | Production (`v1.0.0` tag) | **Phase 1 Foundation:** SEC EDGAR search, Revenue / FCF / Margins charts, Key Metrics, P/E Fair Value panel, local Watchlist, Dark/Light theme. |
 | **`v1.1.0`** | `2026-09-17` | `main` | **Full-History Data Layer:** `40-F` & `IFRS` normalization, tag-shift stitching, currency normalization, `latestFiledDate` freshness, `cacheWriter` Cloud Function (`#248`, `#285`, `#286`), and Phase 1.5 architecture planning (`#287`, `#288`). |
-| **`1.2.0`** | `2026-11-20` *(In Progress)* | `develop` / Staging | **Step 1 Triage & Business Clarity:** Step 1 Triage Gatekeeper (`PR #316`), `10-K`/`8-K` context pipeline & Generative UI Tear Sheet (`#335` / `PR #320` CI green & awaiting merge), repo release governance (`#337`), and Step 1 Stabilization & Discovery (`#335`, `#336`). |
+| **`1.2.0`** | `2026-11-22` *(In Progress)* | `develop` / Staging | **Step 1 Triage & Business Clarity:** Step 1 Triage Gatekeeper (`PR #316`), `10-K`/`8-K` context pipeline & Generative UI Tear Sheet (`#335` / `PR #320` merged to `develop`), repo release governance (`#337` / `PR #338`), and Step 1 Stabilization & Discovery (`#335`, `#336`). |
 
 ---
 
@@ -20,9 +20,9 @@
 
 | Epic | Phase / Track | Scope | Current Status |
 | :--- | :--- | :--- | :--- |
-| **[#335](https://github.com/DubiWork/edgar-value-miner/issues/335)** | Step 1 Triage — Core & Stabilization | `10-K`/`8-K` pipeline & Tear Sheet Blade (`#318`, `#319`, `#321`–`#323` in `PR #320`), release governance (`#337`), SEC 429 prevention (`#324`), mobile portal tooltips (`#327`), cache grounding verification (`#328`), mobile header/search UX (`#330`, `#331`) | **Active** (`PR #320` CI green / ready to merge) |
+| **[#335](https://github.com/DubiWork/edgar-value-miner/issues/335)** | Step 1 Triage — Core & Stabilization | `10-K`/`8-K` pipeline & Tear Sheet Blade (`#318`, `#319`, `#321`–`#323` merged in `PR #320`), release governance (`#337` in `PR #338`), SEC 429 prevention (`#324`), mobile portal tooltips (`#327`), cache grounding verification (`#328`), mobile header/search UX (`#330`, `#331`) | **Active** (`PR #320` merged to Staging; stabilization backlog next) |
 | **[#336](https://github.com/DubiWork/edgar-value-miner/issues/336)** | Step 1 Discovery & UX Polish | Foreign `6-K`/`40-F`/`20-F` filings (`#325`), recent IPO `S-1`/`10-Q` fallback (`#332`), URL state persistence (`#326`), multi-watchlists (`#329`), Circle of Competence Sector Heatmap (`#333`), Landing/Step 1 declutter (`#334`) | **Queued (Next)** |
-| **[#288](https://github.com/DubiWork/edgar-value-miner/issues/288)** (`#310`–`#313`) | Phase 1.5 — Statements Grid | iCharts-style full financial statements grid, React Router split, multi-metric chart drill-down & visual baselines | **Spec & Epic Scaffolded** |
+| **[#288](https://github.com/DubiWork/edgar-value-miner/issues/288)** (`#310`–`#313`) | Phase 1.5 — Statements Grid | iCharts-style full financial statements grid, React Router split, multi-metric chart drill-down, visual baselines & CI pipeline hardening (`#340`) | **Spec & Epic Scaffolded** |
 | **[#143](https://github.com/DubiWork/edgar-value-miner/issues/143)** | Phase 3 — AI Bull vs Bear Debate | Full-stack multi-round Bull vs Bear AI debate UI wired to backend engine with SEC citations | **Planned** |
 
 ---
