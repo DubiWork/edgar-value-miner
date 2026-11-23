@@ -31,22 +31,14 @@ vi.mock('../../services/edgarApi', () => ({
   fetchCompanyTickers: vi.fn(() => Promise.resolve(mockTickerMap)),
 }));
 
-vi.mock('../../utils/inputSanitization', () => ({
-  sanitizeTickerInput: vi.fn((input) => {
-    const str = String(input || '');
-    const sanitized = str.replace(/[^A-Za-z0-9.-]/g, '').slice(0, 10);
-    return { sanitized, isValid: sanitized.length > 0, original: str, warnings: [] };
-  }),
-  sanitizeSearchQuery: vi.fn((input) => {
-    const str = String(input || '').replace(/<[^>]*>/g, '');
-    const sanitized = str
-      .replace(/[^A-Za-z0-9.\-& ]/g, '')
-      .replace(/\s+/g, ' ')
-      .replace(/^\s+/, '')
-      .slice(0, 60);
-    return { sanitized, isValid: sanitized.trim().length > 0, original: String(input || ''), warnings: [] };
-  }),
-}));
+vi.mock('../../utils/inputSanitization', async () => {
+  const actual = await vi.importActual('../../utils/inputSanitization');
+  return {
+    ...actual,
+    sanitizeTickerInput: vi.fn(actual.sanitizeTickerInput),
+    sanitizeSearchQuery: vi.fn(actual.sanitizeSearchQuery),
+  };
+});
 
 // =============================================================================
 // localStorage Mock
