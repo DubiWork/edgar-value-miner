@@ -30,7 +30,7 @@ export function ThemeToggle() {
       onClick={handleToggle}
       aria-label={label}
       title={label}
-      className="inline-flex items-center justify-center w-11 h-11 rounded-lg transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] focus-visible:ring-offset-2"
+      className="inline-flex items-center justify-center w-11 h-11 shrink-0 rounded-lg transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] focus-visible:ring-offset-2"
       style={{
         backgroundColor: 'var(--color-bg-hover)',
         color: 'var(--color-text-secondary)',

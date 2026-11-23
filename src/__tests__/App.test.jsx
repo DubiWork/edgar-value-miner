@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render as rtlRender, screen, fireEvent } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent, within } from '@testing-library/react';
 import App from '../App';
 
 function render(ui, options) {
@@ -753,6 +753,77 @@ describe('App', () => {
 
       expect(screen.getByTestId('dashboard-layout')).toBeTruthy();
       expect(screen.queryByTestId('dashboard-skeleton')).toBeNull();
+    });
+  });
+
+  // ===========================================================================
+  // Mobile Header & Search Modal (#330, #331)
+  // ===========================================================================
+
+  describe('Mobile Header & Search Modal (#330, #331)', () => {
+    it('clicking header logo resets company search and closes mobile search modal', () => {
+      mockHookReturn.data = createMockCompanyData();
+      render(<App />);
+
+      fireEvent.click(screen.getByTestId('mobile-search-trigger'));
+      expect(screen.getByTestId('mobile-search-modal')).toBeTruthy();
+
+      fireEvent.click(screen.getByTestId('header-logo-btn'));
+      expect(mockReset).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId('mobile-search-modal')).toBeNull();
+    });
+
+    it('renders mobile search trigger only when a company is loaded or loading', () => {
+      const { rerender } = render(<App />);
+      expect(screen.queryByTestId('mobile-search-trigger')).toBeNull();
+
+      mockHookReturn.loading = true;
+      rerender(<App />);
+      expect(screen.getByTestId('mobile-search-trigger')).toBeTruthy();
+
+      mockHookReturn.loading = false;
+      mockHookReturn.data = createMockCompanyData();
+      rerender(<App />);
+      expect(screen.getByTestId('mobile-search-trigger')).toBeTruthy();
+    });
+
+    it('opens centered search modal, submits ticker, and auto-closes', () => {
+      mockHookReturn.data = createMockCompanyData();
+      render(<App />);
+
+      fireEvent.click(screen.getByTestId('mobile-search-trigger'));
+      const modal = screen.getByTestId('mobile-search-modal');
+      const modalInput = within(modal).getByTestId('ticker-input-hero');
+
+      fireEvent.change(modalInput, { target: { value: 'MSFT' } });
+      fireEvent.keyDown(modalInput, { key: 'Enter', target: { value: 'MSFT' } });
+
+      expect(mockSearchCompany).toHaveBeenCalledWith('MSFT');
+      expect(screen.queryByTestId('mobile-search-modal')).toBeNull();
+    });
+
+    it('dismisses mobile search modal on close button, backdrop click, and Escape key', () => {
+      mockHookReturn.data = createMockCompanyData();
+      render(<App />);
+
+      // 1. Close button
+      fireEvent.click(screen.getByTestId('mobile-search-trigger'));
+      expect(screen.getByTestId('mobile-search-modal')).toBeTruthy();
+      fireEvent.click(screen.getByTestId('mobile-search-close'));
+      expect(screen.queryByTestId('mobile-search-modal')).toBeNull();
+
+      // 2. Backdrop click (clicking inside modal dialog must not close it)
+      fireEvent.click(screen.getByTestId('mobile-search-trigger'));
+      fireEvent.click(screen.getByTestId('mobile-search-modal'));
+      expect(screen.getByTestId('mobile-search-modal')).toBeTruthy();
+      fireEvent.click(screen.getByTestId('mobile-search-backdrop'));
+      expect(screen.queryByTestId('mobile-search-modal')).toBeNull();
+
+      // 3. Escape key
+      fireEvent.click(screen.getByTestId('mobile-search-trigger'));
+      expect(screen.getByTestId('mobile-search-modal')).toBeTruthy();
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByTestId('mobile-search-modal')).toBeNull();
     });
   });
 });

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
-> Active `1.2.0` release train on `develop` (staged prior to `main` promotion).
+> Active `1.2.1` release train on `develop` (staged prior to `main` promotion).
 
 ### Added
 - Step 1 Triage Gatekeeper UI, Vertex AI `generateAiSummary` Cloud Function, and admin cache/ingestion controls (`PR #316`).
@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Pinned Playwright E2E workflow runners to `ubuntu-24.04` (`PR #316`) and enabled `CodeQL Advanced` on `develop` (`PR #320`).
 
 ### Fixed
+- Responsive single-row mobile header: icon-only clickable logo returning to the Welcome screen, guaranteed in-viewport `ThemeToggle` on `360px`+ phones without horizontal overflow, and a centered Portal `MobileSearchModal` triggered by a magnifying-glass icon on `< 640px` viewports (`#330`, `#331`).
 - Tailwind v4 light-mode contrast, short-ticker autocomplete (`BA`), duplicate clear button, and Firebase auth error banner (`#321`, `PR #320`).
 
 ### Security
