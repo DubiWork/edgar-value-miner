@@ -37,10 +37,10 @@ test.describe('Step 1 Triage Feature E2E (#310)', () => {
     // Toggling EN translates both Tear Sheet and Section 2 cleanly
     await page.locator('[data-testid="lang-btn-en"]').click();
     await expect(page.getByText('Instant Fundamentals Check')).toBeVisible();
-    await expect(page.getByText('Revenue Growth')).toBeVisible();
-    await expect(page.getByText('Operating Margins')).toBeVisible();
-    await expect(page.getByText('Share Dilution')).toBeVisible();
-    await expect(page.getByText('Current Ratio (Liquidity)')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Revenue Growth' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Operating Margins' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Share Dilution' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Current Ratio (Liquidity)' })).toBeVisible();
 
     // Section 3: Gatekeeper CTA transitions to Step 2 Dashboard
     const continueBtn = page.getByRole('button', {
