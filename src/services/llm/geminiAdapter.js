@@ -30,6 +30,7 @@ export async function generateJSON(prompt, _apiKey, options = {}) {
   const requestPayload = {
     prompt: prompt.trim(),
     ...(options?.ticker ? { ticker: options.ticker } : {}),
+    ...(options?.cik ? { cik: options.cik } : {}),
     ...(options?.forceRefreshContext ? { forceRefreshContext: true } : {}),
   };
   const response = await generateAiSummary(requestPayload);

@@ -23,6 +23,7 @@ import {
   getCachedSummary,
   setCachedSummary,
   invalidateCachedSummary,
+  getCompanyContextStatus,
   normalizeMoat,
   normalizeBusinessInfographic,
   normalizeCompetitors,
@@ -99,18 +100,39 @@ describe('aiSummaryService', () => {
     expect(result.keyEngines).toEqual(['Engine 1', 'Engine 2']);
   });
 
-  it('returns dynamic mock for marquee tickers (MSFT, AAPL, etc.) when Cloud Function rejects', async () => {
+  it('returns dynamic mock when Cloud Function rejects without poisoning IndexedDB cache (#328)', async () => {
+    await invalidateCachedSummary('AAPL');
     mockHttpsCallable.mockReturnValue(() => Promise.reject(new Error('Offline')));
 
     const result = await getOrFetchCompanySummary('AAPL');
 
     expect(result.ticker).toBe('AAPL');
     expect(result.summary).toContain('אפל');
+    expect(result.source).toBe('mock-preset');
     expect(result.keyEngines.length).toBeGreaterThanOrEqual(3);
 
-    // Since it was cached during first call, second call is immediate
+    // Ungrounded mock fallback MUST NOT be saved into IndexedDB cache (#328)
+    expect(await getCachedSummary('AAPL')).toBeNull();
+
+    // Next call retries Cloud Function instead of serving stale mock from cache
+    const liveCallable = vi.fn().mockResolvedValueOnce({
+      data: {
+        text: JSON.stringify({
+          summary: 'תקציר מאומת מ-SEC עבור אפל',
+          keyEngines: ['iPhone', 'Services'],
+        }),
+        ingestionStatus: {
+          tenK: { status: 'ok', date: '2026-10-30' },
+          eightK: { status: 'ok', date: '2026-11-01' },
+          transcript: { status: 'fallback_8k' },
+        },
+      },
+    });
+    mockHttpsCallable.mockReturnValueOnce(liveCallable);
+
     const secondCall = await getOrFetchCompanySummary('AAPL');
-    expect(secondCall.source).toBe('cache');
+    expect(secondCall.source).toBe('ai-live');
+    expect(secondCall.summary).toBe('תקציר מאומת מ-SEC עבור אפל');
   }, 10000);
 
   it('generates dynamic mock containing ticker name for any custom ticker', async () => {
@@ -344,5 +366,84 @@ describe('aiSummaryService', () => {
       'he'
     );
     expect(terms).toEqual([{ term: 'MRO', definition: 'תחזוקה, תיקון ושיפוץ כלי טיס' }]);
+  });
+
+  it('forwards numeric CIK from options/companyProfile and exposes _contextMissing on null server context (#324, #328)', async () => {
+    const adapterCallable = vi.fn().mockResolvedValueOnce({
+      data: {
+        text: '{"summary":"Shopify summary","keyEngines":["Merchant Solutions"]}',
+        ingestionStatus: {
+          tenK: { status: 'ok', date: '2026-02-11' },
+          eightK: { status: 'ok', date: '2026-11-03' },
+          transcript: { status: 'fallback_8k' },
+        },
+      },
+    });
+    mockHttpsCallable.mockReturnValueOnce(adapterCallable);
+
+    const adapterParsed = await geminiAdapter.generateJSON('Summarize SHOP', undefined, {
+      ticker: 'SHOP',
+      cik: 1594805,
+    });
+    expect(adapterCallable).toHaveBeenCalledWith({
+      prompt: 'Summarize SHOP',
+      ticker: 'SHOP',
+      cik: 1594805,
+    });
+    expect(adapterParsed._ingestionStatus?.tenK?.status).toBe('ok');
+
+    await invalidateCachedSummary('SHOP');
+    const summaryCallable = vi.fn().mockResolvedValueOnce({
+      data: {
+        text: JSON.stringify({
+          summary: 'שופיפיי מספקת תשתית מסחר',
+          keyEngines: ['Subscription Solutions', 'Merchant Solutions'],
+        }),
+        ingestionStatus: {
+          tenK: { status: 'ok', date: '2026-02-11' },
+          eightK: { status: 'ok', date: '2026-11-03' },
+          transcript: { status: 'fallback_8k' },
+        },
+      },
+    });
+    mockHttpsCallable.mockReturnValueOnce(summaryCallable);
+
+    const liveShop = await getOrFetchCompanySummary('SHOP', {
+      name: 'Shopify Inc.',
+      cik: '0001594805',
+    });
+    expect(summaryCallable).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ticker: 'SHOP',
+        cik: 1594805,
+      })
+    );
+    expect(liveShop.source).toBe('ai-live');
+
+    // getCompanyContextStatus returns _contextMissing: true when server has no Firestore doc yet (e.g. MA)
+    const missingCtxCallable = vi.fn().mockResolvedValueOnce({
+      data: {
+        text: '',
+        budget: { status: 'active' },
+        ingestionStatus: null,
+        hasNewerFilings: false,
+        latestFilingDates: { tenKDate: null, eightKDate: null },
+      },
+    });
+    mockHttpsCallable.mockReturnValueOnce(missingCtxCallable);
+
+    const status = await getCompanyContextStatus('MA', null, { cik: '0001141391' });
+    expect(missingCtxCallable).toHaveBeenCalledWith({
+      action: 'getCompanyContextStatus',
+      ticker: 'MA',
+      cik: 1141391,
+    });
+    expect(status?._serverReachable).toBe(true);
+    expect(status?._contextMissing).toBe(true);
+    expect(status?.budgetStatus).toBe('active');
+
+    // Returns null only when server call itself fails
+    mockHttpsCallable.mockReturnValueOnce(() => Promise.reject(new Error('Network down')));
+    expect(await getCompanyContextStatus('MA')).toBeNull();
   });
 });

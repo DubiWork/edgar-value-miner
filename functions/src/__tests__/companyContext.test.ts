@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { EventEmitter } from 'events';
 import {
   cleanFilingHtmlToText,
   extract10KSections,
@@ -7,7 +8,11 @@ import {
   checkAndRefreshCompanyContext,
   saveManualTranscriptForTicker,
   buildGroundedContextPromptBlock,
+  resolveTickerFromSec,
+  parseRetryAfterMs,
+  httpsGetRaw,
   resetInMemoryContextForTesting,
+  clearTickersCacheForTesting,
 } from '../functions/companyContext';
 
 describe('companyContext (#318 — 10-K & Earnings Call Data Pipeline)', () => {
@@ -245,5 +250,190 @@ describe('companyContext (#318 — 10-K & Earnings Call Data Pipeline)', () => {
     expect(cleaned).toContain('Lead summary.');
     expect(cleaned).toContain('Trailing prose preserved.');
     expect(cleaned).not.toContain('leaked');
+  });
+
+  it('skips SEC company_tickers.json when known CIK is provided (e.g. SHOP) and adopts entity name from submissions (#324)', async () => {
+    const padding = 'Merchant commerce platform and subscription solutions. '.repeat(25);
+    const mockFetcher = vi.fn(async (url: string) => {
+      if (url.includes('company_tickers.json')) {
+        throw new Error('HTTP 429 when fetching company_tickers.json (should not be called!)');
+      }
+      if (url.includes('submissions/CIK0001594805.json')) {
+        return JSON.stringify({
+          name: 'SHOPIFY INC.',
+          filings: {
+            recent: {
+              form: ['8-K', '10-K'],
+              accessionNumber: ['0001594805-26-000012', '0001594805-26-000004'],
+              filingDate: ['2026-11-03', '2026-02-11'],
+              primaryDocument: ['shop-20261103.htm', 'shop-20251231.htm'],
+              items: ['2.02', ''],
+            },
+          },
+        });
+      }
+      if (url.includes('shop-20251231.htm')) {
+        return `<p>ITEM 1. BUSINESS</p><p>Shopify empowers independent merchants globally. ${padding}</p>`;
+      }
+      if (url.includes('shop-20261103.htm')) {
+        return `<p>Q3 revenue grew 26% YoY. ${padding}</p>`;
+      }
+      throw new Error(`404 Not Found: ${url}`);
+    });
+
+    const ctx = await getOrFetchCompanyContext('SHOP', {
+      cik: '0001594805',
+      fetcher: mockFetcher,
+    });
+
+    expect(ctx.cik).toBe(1594805);
+    expect(ctx.companyName).toBe('SHOPIFY INC.');
+    expect(ctx.ingestionStatus.tenK.status).toBe('ok');
+    expect(ctx.ingestionStatus.eightK.status).toBe('ok');
+    expect(
+      mockFetcher.mock.calls.some(([calledUrl]) => String(calledUrl).includes('company_tickers.json'))
+    ).toBe(false);
+  });
+
+  it('caches parsed SEC company_tickers.json in memory for 24h (#324)', async () => {
+    clearTickersCacheForTesting();
+    const mockFetcher = vi.fn(async () =>
+      JSON.stringify({
+        '0': { cik_str: 1594805, ticker: 'SHOP', title: 'SHOPIFY INC.' },
+        '1': { cik_str: 789019, ticker: 'MSFT', title: 'MICROSOFT CORP' },
+      })
+    );
+
+    const t0 = 1_700_000_000_000;
+    const first = await resolveTickerFromSec('SHOP', mockFetcher, { nowMs: t0 });
+    const second = await resolveTickerFromSec('MSFT', mockFetcher, { nowMs: t0 + 60_000 });
+
+    expect(first).toEqual({ cik: 1594805, companyName: 'SHOPIFY INC.' });
+    expect(second).toEqual({ cik: 789019, companyName: 'MICROSOFT CORP' });
+    expect(mockFetcher).toHaveBeenCalledTimes(1);
+
+    // After 25h (> 24h TTL), refreshes directory once
+    await resolveTickerFromSec('SHOP', mockFetcher, { nowMs: t0 + 25 * 60 * 60 * 1000 });
+    expect(mockFetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries transient HTTP 429/503 with Retry-After or backoff and does not retry 404 (#324)', async () => {
+    expect(parseRetryAfterMs('2', 0, 5_000)).toBe(2_000);
+    expect(parseRetryAfterMs('30', 0, 5_000)).toBe(5_000);
+    expect(parseRetryAfterMs(undefined)).toBeNull();
+
+    const makeMockHttpsGet = (responses: Array<{ statusCode: number; headers?: Record<string, string>; body?: string }>) => {
+      let idx = 0;
+      return vi.fn((_url: any, _opts: any, cb: any) => {
+        const spec = responses[idx++] || responses[responses.length - 1];
+        const req = new EventEmitter() as any;
+        req.destroy = vi.fn();
+
+        const res = new EventEmitter() as any;
+        res.statusCode = spec.statusCode;
+        res.headers = spec.headers || {};
+        res.resume = vi.fn();
+
+        queueMicrotask(() => {
+          cb(res);
+          if (spec.statusCode === 200) {
+            if (spec.body) {
+              res.emit('data', Buffer.from(spec.body, 'utf-8'));
+            }
+            res.emit('end');
+          }
+        });
+
+        return req;
+      });
+    };
+
+    const sleepMock = vi.fn().mockResolvedValue(undefined);
+    const get429ThenOk = makeMockHttpsGet([
+      { statusCode: 429, headers: { 'retry-after': '2' } },
+      { statusCode: 503 },
+      { statusCode: 200, body: '{"ok":true}' },
+    ]);
+
+    const body = await httpsGetRaw('https://www.sec.gov/files/company_tickers.json', {}, {
+      requestFn: get429ThenOk as any,
+      sleep: sleepMock,
+      baseDelayMs: 200,
+    });
+    expect(body).toBe('{"ok":true}');
+    expect(get429ThenOk).toHaveBeenCalledTimes(3);
+    expect(sleepMock).toHaveBeenNthCalledWith(1, 2_000);
+    expect(sleepMock).toHaveBeenNthCalledWith(2, 400);
+
+    // 404 fails fast with zero retries
+    const sleep404 = vi.fn().mockResolvedValue(undefined);
+    const get404 = makeMockHttpsGet([{ statusCode: 404 }]);
+    await expect(
+      httpsGetRaw('https://data.sec.gov/missing.json', {}, {
+        requestFn: get404 as any,
+        sleep: sleep404,
+      })
+    ).rejects.toThrow(/HTTP 404/);
+    expect(get404).toHaveBeenCalledTimes(1);
+    expect(sleep404).not.toHaveBeenCalled();
+
+    // Exhausted 429 retries reject cleanly after maxRetries attempts
+    const sleepExhausted = vi.fn().mockResolvedValue(undefined);
+    const getAlways429 = makeMockHttpsGet([{ statusCode: 429 }]);
+    await expect(
+      httpsGetRaw('https://www.sec.gov/files/company_tickers.json', {}, {
+        requestFn: getAlways429 as any,
+        sleep: sleepExhausted,
+        maxRetries: 2,
+        baseDelayMs: 50,
+      })
+    ).rejects.toThrow(/HTTP 429/);
+    expect(getAlways429).toHaveBeenCalledTimes(3);
+    expect(sleepExhausted).toHaveBeenCalledTimes(2);
+  });
+
+  it('reuses explicit CIK when recovering an incomplete cik:0 context in checkAndRefreshCompanyContext (#324)', async () => {
+    const padding = 'Payment network processing global card transactions. '.repeat(25);
+    // Simulate a failed earlier lookup that saved cik: 0 without overwriting later recovery
+    const failingFetcher = vi.fn().mockRejectedValue(new Error('HTTP 429 when fetching company_tickers.json'));
+    const failed = await getOrFetchCompanyContext('MA', { fetcher: failingFetcher });
+    expect(failed.cik).toBe(0);
+    expect(failed.ingestionStatus.tenK.status).toBe('error');
+
+    const recoverFetcher = vi.fn(async (url: string) => {
+      if (url.includes('company_tickers.json')) {
+        throw new Error('Should reuse passed cik instead of fetching company_tickers.json');
+      }
+      if (url.includes('submissions/CIK0001141391.json')) {
+        return JSON.stringify({
+          name: 'MASTERCARD INC',
+          filings: {
+            recent: {
+              form: ['8-K', '10-K'],
+              accessionNumber: ['0001141391-26-000010', '0001141391-26-000002'],
+              filingDate: ['2026-10-30', '2026-02-12'],
+              primaryDocument: ['ma-8k.htm', 'ma-10k.htm'],
+              items: ['2.02', ''],
+            },
+          },
+        });
+      }
+      if (url.includes('ma-10k.htm')) {
+        return `<p>ITEM 1. BUSINESS</p><p>Mastercard connects consumers and banks worldwide. ${padding}</p>`;
+      }
+      if (url.includes('ma-8k.htm')) {
+        return `<p>Mastercard Q3 earnings grew 14% YoY. ${padding}</p>`;
+      }
+      throw new Error(`404: ${url}`);
+    });
+
+    const recovered = await checkAndRefreshCompanyContext('MA', {
+      cik: '0001141391',
+      fetcher: recoverFetcher,
+    });
+    expect(recovered.refreshed).toBe(true);
+    expect(recovered.context?.cik).toBe(1141391);
+    expect(recovered.context?.ingestionStatus.tenK.status).toBe('ok');
+    expect(recovered.context?.ingestionStatus.eightK.status).toBe('ok');
   });
 });

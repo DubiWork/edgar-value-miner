@@ -1422,10 +1422,24 @@ function generateDynamicMock(ticker, companyProfile) {
 // LLM API Caller (via Factory/Adapter Pattern)
 // =============================================================================
 
+function normalizeCikNumber(cik) {
+  if (typeof cik === 'number') {
+    return Number.isInteger(cik) && cik > 0 ? cik : null;
+  }
+  if (typeof cik === 'string') {
+    const trimmed = cik.trim();
+    if (!/^\d{1,10}$/.test(trimmed)) return null;
+    const parsed = Number(trimmed);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  }
+  return null;
+}
+
 async function callLlmApi(ticker, companyProfile, apiKey, options = {}) {
   const normTicker = ticker.toUpperCase().trim();
   const companyName = companyProfile?.name || companyProfile?.companyName || normTicker;
   const sector = companyProfile?.sector || '';
+  const cik = normalizeCikNumber(options?.cik ?? companyProfile?.cik);
 
   const promptText = `אתה אנליסט השקעות ערך בכיר. קרא בעיון את נתוני דוח ה-10-K (Item 1, Item 1A, Item 7) ושיחת הוועידה המצורפים עבור ${companyName} (${normTicker}${sector ? `, סקטור: ${sector}` : ''}).
 בנה JSON מובנה עבור כרטיס סיכום ויזואלי ("Tear Sheet" / Blade) שמאפשר למשקיע להבין את העסק ב-30 שניות ללא "קיר של טקסט".
@@ -1519,6 +1533,7 @@ async function callLlmApi(ticker, companyProfile, apiKey, options = {}) {
   const provider = llmFactory.getProvider();
   const parsed = await provider.generateJSON(promptText, apiKey, {
     ticker: normTicker,
+    ...(cik ? { cik } : {}),
     forceRefreshContext: Boolean(options?.forceRefresh),
   });
 
@@ -1761,24 +1776,50 @@ export async function getAiBudgetStatus() {
 /**
  * Fetches the 10-K / Transcript / 8-K ingestion status for a ticker from Firestore via Cloud Function,
  * optionally validating cached filing dates cleanly without redundant SEC/LLM calls.
+ * When the server responds cleanly with `ingestionStatus: null` (e.g., first-time uningested ticker),
+ * returns structured missing-context metadata (`_serverReachable: true`, `_contextMissing: true`)
+ * instead of `null` so callers can trigger automatic SEC grounding upgrades while returning `null`
+ * only when the server is unreachable.
  * @param {string} ticker
  * @param {{ tenKDate?: string|null, eightKDate?: string|null }|null} [clientFilingDates]
+ * @param {{ cik?: number|string|null }} [options]
  * @returns {Promise<Object|null>}
  */
-export async function getCompanyContextStatus(ticker, clientFilingDates = null) {
+export async function getCompanyContextStatus(ticker, clientFilingDates = null, options = {}) {
   try {
     const functions = firebaseLib.functions;
     if (!functions || !ticker) return null;
+    const cik = normalizeCikNumber(options?.cik);
     const callable = httpsCallable(functions, 'generateAiSummary');
     const response = await callable({
       action: 'getCompanyContextStatus',
       ticker: ticker.toUpperCase().trim(),
+      ...(cik ? { cik } : {}),
       ...(clientFilingDates ? { clientFilingDates } : {}),
     });
     const payload = response?.data ?? response;
-    if (!payload?.ingestionStatus) return null;
+    if (!payload || typeof payload !== 'object') return null;
+    const budgetStatus = payload?.budget?.status || 'active';
+
+    if (!payload?.ingestionStatus) {
+      return {
+        tenK: { status: 'missing', error: 'Not fetched yet' },
+        transcript: { status: 'missing', error: 'Not fetched yet' },
+        eightK: { status: 'missing', error: 'Not fetched yet' },
+        lastFetched: null,
+        _serverReachable: true,
+        _contextMissing: true,
+        budgetStatus,
+        hasNewerFilings: false,
+        latestFilingDates: payload?.latestFilingDates || { tenKDate: null, eightKDate: null },
+      };
+    }
+
     return {
       ...payload.ingestionStatus,
+      _serverReachable: true,
+      _contextMissing: false,
+      budgetStatus,
       ...(typeof payload.hasNewerFilings === 'boolean'
         ? { hasNewerFilings: payload.hasNewerFilings }
         : {}),
@@ -1792,16 +1833,19 @@ export async function getCompanyContextStatus(ticker, clientFilingDates = null) 
 /**
  * Forces a fresh server-side download & extraction of the 10-K + Transcript / 8-K for a ticker.
  * @param {string} ticker
+ * @param {{ cik?: number|string|null }} [options]
  * @returns {Promise<Object|null>}
  */
-export async function refreshCompanyContext(ticker) {
+export async function refreshCompanyContext(ticker, options = {}) {
   try {
     const functions = firebaseLib.functions;
     if (!functions || !ticker) return null;
+    const cik = normalizeCikNumber(options?.cik);
     const callable = httpsCallable(functions, 'generateAiSummary');
     const response = await callable({
       action: 'refreshCompanyContext',
       ticker: ticker.toUpperCase().trim(),
+      ...(cik ? { cik } : {}),
     });
     const payload = response?.data ?? response;
     return payload?.ingestionStatus || null;
@@ -1839,6 +1883,7 @@ export async function getOrFetchCompanySummary(ticker, companyProfile = {}, opti
   const normTicker = ticker.toUpperCase().trim();
   const apiKey = getConfiguredApiKey();
   const forceRefresh = options?.forceRefresh === true;
+  const cik = normalizeCikNumber(options?.cik ?? companyProfile?.cik);
 
   let existingCached = null;
   try {
@@ -1870,6 +1915,7 @@ export async function getOrFetchCompanySummary(ticker, companyProfile = {}, opti
     try {
       const liveResult = await callLlmApi(normTicker, companyProfile, apiKey, {
         forceRefresh,
+        ...(cik ? { cik } : {}),
       });
       await setCachedSummary(normTicker, liveResult);
       return liveResult;
@@ -1910,12 +1956,8 @@ export async function getOrFetchCompanySummary(ticker, companyProfile = {}, opti
     ...(budgetExhausted ? { budgetExhausted: true } : {}),
   };
 
-  try {
-    await setCachedSummary(normTicker, mockResult);
-  } catch {
-    // Ignore cache write errors
-  }
-
+  // Never persist ungrounded mock fallback summaries into IndexedDB so repeat visits
+  // always retry live SEC + Vertex AI grounding rather than caching stale demo copy (#328).
   return mockResult;
 }
 

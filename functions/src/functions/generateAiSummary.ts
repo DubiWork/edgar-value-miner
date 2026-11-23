@@ -42,6 +42,7 @@ export interface AiBudgetStatus {
 export interface GenerateAiSummaryData {
   prompt?: string;
   ticker?: string;
+  cik?: number | string | null;
   forceRefreshContext?: boolean;
   action?:
     | 'getBudgetStatus'
@@ -240,6 +241,7 @@ export async function generateAiSummaryHandler(
     }
     const freshness = await checkAndRefreshCompanyContext(data.ticker, {
       clientFilingDates: data.clientFilingDates || null,
+      cik: data.cik,
     });
     return {
       text: '',
@@ -256,6 +258,7 @@ export async function generateAiSummaryHandler(
     }
     const refreshedCtx = await getOrFetchCompanyContext(data.ticker, {
       forceRefresh: true,
+      cik: data.cik,
     });
     return {
       text: '',
@@ -298,6 +301,7 @@ export async function generateAiSummaryHandler(
     try {
       companyCtx = await getOrFetchCompanyContext(data.ticker, {
         forceRefresh: Boolean(data.forceRefreshContext),
+        cik: data.cik,
       });
     } catch {
       companyCtx = null;
