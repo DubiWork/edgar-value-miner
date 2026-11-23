@@ -33,7 +33,7 @@ const DEFAULT_MSFT_TRIAGE = {
     detail: 'צמיחה עקבית של ~14% בשנה',
     detailEn: 'Consistent ~14% annual revenue growth',
     metricSummary: '5Y CAGR ~14.2% · 9Y ~11.3%',
-    metricSummaryHe: 'CAGR 5 ש׳: ~14% · 9 ש׳: ~11%',
+    metricSummaryHe: 'צמיחה שנתית (CAGR) · 5 ש׳: ~14% · 9 ש׳: ~11%',
     sparklineUnit: '$M',
     historyMeta: {
       startYear: 2015,
@@ -153,8 +153,8 @@ const DEFAULT_MSFT_TRIAGE = {
     targetHe: 'תנאי למעבר: מעל 1.0',
     latestValue: 1.24,
     badge: 'Safe (> 1.0)',
-    badgeHe: 'בטוח (> 1.0)',
-    detail: 'Current Ratio תקין > 1',
+    badgeHe: 'בטוח (מעל 1.0)',
+    detail: 'יחס שוטף תקין (מעל 1.0)',
     detailEn: 'Healthy Current Ratio > 1.0',
     metricSummary: 'Solid liquidity, low solvency risk',
     metricSummaryHe: 'נכסים שוטפים עולים על התחייבויות (טווח 1.2x–2.9x)',
@@ -411,14 +411,14 @@ function calculateRevenueMetric(metrics) {
       ? isCyclical
         ? `צמיחה של ${yoy >= 0 ? '+' : ''}${Math.round(yoy)}% בשנה לצד מחזוריות (${historyMeta.downYears} ש׳ ירידה)`
         : `צמיחה עקבית של ~${Math.abs(Math.round(yoy || cagr))}% בשנה`
-      : `ירידה בהכנסות (${Math.round(yoy)}% YoY)`,
+      : `ירידה בהכנסות של ${Math.round(yoy)}% בשנה`,
     detailEn: isPass
       ? isCyclical
         ? `${formattedGrowth} top-line with cyclical dips (${historyMeta.downYears} down yrs)`
         : `Consistent ~${Math.abs(Math.round(yoy || cagr))}% annual revenue growth`
       : `Revenue declined ${Math.round(yoy)}% YoY`,
     metricSummary: `${yearsDiff > 0 ? `${yearsDiff}Y` : 'Latest'} CAGR ~${Math.round(cagr)}%${longEn}`,
-    metricSummaryHe: `CAGR ${yearsDiff > 0 ? `${yearsDiff} ש׳` : 'אחרון'}: ~${Math.round(cagr)}%${longHe}`,
+    metricSummaryHe: `צמיחה שנתית (CAGR) · ${yearsDiff > 0 ? `${yearsDiff} ש׳` : 'אחרון'}: ~${Math.round(cagr)}%${longHe}`,
     sparklineUnit: '$M',
     historyMeta,
     status: isPass ? 'pass' : 'fail',
@@ -735,7 +735,7 @@ function calculateShareDilutionMetric(metrics) {
   const annualFmt = `${annualChangePct >= 0 ? '+' : ''}${annualChangePct.toFixed(1)}%`;
   const spendNoteHe = latestBuybackUsd
     ? ` · רכישות אשתקד: ${formatCompactUsd(latestBuybackUsd)}${
-        buybackCagrPct !== null ? ` (CAGR ${buybackCagrPct >= 0 ? '+' : ''}${Math.round(buybackCagrPct)}%)` : ''
+        buybackCagrPct !== null ? ` (קצב שנתי ${buybackCagrPct >= 0 ? '+' : ''}${Math.round(buybackCagrPct)}%)` : ''
       }`
     : '';
   const spendNoteEn = latestBuybackUsd
@@ -867,9 +867,9 @@ function calculateCurrentRatioMetric(metrics) {
     targetHe: 'תנאי למעבר: מעל 1.0',
     latestValue: latest.value,
     badge: isPass ? 'Safe (> 1.0)' : 'At Risk (< 1.0)',
-    badgeHe: isPass ? 'בטוח (> 1.0)' : 'סיכון (< 1.0)',
+    badgeHe: isPass ? 'בטוח (מעל 1.0)' : 'סיכון (מתחת ל-1.0)',
     detail: isPass
-      ? 'Current Ratio תקין > 1'
+      ? 'יחס שוטף תקין (מעל 1.0)'
       : `יחס שוטף נמוך מ-1.0 (${latest.value.toFixed(2)}x)`,
     detailEn: isPass
       ? `Healthy liquidity (${latest.value.toFixed(2)}x > 1.0)`

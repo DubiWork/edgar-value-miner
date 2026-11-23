@@ -37,10 +37,10 @@ test.describe('Step 1 Triage Feature E2E (#310)', () => {
     // Toggling EN translates both Tear Sheet and Section 2 cleanly
     await page.locator('[data-testid="lang-btn-en"]').click();
     await expect(page.getByText('Instant Fundamentals Check')).toBeVisible();
-    await expect(page.getByText('Revenue Growth')).toBeVisible();
-    await expect(page.getByText('Operating Margins')).toBeVisible();
-    await expect(page.getByText('Share Dilution')).toBeVisible();
-    await expect(page.getByText('Current Ratio (Liquidity)')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Revenue Growth' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Operating Margins' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Share Dilution' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Current Ratio (Liquidity)' })).toBeVisible();
 
     // Section 3: Gatekeeper CTA transitions to Step 2 Dashboard
     const continueBtn = page.getByRole('button', {
@@ -57,7 +57,7 @@ test.describe('Step 1 Triage Feature E2E (#310)', () => {
     ).toBeVisible();
   });
 
-  test('renders mobile-safe Step 1 Triage tooltips within 375px phone viewport without horizontal overflow', async ({
+  test('renders Portal mobile & tablet tooltips within 375px phone and 768px tablet viewports without clipping or overflow (#327)', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 375, height: 812 });
@@ -71,36 +71,47 @@ test.describe('Step 1 Triage Feature E2E (#310)', () => {
       timeout: 15_000,
     });
 
-    const horizontalOverflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - window.innerWidth,
-    );
-    expect(horizontalOverflow).toBeLessThanOrEqual(1);
+    for (const vp of [
+      { width: 375, height: 812 },
+      { width: 768, height: 1024 },
+    ]) {
+      await page.setViewportSize(vp);
 
-    // Tap first Educational rationale button -> tooltip must fit inside 375px width
-    const infoBtn = page.locator('button[aria-label="Educational rationale"]').first();
-    await infoBtn.click();
-    const openInfoTooltip = infoBtn.locator('..').locator('[role="tooltip"]');
-    await expect(openInfoTooltip).toBeVisible();
-    const infoBox = await openInfoTooltip.boundingBox();
-    expect(infoBox).not.toBeNull();
-    expect(infoBox.x).toBeGreaterThanOrEqual(0);
-    expect(infoBox.x + infoBox.width).toBeLessThanOrEqual(375);
+      const horizontalOverflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - window.innerWidth,
+      );
+      expect(horizontalOverflow).toBeLessThanOrEqual(1);
 
-    await page.locator('button[aria-label="סגור הסבר"]').click();
-    await expect(openInfoTooltip).toBeHidden();
+      const sheet = page.locator('[data-testid="tooltip-portal-sheet"]');
+      const backdrop = page.locator('[data-testid="tooltip-portal-backdrop"]');
 
-    // Tap moat badge -> tooltip must also fit cleanly within 375px viewport
-    const moatBadge = page.locator('[data-testid="moat-summary-badge"]');
-    await moatBadge.click();
-    const openMoatTooltip = moatBadge.locator('..').locator('[role="tooltip"]');
-    await expect(openMoatTooltip).toBeVisible();
-    const moatBox = await openMoatTooltip.boundingBox();
-    expect(moatBox).not.toBeNull();
-    expect(moatBox.x).toBeGreaterThanOrEqual(0);
-    expect(moatBox.x + moatBox.width).toBeLessThanOrEqual(375);
+      // 1. Tap first Educational rationale button -> Portal sheet fits cleanly inside viewport bounds
+      const infoBtn = page.locator('button[aria-label="Educational rationale"]').first();
+      await infoBtn.click();
+      await expect(sheet).toBeVisible();
+      const sheetBox = await sheet.boundingBox();
+      expect(sheetBox).not.toBeNull();
+      expect(sheetBox.x).toBeGreaterThanOrEqual(0);
+      expect(sheetBox.y).toBeGreaterThanOrEqual(0);
+      expect(sheetBox.x + sheetBox.width).toBeLessThanOrEqual(vp.width);
+      expect(sheetBox.y + sheetBox.height).toBeLessThanOrEqual(vp.height);
 
-    await page.keyboard.press('Escape');
-    await expect(openMoatTooltip).toBeHidden();
+      // 2. Dismiss via close button
+      await sheet.locator('button[aria-label="סגור הסבר"]').click();
+      await expect(sheet).toBeHidden();
+
+      // 3. Re-open and dismiss via backdrop tap
+      await infoBtn.click();
+      await expect(sheet).toBeVisible();
+      await backdrop.click({ position: { x: 10, y: 10 } });
+      await expect(sheet).toBeHidden();
+
+      // 4. Re-open and dismiss via Escape
+      await infoBtn.click();
+      await expect(sheet).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(sheet).toBeHidden();
+    }
   });
 
   test('renders single-row mobile header with ThemeToggle in bounds, search modal, and home logo reset on 360px phones', async ({
@@ -137,6 +148,14 @@ test.describe('Step 1 Triage Feature E2E (#310)', () => {
       expect(box).not.toBeNull();
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(360);
+    }
+
+    const signInBtn = page.locator('[data-testid="header-signin-btn"]');
+    if ((await signInBtn.count()) > 0 && (await signInBtn.isVisible())) {
+      const signInBox = await signInBtn.boundingBox();
+      expect(signInBox).not.toBeNull();
+      expect(signInBox.x).toBeGreaterThanOrEqual(0);
+      expect(signInBox.x + signInBox.width).toBeLessThanOrEqual(360);
     }
 
     // Open mobile search modal, type ticker, submit, and confirm auto-close

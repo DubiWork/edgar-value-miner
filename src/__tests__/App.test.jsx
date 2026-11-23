@@ -78,6 +78,20 @@ vi.mock('../hooks/useStockQuote', () => ({
   default: () => mockStockQuoteReturn,
 }));
 
+// Mock useAdminAuth hook (disabled by default; enabled in #343 Sign-In header test)
+let mockAdminAuthReturn = {
+  user: null,
+  isAdmin: false,
+  authError: null,
+  signInWithGoogle: vi.fn(),
+  signOutUser: vi.fn(),
+  isFirebaseAvailable: false,
+};
+vi.mock('../hooks/useAdminAuth', () => ({
+  useAdminAuth: () => mockAdminAuthReturn,
+  default: () => mockAdminAuthReturn,
+}));
+
 // Mock TickerSearch to simplify — avoid autocomplete complexity
 vi.mock('../components/TickerSearch', () => ({
   TickerSearch: ({ variant, onSearch, isSearching, autoFocus, className }) => (
@@ -283,6 +297,14 @@ describe('App', () => {
     vi.clearAllMocks();
     mockKeyMetricsReturn = [];
     mockStockQuoteReturn = { data: null, loading: false, error: null, refetch: vi.fn() };
+    mockAdminAuthReturn = {
+      user: null,
+      isAdmin: false,
+      authError: null,
+      signInWithGoogle: vi.fn(),
+      signOutUser: vi.fn(),
+      isFirebaseAvailable: false,
+    };
     mockHookReturn = {
       data: null,
       loading: false,
@@ -824,6 +846,40 @@ describe('App', () => {
       expect(screen.getByTestId('mobile-search-modal')).toBeTruthy();
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(screen.queryByTestId('mobile-search-modal')).toBeNull();
+    });
+
+    it('renders active search loader banner and skeleton instead of blank white screen when switching tickers (#342)', () => {
+      mockHookReturn.data = createMockCompanyData();
+      mockHookReturn.loading = true;
+      render(<App />);
+
+      expect(screen.getByTestId('loading-state')).toBeTruthy();
+      expect(screen.getByTestId('search-loading-banner')).toBeTruthy();
+      expect(screen.getByTestId('dashboard-skeleton')).toBeTruthy();
+      expect(screen.queryByTestId('step1-triage')).toBeNull();
+      expect(screen.queryByTestId('dashboard-layout')).toBeNull();
+
+      // When user submits a new search while viewing a company, banner displays the target ticker
+      fireEvent.click(screen.getByTestId('mobile-search-trigger'));
+      const modal = screen.getByTestId('mobile-search-modal');
+      const modalInput = within(modal).getByTestId('ticker-input-hero');
+      fireEvent.change(modalInput, { target: { value: 'SHOP' } });
+      fireEvent.keyDown(modalInput, { key: 'Enter', target: { value: 'SHOP' } });
+
+      expect(screen.getByTestId('search-loading-banner').textContent).toContain('SHOP');
+    });
+
+    it('renders Sign-In header button as a uniform 44x44 icon button on phones (#343)', () => {
+      mockAdminAuthReturn.isFirebaseAvailable = true;
+      render(<App />);
+
+      const signInBtn = screen.getByTestId('header-signin-btn');
+      expect(signInBtn.getAttribute('aria-label')).toBe('התחברות עם Google / Sign in');
+      expect(signInBtn.className).toContain('w-11');
+      expect(signInBtn.className).toContain('h-11');
+      const labelSpan = within(signInBtn).getByText('התחברות');
+      expect(labelSpan.className).toContain('hidden');
+      expect(labelSpan.className).toContain('sm:inline');
     });
   });
 });

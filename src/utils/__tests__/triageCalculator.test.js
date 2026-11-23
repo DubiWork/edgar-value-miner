@@ -131,6 +131,8 @@ describe('triageCalculator', () => {
     const result = calculateTriageMetrics(unhealthyFacts);
 
     expect(result.revenue.status).toBe('fail');
+    expect(result.revenue.detail).toBe('ירידה בהכנסות של -20% בשנה');
+    expect(result.revenue.detail).not.toContain('YoY');
     expect(result.margins.status).toBe('fail');
 
     // Dilution must be FAIL / Red
@@ -142,6 +144,7 @@ describe('triageCalculator', () => {
     expect(result.currentRatio.status).toBe('fail');
     expect(result.currentRatio.value).toBe('0.50x');
     expect(result.currentRatio.badge).toBe('At Risk (< 1.0)');
+    expect(result.currentRatio.badgeHe).toBe('סיכון (מתחת ל-1.0)');
   });
 
   it('computes true 5Y CAGR without off-by-one (no 4Y shift) and detects cyclical low margins + buyback dollar spend', () => {
@@ -196,9 +199,11 @@ describe('triageCalculator', () => {
 
     const result = calculateTriageMetrics(facts);
 
-    // Must show 5Y CAGR (~10%), NOT 4Y!
+    // Must show 5Y CAGR (~10%), NOT 4Y, with Hebrew-first ordering (#344)!
     expect(result.revenue.metricSummary).toContain('5Y CAGR ~10%');
-    expect(result.revenue.metricSummaryHe).toContain('5 ש׳: ~10%');
+    expect(result.revenue.metricSummaryHe).toBe('צמיחה שנתית (CAGR) · 5 ש׳: ~10% · 9 ש׳: ~5%');
+    expect(result.currentRatio.badgeHe).toBe('בטוח (מעל 1.0)');
+    expect(result.currentRatio.detail).toBe('יחס שוטף תקין (מעל 1.0)');
     expect(result.revenue.historyMeta.startYear).toBe(2016);
     expect(result.revenue.historyMeta.endYear).toBe(2025);
 

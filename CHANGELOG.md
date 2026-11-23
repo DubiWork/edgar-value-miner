@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
-> Active `1.2.2` release train on `develop` (staged prior to `main` promotion).
+> Active `1.2.3` release train on `develop` (staged prior to `main` promotion).
 
 ### Added
 - Step 1 Triage Gatekeeper UI, Vertex AI `generateAiSummary` Cloud Function, and admin cache/ingestion controls (`PR #316`).
@@ -23,8 +23,12 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Pinned Playwright E2E workflow runners to `ubuntu-24.04` (`PR #316`) and enabled `CodeQL Advanced` on `develop` (`PR #320`).
 
 ### Fixed
-- Prevented SEC EDGAR `HTTP 429` rate-limit failures in `companyContext.ts` by forwarding known numeric CIKs from client/Firestore (`companyContext`/`edgarCache`), caching `company_tickers.json` in memory for 24 hours, and adding bounded `Retry-After` / exponential backoff retries on `429`/`503` responses (`#324`).
-- Eliminated ungrounded stale AI summary cache hits (e.g. `MA`) by stopping IndexedDB persistence of `mock-*` fallback summaries, distinguishing server-reachable missing Firestore context (`_contextMissing`) from offline errors, auto-upgrading missing or ungrounded SEC `10-K`/`8-K` summaries with live progress feedback, and guarding existing caches when monthly AI budget is exhausted (`#328`).
+- Rendered touch/mobile and tablet tooltips (`< 1024px` or coarse pointer) via `ReactDOM.createPortal` onto `document.body` with backdrop dismissal, safe-area bottom padding, and `max-h-[75dvh]` scroll containment (`#327`).
+- Rendered an active-search loading banner (`search-loading-banner`) and `DashboardSkeleton` when switching between tickers (`loading && data`) instead of leaving `<main>` blank white (`#342`).
+- Collapsed the header Sign-In button (`header-signin-btn`) to a uniform `44×44` icon button on `< 640px` phones while preserving the text pill on `sm:`+ screens (`#343`).
+- Improved Hebrew-first wording and added `<bdi dir="ltr">` BiDi isolation across Step 1 Fundamentals cards so `CAGR`, percentages, signs, and ranges render cleanly in RTL (`#344`).
+- Prevented SEC EDGAR `HTTP 429` rate-limit failures in `companyContext.ts` by forwarding known numeric CIKs from client/Firestore (`companyContext`/`edgarCache`), caching `company_tickers.json` in memory for 24 hours, and adding bounded `Retry-After` / exponential backoff retries on `429`/`503` responses (`#324`, `PR #345`).
+- Eliminated ungrounded stale AI summary cache hits (e.g. `MA`) by stopping IndexedDB persistence of `mock-*` fallback summaries, distinguishing server-reachable missing Firestore context (`_contextMissing`) from offline errors, auto-upgrading missing or ungrounded SEC `10-K`/`8-K` summaries with live progress feedback, and guarding existing caches when monthly AI budget is exhausted (`#328`, `PR #345`).
 - Responsive single-row mobile header: icon-only clickable logo returning to the Welcome screen, guaranteed in-viewport `ThemeToggle` on `360px`+ phones without horizontal overflow, and a centered Portal `MobileSearchModal` triggered by a magnifying-glass icon on `< 640px` viewports (`#330`, `#331`, `PR #341`).
 - Tailwind v4 light-mode contrast, short-ticker autocomplete (`BA`), duplicate clear button, and Firebase auth error banner (`#321`, `PR #320`).
 
