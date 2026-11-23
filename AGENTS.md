@@ -29,9 +29,9 @@ Complete these updates **proactively in every PR** without asking or waiting to 
 
 1. **`CHANGELOG.md`:** Add concise entries under `## [Unreleased]` grouped by `Added` / `Changed` / `Fixed` / `Security`, referencing `(#<issue>)` or `(#<pr>)`.
 2. **Semantic Versioning (`SemVer 2.0.0`):**
-   - Bump `patch` (`X.Y.Z+1`) for bugfix-only PRs (`fix`).
-   - Bump `minor` (`X.Y+1.0`) for new feature milestones or grouped feature increments (`feat`).
-   - Bump `major` (`X+1.0.0`) only for breaking architectural releases.
+   - Bump `patch` (`X.Y.Z+1`) for bugfix-only changes (`fix`).
+   - Bump `minor` (`X.Y+1.0`) for **each new backwards-compatible feature** (`1` new feature = `+1 minor`, resetting `patch` to `0`).
+   - Bump `major` (`X+1.0.0`) for any new feature or change that **breaks existing behavior** (resetting `minor` and `patch` to `0`).
    - Keep `package.json`, `package-lock.json` (both top-level and `packages[""]` header fields), `functions/package.json`, and `functions/package-lock.json` (both top-level and `packages[""]` header fields) in strict version sync. Edit lockfile headers surgically — **do not run `npm install` on Windows just to bump versions**, so platform-specific optional dependencies stay clean for Linux `npm ci`.
 3. **`README.md`:** Update whenever user-facing capabilities, live URLs, architecture, tech stack, or setup scripts change.
 4. **`ROADMAP.md`:** Update Epic/Phase statuses, shipped version rows, and active Epic/PR references when milestone state changes.
@@ -59,4 +59,5 @@ Complete these updates **proactively in every PR** without asking or waiting to 
 Run and observe passing results after your final edit:
 - **Frontend:** `npm run lint`, `npm test -- --run` (on Windows Vitest, pass `--pool=threads --maxWorkers=1 --no-file-parallelism` if worker startup times out, and do not run tests in parallel with `vite build`), and `npm run build`.
 - **Cloud Functions (if `functions/` changed or for release sanity):** `cd functions && npm run build && npm test`.
+- **Static Analysis & Test Mock Hygiene:** Never duplicate single-pass HTML/XSS sanitization regexes inside test mocks (causes CodeQL `js/incomplete-multi-character-sanitization` alerts); delegate via `vi.importActual(...)` or reuse the production helper.
 - **Workspace Hygiene:** Stage files explicitly by path; never stage session logs, secrets (`.env*`), `.agents/`, `.firebase/`, `.github/reviews/`, or unrelated build outputs.
