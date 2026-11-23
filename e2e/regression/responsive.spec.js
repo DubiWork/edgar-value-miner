@@ -37,8 +37,17 @@ test.describe('Responsive layout', () => {
     );
     expect(hasNoOverflow).toBe(true);
 
-    // -- Key layout elements visible --
-    await expect(page.getByText('EDGAR Value Miner')).toBeVisible();
+    // -- Key layout elements visible (icon-only clickable logo on <640px) --
+    await expect(page.locator('[data-testid="header-logo-btn"]')).toBeVisible();
+    await expect(page.getByText('EDGAR Value Miner')).toBeHidden();
+
+    const themeToggle = page.getByRole('button', { name: /Switch to/ });
+    await expect(themeToggle).toBeVisible();
+    const toggleBox = await themeToggle.boundingBox();
+    expect(toggleBox).not.toBeNull();
+    expect(toggleBox.x).toBeGreaterThanOrEqual(0);
+    expect(toggleBox.x + toggleBox.width).toBeLessThanOrEqual(VIEWPORTS.mobile.width);
+
     await expect(
       page.getByRole('heading', { name: 'Find gems in the market' }),
     ).toBeVisible();
@@ -100,8 +109,10 @@ test.describe('Responsive layout', () => {
     );
     expect(hasNoOverflow).toBe(true);
 
-    // -- Key layout elements visible --
+    // -- Key layout elements visible (brand title shown on >= 640px tablet) --
+    await expect(page.locator('[data-testid="header-logo-btn"]')).toBeVisible();
     await expect(page.getByText('EDGAR Value Miner')).toBeVisible();
+
     await expect(
       page.getByRole('heading', { name: 'Find gems in the market' }),
     ).toBeVisible();

@@ -83,7 +83,8 @@ SuggestionItem.propTypes = {
  * @param {'hero'|'compact'} props.variant - Layout variant
  * @param {Function} props.onSearch - Callback when a search is triggered
  * @param {boolean} props.isSearching - Whether a search is currently in progress
- * @param {boolean} props.autoFocus - Whether to auto-focus on mount (desktop only)
+ * @param {boolean} props.autoFocus - Whether to auto-focus on mount (desktop only unless autoFocusOnMobile)
+ * @param {boolean} props.autoFocusOnMobile - Allow auto-focus even on mobile viewports (e.g. inside modal)
  * @param {string} props.className - Additional CSS classes
  */
 export function TickerSearch({
@@ -91,6 +92,7 @@ export function TickerSearch({
   onSearch,
   isSearching = false,
   autoFocus = false,
+  autoFocusOnMobile = false,
   className = '',
 }) {
   // State
@@ -139,10 +141,10 @@ export function TickerSearch({
   // -------------------------------------------------------------------------
 
   useEffect(() => {
-    if (autoFocus && variant === 'hero' && inputRef.current) {
-      // Check if device likely has a physical keyboard (not mobile)
-      const isDesktop = window.matchMedia('(min-width: 768px)').matches;
-      if (isDesktop) {
+    if (autoFocus && inputRef.current) {
+      const isDesktopHero =
+        variant === 'hero' && window.matchMedia('(min-width: 768px)').matches;
+      if (autoFocusOnMobile || isDesktopHero) {
         // Small delay to ensure the component is rendered
         const timer = setTimeout(() => {
           inputRef.current?.focus();
@@ -150,7 +152,7 @@ export function TickerSearch({
         return () => clearTimeout(timer);
       }
     }
-  }, [autoFocus, variant]);
+  }, [autoFocus, autoFocusOnMobile, variant]);
 
   // -------------------------------------------------------------------------
   // Click outside handler
@@ -281,6 +283,7 @@ export function TickerSearch({
       case 'Escape': {
         e.preventDefault();
         if (isDropdownOpen) {
+          e.stopPropagation();
           setIsOpen(false);
           setShowRecent(false);
           setHighlightedIndex(-1);
@@ -483,6 +486,7 @@ TickerSearch.propTypes = {
   onSearch: PropTypes.func,
   isSearching: PropTypes.bool,
   autoFocus: PropTypes.bool,
+  autoFocusOnMobile: PropTypes.bool,
   className: PropTypes.string,
 };
 

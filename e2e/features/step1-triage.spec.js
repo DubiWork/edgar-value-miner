@@ -28,10 +28,10 @@ test.describe('Step 1 Triage Feature E2E (#310)', () => {
 
     // Section 2: 4 Instant Fundamentals Checks (Hebrew default + sparkline timeline)
     await expect(page.getByText(/בדיקת נתוני בסיס מהירה/)).toBeVisible();
-    await expect(page.getByText('צמיחה בהכנסות')).toBeVisible();
-    await expect(page.getByText('שולי רווח תפעולי')).toBeVisible();
-    await expect(page.getByText('רכישה עצמית / דילול')).toBeVisible();
-    await expect(page.getByText('יחס שוטף (נזילות)')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'צמיחה בהכנסות' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'שולי רווח תפעולי' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'רכישה עצמית / דילול' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'יחס שוטף (נזילות)' })).toBeVisible();
     await expect(page.locator('[data-testid="sparkline-timeline-revenue-growth"]')).toBeVisible();
 
     // Toggling EN translates both Tear Sheet and Section 2 cleanly
@@ -101,5 +101,60 @@ test.describe('Step 1 Triage Feature E2E (#310)', () => {
 
     await page.keyboard.press('Escape');
     await expect(openMoatTooltip).toBeHidden();
+  });
+
+  test('renders single-row mobile header with ThemeToggle in bounds, search modal, and home logo reset on 360px phones', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 780 });
+
+    const heroInput = page.locator('[data-testid="ticker-search-input"]').first();
+    await heroInput.click();
+    await heroInput.fill('AAPL');
+    await heroInput.press('Enter');
+
+    await expect(page.locator('[data-testid="tear-sheet-blade"]')).toBeVisible({
+      timeout: 15_000,
+    });
+
+    const horizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(horizontalOverflow).toBeLessThanOrEqual(1);
+
+    // Brand wordmark is hidden on phones while clickable Gem logo, Search icon, and ThemeToggle fit inside 360px
+    const logoBtn = page.locator('[data-testid="header-logo-btn"]');
+    const mobileSearchTrigger = page.locator('[data-testid="mobile-search-trigger"]');
+    const themeToggle = page.getByRole('button', { name: /Switch to/ });
+
+    await expect(logoBtn).toBeVisible();
+    await expect(page.getByText('EDGAR Value Miner')).toBeHidden();
+    await expect(mobileSearchTrigger).toBeVisible();
+    await expect(themeToggle).toBeVisible();
+
+    for (const control of [logoBtn, mobileSearchTrigger, themeToggle]) {
+      const box = await control.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(360);
+    }
+
+    // Open mobile search modal, type ticker, submit, and confirm auto-close
+    await mobileSearchTrigger.click();
+    const modal = page.locator('[data-testid="mobile-search-modal"]');
+    await expect(modal).toBeVisible();
+    const modalBox = await modal.boundingBox();
+    expect(modalBox).not.toBeNull();
+    expect(modalBox.x).toBeGreaterThanOrEqual(0);
+    expect(modalBox.x + modalBox.width).toBeLessThanOrEqual(360);
+
+    const modalInput = modal.locator('[data-testid="ticker-search-input"]');
+    await modalInput.fill('AAPL');
+    await modalInput.press('Enter');
+    await expect(modal).toBeHidden();
+
+    // Clicking logo returns cleanly to welcome landing screen
+    await logoBtn.click();
+    await expect(page.locator('[data-testid="welcome-state"]')).toBeVisible();
   });
 });
