@@ -287,6 +287,24 @@ describe('useCompanySearch', () => {
       expect(result.current.error.retryable).toBe(true);
     });
 
+    it('preserves cacheCoordinator INVALID_TICKER code as type DATA', async () => {
+      cacheCoordinator.getCompanyData.mockResolvedValue({
+        success: false,
+        data: null,
+        error: { code: 'INVALID_TICKER', message: 'Invalid ticker "BAD"' },
+      });
+
+      const { result } = renderHook(() => useCompanySearch());
+
+      await act(async () => {
+        await result.current.searchCompany('BAD');
+      });
+
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.error.type).toBe('DATA');
+      expect(result.current.error.retryable).toBe(false);
+    });
+
     it('sets a validation error when ticker is empty', async () => {
       const { result } = renderHook(() => useCompanySearch());
 

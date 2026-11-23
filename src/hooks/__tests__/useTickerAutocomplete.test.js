@@ -41,6 +41,15 @@ vi.mock('../../utils/inputSanitization', () => ({
     const sanitized = str.replace(/[^A-Za-z0-9.-]/g, '').slice(0, 10);
     return { sanitized, isValid: sanitized.length > 0, original: str, warnings: [] };
   }),
+  sanitizeSearchQuery: vi.fn((input) => {
+    const str = String(input || '').replace(/<[^>]*>/g, '');
+    const sanitized = str
+      .replace(/[^A-Za-z0-9.\-& ]/g, '')
+      .replace(/\s+/g, ' ')
+      .replace(/^\s+/, '')
+      .slice(0, 60);
+    return { sanitized, isValid: sanitized.trim().length > 0, original: String(input || ''), warnings: [] };
+  }),
 }));
 
 import { fetchCompanyTickers } from '../../services/edgarApi';
@@ -109,6 +118,7 @@ describe('useTickerAutocomplete', () => {
     });
 
     expect(result.current.isReady).toBe(false);
+    expect(result.current.loadError).toBe(true);
     expect(result.current.isLoading).toBe(false);
     expect(result.current.suggestions).toEqual([]);
   });
@@ -333,15 +343,36 @@ describe('useTickerAutocomplete', () => {
     expect(result.current.suggestions).toEqual([]);
   });
 
-  it('should sanitize input via sanitizeTickerInput', async () => {
-    const { sanitizeTickerInput } = await import('../../utils/inputSanitization');
+  it('should sanitize input via sanitizeSearchQuery', async () => {
+    const { sanitizeSearchQuery } = await import('../../utils/inputSanitization');
     const { result } = renderHook(() => useTickerAutocomplete());
 
     act(() => {
       result.current.setQuery('<script>AAPL</script>');
     });
 
-    expect(sanitizeTickerInput).toHaveBeenCalledWith('<script>AAPL</script>');
+    expect(sanitizeSearchQuery).toHaveBeenCalledWith('<script>AAPL</script>');
+  });
+
+  it('supports multi-word company-name queries and resolveQuery', async () => {
+    fetchCompanyTickers.mockResolvedValue({
+      ...mockTickerMap,
+      BAC: { cik: 70858, name: 'BANK OF AMERICA CORP /DE/', ticker: 'BAC' },
+      SAP: { cik: 1000184, name: 'SAP SE', ticker: 'SAP' },
+    });
+
+    const { result } = renderHook(() => useTickerAutocomplete());
+
+    act(() => {
+      result.current.setQuery('bank america');
+    });
+
+    const resolved = await act(async () => result.current.resolveQuery('bank america'));
+    expect(resolved.loadFailed).toBe(false);
+    expect(resolved.bestMatch?.ticker).toBe('BAC');
+
+    const sapResolved = await act(async () => result.current.resolveQuery('SAP'));
+    expect(sapResolved.exactTickerMatch?.ticker).toBe('SAP');
   });
 
   it('should return empty suggestions when tickers not loaded and query is set', async () => {

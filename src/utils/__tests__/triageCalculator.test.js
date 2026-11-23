@@ -314,4 +314,39 @@ describe('triageCalculator', () => {
     expect(steadyBuybacks.shares.trendTone).toBe('steady');
     expect(steadyBuybacks.shares.trendLabelHe).toBe('מגמת הבייבאקס: קצב יציב →');
   });
+
+  it('uses filing currency unit (€M) and falls through empty share arrays (#348)', () => {
+    const sapMetrics = calculateTriageMetrics({
+      metadata: { currency: 'EUR', accountingStandard: 'IFRS' },
+      metrics: {
+        revenue: {
+          annual: [
+            { fiscalYear: 2025, value: 36800000000 },
+            { fiscalYear: 2024, value: 34176000000 },
+          ],
+        },
+        operatingIncome: {
+          annual: [
+            { fiscalYear: 2025, value: 9617000000 },
+            { fiscalYear: 2024, value: 4665000000 },
+          ],
+        },
+        weightedAverageSharesDiluted: { annual: [] },
+        weightedAverageShares: { annual: [] },
+        sharesOutstanding: {
+          annual: [
+            { fiscalYear: 2025, value: 1165000000 },
+            { fiscalYear: 2024, value: 1180000000 },
+          ],
+        },
+        currentAssets: { annual: [{ fiscalYear: 2025, value: 20256000000 }] },
+        currentLiabilities: { annual: [{ fiscalYear: 2025, value: 16200000000 }] },
+      },
+    });
+
+    expect(sapMetrics.revenue.sparklineUnit).toBe('€M');
+    expect(sapMetrics.shares.latestValue).toBe(1165000000);
+    expect(sapMetrics.shares.status).toBe('pass');
+    expect(sapMetrics.currentRatio.value).toBe('1.25x');
+  });
 });

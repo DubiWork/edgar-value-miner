@@ -124,7 +124,7 @@ function validateTicker(ticker) {
 
   const normalized = normalizeTicker(ticker);
 
-  if (!/^[A-Z]{1,5}$/.test(normalized)) {
+  if (!/^[A-Z]{1,5}(?:[.-][A-Z0-9]{1,2})?$/.test(normalized)) {
     return {
       valid: false,
       error: createError(

@@ -1,8 +1,10 @@
 import { getApps } from 'firebase-admin/app';
 import * as https from 'https';
 import * as zlib from 'zlib';
+import { fetchFromSec } from './secProxy.js';
 
-const SEC_USER_AGENT = 'edgar-value-miner (contact@example.com)';
+const SEC_USER_AGENT =
+  process.env.SEC_USER_AGENT || 'EdgarValueMiner/1.2 (dubigreenfeld@gmail.com)';
 const COMPANY_CONTEXT_COLLECTION = 'companyContext';
 const EDGAR_CACHE_COLLECTION = 'edgarCache';
 const CONTEXT_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days (1 quarter)
@@ -647,10 +649,15 @@ export async function resolveTickerFromSec(
   const nowMs = typeof options.nowMs === 'number' ? options.nowMs : Date.now();
 
   if (!memoryTickersCache || nowMs - memoryTickersCache.timestamp >= TICKERS_CACHE_TTL_MS) {
-    const raw = await fetcher('https://www.sec.gov/files/company_tickers.json', {
-      Accept: 'application/json',
-    });
-    const parsed = JSON.parse(raw) as Record<
+    const parsed = (
+      fetcher === httpsGetRaw
+        ? await fetchFromSec('tickers')
+        : JSON.parse(
+            await fetcher('https://www.sec.gov/files/company_tickers.json', {
+              Accept: 'application/json',
+            })
+          )
+    ) as Record<
       string,
       { cik_str?: number | string; cik?: number | string; ticker?: string; title?: string }
     >;
@@ -671,7 +678,10 @@ export async function resolveTickerFromSec(
     memoryTickersCache = { map, timestamp: nowMs };
   }
 
-  const hit = memoryTickersCache.map.get(norm);
+  const hit =
+    memoryTickersCache.map.get(norm) ??
+    memoryTickersCache.map.get(norm.replace(/\./g, '-')) ??
+    memoryTickersCache.map.get(norm.replace(/-/g, '.'));
   if (hit) {
     return hit;
   }

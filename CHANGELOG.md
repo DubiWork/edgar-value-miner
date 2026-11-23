@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
-> Active `1.2.3` release train on `develop` (staged prior to `main` promotion).
+> Active `1.2.4` release train on `develop` (staged prior to `main` promotion).
 
 ### Added
 - Step 1 Triage Gatekeeper UI, Vertex AI `generateAiSummary` Cloud Function, and admin cache/ingestion controls (`PR #316`).
@@ -23,10 +23,13 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Pinned Playwright E2E workflow runners to `ubuntu-24.04` (`PR #316`) and enabled `CodeQL Advanced` on `develop` (`PR #320`).
 
 ### Fixed
-- Rendered touch/mobile and tablet tooltips (`< 1024px` or coarse pointer) via `ReactDOM.createPortal` onto `document.body` with backdrop dismissal, safe-area bottom padding, and `max-h-[75dvh]` scroll containment (`#327`).
-- Rendered an active-search loading banner (`search-loading-banner`) and `DashboardSkeleton` when switching between tickers (`loading && data`) instead of leaving `<main>` blank white (`#342`).
-- Collapsed the header Sign-In button (`header-signin-btn`) to a uniform `44×44` icon button on `< 640px` phones while preserving the text pill on `sm:`+ screens (`#343`).
-- Improved Hebrew-first wording and added `<bdi dir="ltr">` BiDi isolation across Step 1 Fundamentals cards so `CAGR`, percentages, signs, and ranges render cleanly in RTL (`#344`).
+- Eliminated `secTickers` HTTP `502` / SEC `429` directory outages via a 4-tier resilient Cloud Functions loader (24h in-memory cache + in-flight deduplication, shared Firestore `systemCache/secTickers`, bounded `429`/`503` retries with a valid contact User-Agent, and bundled `sec-tickers-snapshot.json.gz` fallback) plus client `localStorage` caching and dot/hyphen share-class resolution (`#349`).
+- Fixed company-name search UX by adding `sanitizeSearchQuery` (preserving spaces and up to 60 characters), ranked multi-word & company-name matching (`scoreTickerMatches`), smart `Enter` auto-resolution to best matching ticker, friendly inline guidance instead of error-page crashes on unmatched company names, and classified error feedback (`#347`).
+- Added full IFRS (`ifrs-full` / Form `20-F`) normalization support (`IFRS_TAG_MAP`, `CY\d{4}(I4|Q4I)?` balance-sheet frames, highest-frequency primary filing currency detection, empty share-array fallthrough, and multi-currency formatting in Step 1 & Key Metrics — unblocking foreign filers such as `SAP SE`) (`#348`).
+- Rendered touch/mobile and tablet tooltips (`< 1024px` or coarse pointer) via `ReactDOM.createPortal` onto `document.body` with backdrop dismissal, safe-area bottom padding, and `max-h-[75dvh]` scroll containment (`#327`, `PR #346`).
+- Rendered an active-search loading banner (`search-loading-banner`) and `DashboardSkeleton` when switching between tickers (`loading && data`) instead of leaving `<main>` blank white (`#342`, `PR #346`).
+- Collapsed the header Sign-In button (`header-signin-btn`) to a uniform `44×44` icon button on `< 640px` phones while preserving the text pill on `sm:`+ screens (`#343`, `PR #346`).
+- Improved Hebrew-first wording and added `<bdi dir="ltr">` BiDi isolation across Step 1 Fundamentals cards so `CAGR`, percentages, signs, and ranges render cleanly in RTL (`#344`, `PR #346`).
 - Prevented SEC EDGAR `HTTP 429` rate-limit failures in `companyContext.ts` by forwarding known numeric CIKs from client/Firestore (`companyContext`/`edgarCache`), caching `company_tickers.json` in memory for 24 hours, and adding bounded `Retry-After` / exponential backoff retries on `429`/`503` responses (`#324`, `PR #345`).
 - Eliminated ungrounded stale AI summary cache hits (e.g. `MA`) by stopping IndexedDB persistence of `mock-*` fallback summaries, distinguishing server-reachable missing Firestore context (`_contextMissing`) from offline errors, auto-upgrading missing or ungrounded SEC `10-K`/`8-K` summaries with live progress feedback, and guarding existing caches when monthly AI budget is exhausted (`#328`, `PR #345`).
 - Responsive single-row mobile header: icon-only clickable logo returning to the Welcome screen, guaranteed in-viewport `ThemeToggle` on `360px`+ phones without horizontal overflow, and a centered Portal `MobileSearchModal` triggered by a magnifying-glass icon on `< 640px` viewports (`#330`, `#331`, `PR #341`).

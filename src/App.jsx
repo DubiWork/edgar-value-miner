@@ -411,9 +411,11 @@ function App() {
             <ErrorFallback
               error={error.originalError || error}
               errorType={error.type}
+              userMessage={error.userMessage}
               resetError={() => {
                 clearError()
               }}
+              onGoHome={handleGoHome}
             />
           </div>
         )}

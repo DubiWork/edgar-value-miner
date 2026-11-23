@@ -1259,24 +1259,115 @@ describe('#252 detectFilingCurrency', () => {
   });
 });
 
-describe('#252 normalizeCompanyFacts — IFRS detection', () => {
-  it('throws for IFRS-only filer', () => {
-    const ifrsOnly = createCompanyFacts({
-      facts: { 'ifrs-full': { Revenue: { units: { EUR: [] } } } },
+describe('#348 normalizeCompanyFacts — full IFRS (ifrs-full / 20-F) support', () => {
+  it('normalizes IFRS-only filer (SAP SE style, Form 20-F, CY2025Q4I balance sheet, EUR primary currency)', () => {
+    const sapLike = createCompanyFacts({
+      cik: 1000184,
+      entityName: 'SAP SE',
+      facts: {
+        'ifrs-full': {
+          Revenue: {
+            units: {
+              USD: [
+                createUnitEntry({ end: '2017-12-31', val: 28000000000, form: '20-F', frame: 'CY2017', filed: '2018-02-28' }),
+              ],
+              EUR: [
+                createUnitEntry({ end: '2024-12-31', val: 34176000000, form: '20-F', frame: 'CY2024', filed: '2026-02-26' }),
+                createUnitEntry({ end: '2025-12-31', val: 36800000000, form: '20-F', frame: 'CY2025', filed: '2026-02-26' }),
+              ],
+            },
+          },
+          ProfitLossFromOperatingActivities: {
+            units: {
+              EUR: [
+                createUnitEntry({ end: '2024-12-31', val: 4665000000, form: '20-F', frame: 'CY2024', filed: '2026-02-26' }),
+                createUnitEntry({ end: '2025-12-31', val: 9617000000, form: '20-F', frame: 'CY2025', filed: '2026-02-26' }),
+              ],
+            },
+          },
+          CashFlowsFromUsedInOperatingActivities: {
+            units: {
+              EUR: [
+                createUnitEntry({ end: '2025-12-31', val: 9156000000, form: '20-F', frame: 'CY2025', filed: '2026-02-26' }),
+              ],
+            },
+          },
+          PurchaseOfPropertyPlantAndEquipmentIntangibleAssetsOtherThanGoodwillInvestmentPropertyAndOtherNoncurrentAssets: {
+            units: {
+              EUR: [
+                createUnitEntry({ end: '2025-12-31', val: 900000000, form: '20-F', frame: 'CY2025', filed: '2026-02-26' }),
+              ],
+            },
+          },
+          CurrentAssets: {
+            units: {
+              EUR: [
+                createUnitEntry({ end: '2025-12-31', val: 20256000000, form: '20-F', frame: 'CY2025Q4I', filed: '2026-02-26' }),
+              ],
+            },
+          },
+          CurrentLiabilities: {
+            units: {
+              EUR: [
+                createUnitEntry({ end: '2025-12-31', val: 16200000000, form: '20-F', frame: 'CY2025Q4I', filed: '2026-02-26' }),
+              ],
+            },
+          },
+          AdjustedWeightedAverageShares: {
+            units: {
+              shares: [
+                createUnitEntry({ end: '2024-12-31', val: 1170000000, form: '20-F', frame: 'CY2024', filed: '2026-02-26' }),
+                createUnitEntry({ end: '2025-12-31', val: 1165000000, form: '20-F', frame: 'CY2025', filed: '2026-02-26' }),
+              ],
+            },
+          },
+        },
+      },
     });
-    expect(() => normalizeCompanyFacts(ifrsOnly)).toThrow(
-      'IFRS filer detected: IFRS namespace not supported. Only US-GAAP filers are supported in this version.'
-    );
+
+    const result = normalizeCompanyFacts(sapLike, { fullHistory: true });
+    expect(result.metadata.accountingStandard).toBe('IFRS');
+    expect(result.metadata.currency).toBe('EUR');
+    expect(result.metadata.warnings.some((w) => w.includes('IFRS'))).toBe(true);
+
+    expect(result.metrics.revenue.annual).toHaveLength(2);
+    expect(result.metrics.revenue.annual[0]).toMatchObject({ fiscalYear: 2025, value: 36800000000 });
+    expect(result.metrics.operatingIncome.annual[0].value).toBe(9617000000);
+    expect(result.metrics.currentAssets.annual[0]).toMatchObject({ fiscalYear: 2025, value: 20256000000 });
+    expect(result.metrics.currentLiabilities.annual[0]).toMatchObject({ fiscalYear: 2025, value: 16200000000 });
+    expect(result.metrics.freeCashFlow.annual[0].value).toBe(9156000000 - 900000000);
+    expect(result.metrics.weightedAverageSharesDiluted.annual).toHaveLength(2);
   });
 
-  it('does NOT throw when both us-gaap and ifrs-full are present', () => {
+  it('prefers US-GAAP when both us-gaap and ifrs-full are present', () => {
     const dual = createCompanyFacts({
       facts: {
         'us-gaap': { Revenues: { units: { USD: [] } } },
-        'ifrs-full': { Revenue: { units: { USD: [] } } },
+        'ifrs-full': { Revenue: { units: { EUR: [] } } },
       },
     });
-    expect(() => normalizeCompanyFacts(dual)).not.toThrow();
+    const res = normalizeCompanyFacts(dual);
+    expect(res.metadata.accountingStandard).toBe('US-GAAP');
+    expect(res.metadata.currency).toBe('USD');
+  });
+
+  it('normalizes IFRS even when us-gaap is an empty object', () => {
+    const ifrsEmptyUsGaap = createCompanyFacts({
+      facts: {
+        'us-gaap': {},
+        'ifrs-full': {
+          Revenue: {
+            units: {
+              EUR: [createUnitEntry({ end: '2025-12-31', val: 1000000, form: '20-F', frame: 'CY2025' })],
+            },
+          },
+        },
+      },
+    });
+    const res = normalizeCompanyFacts(ifrsEmptyUsGaap);
+    expect(res.metadata.accountingStandard).toBe('IFRS');
+    expect(res.metadata.currency).toBe('EUR');
+    expect(res.metrics.revenue.annual).toHaveLength(1);
   });
 });
 
@@ -1294,15 +1385,6 @@ describe('#252 normalizeCompanyFacts — metadata.currency from filing', () => {
     });
     const result = normalizeCompanyFacts(eurFacts);
     expect(result.metadata.currency).toBe('EUR');
-  });
-});
-
-describe('#252 normalizeCompanyFacts — IFRS guard with empty us-gaap', () => {
-  it('throws when us-gaap is empty object and ifrs-full has data', () => {
-    const ifrsEmptyUsGaap = createCompanyFacts({
-      facts: { 'us-gaap': {}, 'ifrs-full': { Revenue: { units: { EUR: [] } } } },
-    });
-    expect(() => normalizeCompanyFacts(ifrsEmptyUsGaap)).toThrow('IFRS filer detected');
   });
 });
 

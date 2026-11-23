@@ -265,10 +265,11 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgra
 
 function formatSparklinePointValue(value, unit, isHe) {
   if (typeof value !== 'number' || Number.isNaN(value)) return String(value ?? '')
-  if (unit === '$M') {
+  if (typeof unit === 'string' && unit.endsWith('M') && unit !== 'sharesM') {
+    const prefix = unit.slice(0, -1) || '$'
     return Math.abs(value) >= 1000
-      ? `$${(value / 1000).toFixed(1)}B`
-      : `$${Math.round(value).toLocaleString()}M`
+      ? `${prefix}${(value / 1000).toFixed(1)}B`
+      : `${prefix}${Math.round(value).toLocaleString()}M`
   }
   if (unit === '%') {
     return `${value.toFixed(1)}%`
