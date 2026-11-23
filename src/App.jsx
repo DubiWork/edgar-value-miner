@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { TrendingUp, DollarSign, BarChart3, Gem, LogIn, LogOut, ShieldCheck, Search } from 'lucide-react'
+import { TrendingUp, DollarSign, BarChart3, Gem, LogIn, LogOut, ShieldCheck, Search, Loader2 } from 'lucide-react'
 import { TickerSearch } from './components/TickerSearch'
 import { MobileSearchModal } from './components/TickerSearch/MobileSearchModal'
 import { ThemeToggle } from './components/ThemeToggle'
@@ -30,6 +30,7 @@ function App() {
   const [currentStep, setCurrentStep] = useState(1)
   const [dismissedAuthError, setDismissedAuthError] = useState(null)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+  const [pendingTicker, setPendingTicker] = useState(null)
   const { data, loading, error, metadata, searchCompany, clearError, reset } = useCompanySearch()
   const { user, isAdmin, authError, signInWithGoogle, signOutUser, isFirebaseAvailable } = useAdminAuth()
 
@@ -45,11 +46,13 @@ function App() {
   const prefersReducedMotion = useReducedMotion()
 
   const handleSearch = (ticker) => {
+    setPendingTicker(String(ticker || '').trim().toUpperCase() || null)
     setCurrentStep(1)
     searchCompany(ticker)
   }
 
   const handleGoHome = () => {
+    setPendingTicker(null)
     setMobileSearchOpen(false)
     reset()
     setCurrentStep(1)
@@ -163,10 +166,11 @@ function App() {
                       type="button"
                       data-testid="header-signout-btn"
                       onClick={signOutUser}
-                      className="inline-flex items-center justify-center gap-1 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors shrink-0"
+                      aria-label="התנתק / Sign out"
+                      className="inline-flex items-center justify-center gap-1 w-11 h-11 sm:w-auto sm:h-auto sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors shrink-0"
                       title="התנתק"
                     >
-                      <LogOut className="w-3.5 h-3.5 shrink-0" />
+                      <LogOut className="w-5 h-5 sm:w-3.5 sm:h-3.5 shrink-0" aria-hidden="true" />
                       <span className="hidden sm:inline whitespace-nowrap">התנתק</span>
                     </button>
                   </div>
@@ -175,10 +179,12 @@ function App() {
                     type="button"
                     data-testid="header-signin-btn"
                     onClick={signInWithGoogle}
-                    className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                    aria-label="התחברות עם Google / Sign in"
+                    title="התחברות עם Google"
+                    className="inline-flex items-center justify-center gap-1.5 w-11 h-11 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors whitespace-nowrap shrink-0"
                   >
-                    <LogIn className="w-3.5 h-3.5 shrink-0" />
-                    <span>התחברות</span>
+                    <LogIn className="w-5 h-5 sm:w-3.5 sm:h-3.5 shrink-0" aria-hidden="true" />
+                    <span className="hidden sm:inline">התחברות</span>
                   </button>
                 )
               )}
@@ -379,9 +385,24 @@ function App() {
           </div>
         )}
 
-        {/* Loading State */}
-        {loading && !data && (
-          <DashboardSkeleton heroChartHeight={400} secondaryChartHeight={400} data-testid="loading-state" />
+        {/* Loading State (both initial load and switching between tickers) */}
+        {loading && (
+          <div data-testid="loading-state" className="space-y-6">
+            <div
+              role="status"
+              aria-live="polite"
+              data-testid="search-loading-banner"
+              className="max-w-4xl mx-auto rounded-2xl border border-sky-500/25 bg-sky-50/80 dark:bg-sky-950/30 px-4 py-3 flex items-center justify-center gap-3 text-sm font-medium text-sky-800 dark:text-sky-200 shadow-xs"
+            >
+              <Loader2 className="w-4 h-4 animate-spin text-sky-600 dark:text-sky-400 shrink-0" aria-hidden="true" />
+              <span dir="auto">
+                {pendingTicker
+                  ? `טוען נתוני ${pendingTicker} מ-SEC EDGAR...`
+                  : 'טוען נתוני חברה מ-SEC EDGAR...'}
+              </span>
+            </div>
+            <DashboardSkeleton heroChartHeight={400} secondaryChartHeight={400} />
+          </div>
         )}
 
         {/* Error State */}

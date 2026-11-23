@@ -81,7 +81,12 @@ describe('Step1Triage Component', () => {
     expect(screen.getByText('רכישה עצמית / דילול')).toBeTruthy()
     expect(screen.getByText('יחס שוטף (נזילות)')).toBeTruthy()
     expect(screen.getByText('4 מתוך 4 עברו')).toBeTruthy()
-    expect(screen.getByText('תנאי למעבר: מעל 1.0')).toBeTruthy()
+    const revCard = screen.getByTestId('fundamental-card-revenue-growth')
+    const marginsCard = screen.getByTestId('fundamental-card-operating-margins')
+    const sharesCard = screen.getByTestId('fundamental-card-share-dilution')
+    const balanceCard = screen.getByTestId('fundamental-card-balance-sheet')
+
+    expect(balanceCard.textContent).toContain('תנאי למעבר: מעל 1.0')
 
     // Minimalist year timeline shown under sparkline + share buyback pace trend
     const revTimeline = screen.getByTestId('sparkline-timeline-revenue-growth')
@@ -89,11 +94,16 @@ describe('Step1Triage Component', () => {
     expect(revTimeline.textContent).toContain('2024')
     expect(screen.getByTestId('fundamental-trend-share-dilution').textContent).toContain('מגמת הבייבאקס:')
 
-    // Check all 4 Hebrew descriptions
-    expect(screen.getByText('צמיחה עקבית של ~14% בשנה')).toBeTruthy()
-    expect(screen.getByText('שוליים יציבים מעל 40%')).toBeTruthy()
-    expect(screen.getByText('החברה רוכשת מניות חזרה')).toBeTruthy()
-    expect(screen.getByText('Current Ratio תקין > 1')).toBeTruthy()
+    // Check all 4 Hebrew descriptions + BiDi <bdi dir="ltr"> isolation (#344)
+    expect(revCard.textContent).toContain('צמיחה עקבית של ~14% בשנה')
+    expect(revCard.textContent).toContain('צמיחה שנתית (CAGR)')
+    expect(marginsCard.textContent).toContain('שוליים יציבים מעל 40%')
+    expect(sharesCard.textContent).toContain('החברה רוכשת מניות חזרה')
+    expect(balanceCard.textContent).toContain('יחס שוטף תקין (מעל 1.0)')
+
+    const bdiNodes = revCard.querySelectorAll('bdi[dir="ltr"]')
+    expect(bdiNodes.length).toBeGreaterThan(0)
+    expect(Array.from(bdiNodes).some((el) => el.textContent === 'CAGR')).toBe(true)
 
     // Switch to English -> Section 2 translates seamlessly too
     fireEvent.click(screen.getByTestId('lang-btn-en'))
@@ -186,14 +196,20 @@ describe('Step1Triage Component', () => {
 
     // 2 of 4 passed in Hebrew default, and switch to English verifies English labels
     expect(screen.getByText('2 מתוך 4 עברו')).toBeTruthy()
-    expect(screen.getByText('+25% בשנה')).toBeTruthy()
-    expect(screen.getByText('5.0%')).toBeTruthy()
-    expect(screen.getByText('שוליים נמוכים')).toBeTruthy()
-    expect(screen.getByText('↓ -5.0% מניות (בייבאק)')).toBeTruthy()
+    const revCard = screen.getByTestId('fundamental-card-revenue-growth')
+    const marginsCard = screen.getByTestId('fundamental-card-operating-margins')
+    const sharesCard = screen.getByTestId('fundamental-card-share-dilution')
+    const balanceCard = screen.getByTestId('fundamental-card-balance-sheet')
+
+    expect(revCard.textContent).toContain('+25% בשנה')
+    expect(revCard.querySelector('bdi[dir="ltr"]')?.textContent).toBe('+25%')
+    expect(marginsCard.textContent).toContain('5.0%')
+    expect(marginsCard.textContent).toContain('שוליים נמוכים')
+    expect(sharesCard.textContent).toContain('↓ -5.0% מניות (בייבאק)')
     expect(screen.getByTestId('fundamental-trend-share-dilution').textContent).toContain('מגמת בייבאקס:')
-    expect(screen.getByText('0.89x')).toBeTruthy()
-    expect(screen.getByText('סיכון (< 1.0)')).toBeTruthy()
-    expect(screen.getByText('תנאי למעבר: מעל 1.0')).toBeTruthy()
+    expect(balanceCard.textContent).toContain('0.89x')
+    expect(balanceCard.textContent).toContain('סיכון (מתחת ל-1.0)')
+    expect(balanceCard.textContent).toContain('תנאי למעבר: מעל 1.0')
 
     fireEvent.click(screen.getByTestId('lang-btn-en'))
     expect(screen.getByText('2 of 4 Passed')).toBeTruthy()
@@ -264,36 +280,48 @@ describe('Step1Triage Component', () => {
     expect(screen.queryByTestId('tear-sheet-moat-sources')).toBeNull()
   })
 
-  it('supports tap-to-toggle mobile tooltips clamped to viewport width and closes on close button or Escape', async () => {
+  it('renders mobile/tablet tooltips via Portal in document.body with backdrop, close button, and Escape dismissal (#327)', async () => {
     render(<Step1Triage company={mockCompany} />)
 
     const moatBadge = await screen.findByTestId('moat-summary-badge')
-    const allTooltips = screen.getAllByRole('tooltip')
-    expect(allTooltips.length).toBeGreaterThan(0)
-    for (const tip of allTooltips) {
-      expect(tip.className).toContain('fixed')
-      expect(tip.className).toContain('inset-x-4')
-      expect(tip.className).toContain('bottom-4')
+    const allInlineTooltips = screen.getAllByRole('tooltip')
+    expect(allInlineTooltips.length).toBeGreaterThan(0)
+    for (const tip of allInlineTooltips) {
+      expect(tip.className).toContain('lg:absolute')
     }
 
-    // Tap first educational info button -> opens its tooltip cleanly
+    // Portal sheet is closed initially
+    expect(screen.queryByTestId('tooltip-portal-sheet')).toBeNull()
+
+    // Tap first educational info button -> mounts Portal backdrop & sheet in document.body
     const infoButtons = screen.getAllByRole('button', { name: /educational rationale/i })
     fireEvent.click(infoButtons[0])
-    const closeBtn = await screen.findByRole('button', { name: 'סגור הסבר' })
-    const firstTooltip = infoButtons[0].parentElement.querySelector('[role="tooltip"]')
-    expect(firstTooltip.className).toContain('opacity-100')
+    const sheet = await screen.findByTestId('tooltip-portal-sheet')
+    const backdrop = screen.getByTestId('tooltip-portal-backdrop')
+    expect(infoButtons[0].parentElement.contains(sheet)).toBe(false)
+    expect(document.body.contains(sheet)).toBe(true)
+    expect(sheet.className).toContain('max-h-[75dvh]')
+    expect(backdrop.className).toContain('safe-area-inset-bottom')
 
-    // Tapping close button dismisses it cleanly
+    // Tapping close button dismisses Portal tooltip cleanly
+    const closeBtn = screen.getByRole('button', { name: 'סגור הסבר' })
     fireEvent.click(closeBtn)
-    expect(firstTooltip.className).toContain('opacity-0')
+    expect(screen.queryByTestId('tooltip-portal-sheet')).toBeNull()
 
-    // Tapping moat badge opens its tooltip without expanding Tear Sheet, and Escape closes it
+    // Tap again -> clicking backdrop dismisses, clicking sheet inside does NOT dismiss
+    fireEvent.click(infoButtons[0])
+    expect(screen.getByTestId('tooltip-portal-sheet')).toBeTruthy()
+    fireEvent.click(screen.getByTestId('tooltip-portal-sheet'))
+    expect(screen.getByTestId('tooltip-portal-sheet')).toBeTruthy()
+    fireEvent.click(screen.getByTestId('tooltip-portal-backdrop'))
+    expect(screen.queryByTestId('tooltip-portal-sheet')).toBeNull()
+
+    // Tapping moat badge opens Portal sheet without expanding Tear Sheet, and Escape closes it
     fireEvent.click(moatBadge)
-    const moatTooltip = moatBadge.parentElement.querySelector('[role="tooltip"]')
-    expect(moatTooltip.className).toContain('opacity-100')
+    expect(screen.getByTestId('tooltip-portal-sheet')).toBeTruthy()
     expect(screen.queryByTestId('tear-sheet-expanded-content')).toBeNull()
 
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(moatTooltip.className).toContain('opacity-0')
+    expect(screen.queryByTestId('tooltip-portal-sheet')).toBeNull()
   })
 })

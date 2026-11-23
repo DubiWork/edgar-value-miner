@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import PropTypes from 'prop-types'
 import {
   TrendingUp,
@@ -337,45 +338,101 @@ const FUNDAMENTAL_TREND_TONE_STYLES = {
 }
 
 const DESKTOP_TOOLTIP_ALIGN_MAP = {
-  left: 'sm:-left-3',
-  right: 'sm:-right-3',
-  start: 'sm:start-0',
-  end: 'sm:end-0',
-  center: 'sm:left-1/2 sm:-translate-x-1/2',
+  left: 'lg:-left-3',
+  right: 'lg:-right-3',
+  start: 'lg:start-0',
+  end: 'lg:end-0',
+  center: 'lg:left-1/2 lg:-translate-x-1/2',
 }
 
 const DESKTOP_TOOLTIP_ARROW_MAP = {
-  left: 'sm:left-4',
-  right: 'sm:right-4',
-  start: 'sm:start-3',
-  end: 'sm:end-3',
-  center: 'sm:left-1/2 sm:-translate-x-1/2',
+  left: 'lg:left-4',
+  right: 'lg:right-4',
+  start: 'lg:start-3',
+  end: 'lg:end-3',
+  center: 'lg:left-1/2 lg:-translate-x-1/2',
+}
+
+const LTR_BIDI_TOKEN_REGEX =
+  /([~$+-]?\d+(?:[.,]\d+)?[%xKMBT]?(?:[–-][~$+-]?\d+(?:[.,]\d+)?[%xKMBT]?)?|[A-Za-z][A-Za-z0-9./-]*)/g
+
+/**
+ * Isolates numbers, signs (+/-/%/x), ranges, and Latin tokens with <bdi dir="ltr"> inside RTL Hebrew prose
+ * so punctuation and parentheses never reverse in bidirectional rendering (#344).
+ */
+function BidiText({ text, isRtl = true }) {
+  if (text === null || text === undefined) return null
+  const str = String(text)
+  if (!isRtl || !str) return str
+
+  const parts = str.split(LTR_BIDI_TOKEN_REGEX)
+  if (parts.length <= 1) return str
+
+  return parts.map((part, idx) => {
+    if (!part) return null
+    if (idx % 2 === 1) {
+      return (
+        <bdi key={`${idx}-${part}`} dir="ltr">
+          {part}
+        </bdi>
+      )
+    }
+    return part
+  })
+}
+
+BidiText.propTypes = {
+  text: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  isRtl: PropTypes.bool,
 }
 
 /**
  * ResponsiveTooltip Component
- * Desktop (`sm:`+): floats above/below trigger on hover/focus with logical RTL/LTR alignment.
- * Mobile (`< 640px`): clamps cleanly inside the viewport (`fixed inset-x-4 bottom-4`) and supports tap-to-toggle.
+ * Desktop (>= 1024px fine pointer): floats above/below trigger on hover/focus with logical RTL/LTR alignment.
+ * Mobile & Tablet (< 1024px or coarse pointer): renders via Portal in document.body with backdrop & safe-area padding (#327).
  */
 function ResponsiveTooltip({
   trigger,
   children,
   placement = 'top',
   align = 'start',
-  widthClass = 'sm:w-72',
+  widthClass = 'lg:w-72',
   dir = 'rtl',
   showArrow = false,
   className = '',
   wrapperClass = 'relative inline-flex items-center group/rtooltip',
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [isCoarsePointer, setIsCoarsePointer] = useState(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(pointer: coarse)').matches
+      : false
+  )
   const containerRef = useRef(null)
+  const portalSheetRef = useRef(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return undefined
+    }
+    const mq = window.matchMedia('(pointer: coarse)')
+    const handleChange = (e) => setIsCoarsePointer(e.matches)
+    if (typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', handleChange)
+      return () => mq.removeEventListener('change', handleChange)
+    }
+    return undefined
+  }, [])
 
   useEffect(() => {
     if (!isOpen) return undefined
 
     const handlePointerDown = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target) &&
+        !(portalSheetRef.current && portalSheetRef.current.contains(e.target))
+      ) {
         setIsOpen(false)
       }
     }
@@ -399,13 +456,13 @@ function ResponsiveTooltip({
 
   const desktopPlacementClass =
     placement === 'bottom'
-      ? 'sm:top-full sm:bottom-auto sm:mt-2'
-      : 'sm:bottom-full sm:top-auto sm:mb-2'
+      ? 'lg:top-full lg:bottom-auto lg:mt-2'
+      : 'lg:bottom-full lg:top-auto lg:mb-2'
   const desktopAlignClass = DESKTOP_TOOLTIP_ALIGN_MAP[align] || DESKTOP_TOOLTIP_ALIGN_MAP.start
   const arrowAlignClass = DESKTOP_TOOLTIP_ARROW_MAP[align] || DESKTOP_TOOLTIP_ARROW_MAP.start
 
   const visibilityClass = isOpen
-    ? 'opacity-100 visible pointer-events-auto sm:pointer-events-none'
+    ? 'opacity-100 visible pointer-events-auto lg:pointer-events-none'
     : 'opacity-0 invisible pointer-events-none group-hover/rtooltip:opacity-100 group-hover/rtooltip:visible group-focus-within/rtooltip:opacity-100 group-focus-within/rtooltip:visible'
 
   return (
@@ -415,31 +472,57 @@ function ResponsiveTooltip({
       <span
         role="tooltip"
         dir={dir}
-        className={`fixed inset-x-4 bottom-4 w-auto max-w-[calc(100vw-2rem)] max-h-[60vh] overflow-y-auto p-3.5 shadow-2xl sm:inset-x-auto sm:bottom-auto sm:absolute ${desktopPlacementClass} ${desktopAlignClass} ${widthClass} sm:max-h-none sm:overflow-visible sm:p-3 sm:shadow-xl text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-xl border border-slate-700/60 dark:border-slate-800 ${
+        className={`${
+          isCoarsePointer ? 'hidden' : 'hidden lg:block'
+        } lg:absolute ${desktopPlacementClass} ${desktopAlignClass} ${widthClass} lg:p-3 lg:shadow-xl text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-xl border border-slate-700/60 dark:border-slate-800 ${
           dir === 'rtl' ? 'text-right' : 'text-left'
         } ${visibilityClass} transition-all duration-150 z-50 font-sans font-normal normal-case tracking-normal ${className}`}
       >
-        {isOpen && (
-          <button
-            type="button"
-            aria-label={dir === 'rtl' ? 'סגור הסבר' : 'Close tooltip'}
-            onClick={(e) => {
-              e.stopPropagation()
-              setIsOpen(false)
-            }}
-            className="sm:hidden float-end ms-2 mb-1 px-1.5 py-0.5 rounded-md text-[11px] font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 hover:text-white cursor-pointer"
-          >
-            ✕
-          </button>
-        )}
         {children}
         {showArrow && placement === 'top' && (
           <span
-            className={`hidden sm:block absolute top-full ${arrowAlignClass} border-4 border-transparent border-t-slate-900/95 dark:border-t-slate-950/95`}
+            className={`hidden lg:block absolute top-full ${arrowAlignClass} border-4 border-transparent border-t-slate-900/95 dark:border-t-slate-950/95`}
             aria-hidden="true"
           />
         )}
       </span>
+
+      {isOpen &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            data-testid="tooltip-portal-backdrop"
+            onClick={() => setIsOpen(false)}
+            className={`${
+              isCoarsePointer ? 'flex' : 'flex lg:hidden'
+            } fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs items-end sm:items-center justify-center p-4 pb-[max(1rem,env(safe-area-inset-bottom))]`}
+          >
+            <div
+              ref={portalSheetRef}
+              role="tooltip"
+              data-testid="tooltip-portal-sheet"
+              dir={dir}
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-md max-h-[75dvh] overflow-y-auto p-4 shadow-2xl text-xs leading-relaxed text-slate-100 bg-slate-900/95 dark:bg-slate-950/95 rounded-2xl border border-slate-700/60 dark:border-slate-800 ${
+                dir === 'rtl' ? 'text-right' : 'text-left'
+              } font-sans font-normal normal-case tracking-normal ${className}`}
+            >
+              <button
+                type="button"
+                aria-label={dir === 'rtl' ? 'סגור הסבר' : 'Close tooltip'}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsOpen(false)
+                }}
+                className="float-end ms-2 mb-1 inline-flex items-center justify-center min-w-[32px] min-h-[32px] px-2 py-1 rounded-lg text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+              {children}
+            </div>
+          </div>,
+          document.body
+        )}
     </span>
   )
 }
@@ -465,7 +548,7 @@ function InfoTooltip({ text, align = 'center', dir = 'rtl' }) {
     <ResponsiveTooltip
       placement="top"
       align={align}
-      widthClass="sm:w-72"
+      widthClass="lg:w-72"
       dir={dir}
       showArrow
       trigger={({ isOpen, onToggle }) => (
@@ -1279,7 +1362,7 @@ export function Step1Triage({
               <ResponsiveTooltip
                 placement="bottom"
                 align="end"
-                widthClass="sm:w-80"
+                widthClass="lg:w-80"
                 dir={lang === 'he' ? 'rtl' : 'ltr'}
                 className="space-y-1.5"
                 trigger={({ isOpen, onToggle }) => (
@@ -1364,9 +1447,9 @@ export function Step1Triage({
               <ResponsiveTooltip
                 placement="bottom"
                 align="end"
-                widthClass="sm:w-80"
+                widthClass="lg:w-80"
                 dir={lang === 'he' ? 'rtl' : 'ltr'}
-                className="space-y-2 sm:p-3.5"
+                className="space-y-2 lg:p-3.5"
                 trigger={({ isOpen, onToggle }) => (
                   <button
                     type="button"
@@ -1456,9 +1539,9 @@ export function Step1Triage({
                   key={traitInfo.key}
                   placement="top"
                   align="start"
-                  widthClass="sm:w-64"
+                  widthClass="lg:w-64"
                   dir={lang === 'he' ? 'rtl' : 'ltr'}
-                  className="sm:p-2.5"
+                  className="lg:p-2.5"
                   trigger={({ isOpen, onToggle }) => (
                     <button
                       type="button"
@@ -1528,7 +1611,7 @@ export function Step1Triage({
                           key={src.name}
                           placement="top"
                           align="start"
-                          widthClass="sm:w-72"
+                          widthClass="lg:w-72"
                           dir={lang === 'he' ? 'rtl' : 'ltr'}
                           className="space-y-1"
                           trigger={({ isOpen, onToggle }) => (
@@ -1827,9 +1910,9 @@ export function Step1Triage({
                         key={comp.name}
                         placement="top"
                         align="start"
-                        widthClass="sm:w-60"
+                        widthClass="lg:w-60"
                         dir={lang === 'he' ? 'rtl' : 'ltr'}
-                        className="space-y-1 sm:p-2.5"
+                        className="space-y-1 lg:p-2.5"
                         trigger={({ isOpen, onToggle }) => (
                           <button
                             type="button"
@@ -1959,7 +2042,10 @@ export function Step1Triage({
                           isPass ? 'bg-emerald-500' : 'bg-rose-500'
                         }`}
                       />
-                      {lang === 'he' ? indicator.badgeHe : indicator.badge}
+                      <BidiText
+                        text={lang === 'he' ? indicator.badgeHe : indicator.badge}
+                        isRtl={lang === 'he'}
+                      />
                     </span>
                   </div>
 
@@ -1978,7 +2064,10 @@ export function Step1Triage({
                   {/* Highlight Value + Trend or Target Baseline */}
                   <div className="mt-0.5">
                     <div className="text-lg font-bold text-slate-900 dark:text-white">
-                      {lang === 'he' ? indicator.valueHe : indicator.value}
+                      <BidiText
+                        text={lang === 'he' ? indicator.valueHe : indicator.value}
+                        isRtl={lang === 'he'}
+                      />
                     </div>
                     {(indicator.trendLabelHe || indicator.trendLabelEn) ? (
                       <div
@@ -1988,12 +2077,18 @@ export function Step1Triage({
                           FUNDAMENTAL_TREND_TONE_STYLES.neutral
                         }`}
                       >
-                        {lang === 'he' ? indicator.trendLabelHe : indicator.trendLabelEn}
+                        <BidiText
+                          text={lang === 'he' ? indicator.trendLabelHe : indicator.trendLabelEn}
+                          isRtl={lang === 'he'}
+                        />
                       </div>
                     ) : (
                       (lang === 'he' ? indicator.targetHe : indicator.target) && (
                         <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                          {lang === 'he' ? indicator.targetHe : indicator.target}
+                          <BidiText
+                            text={lang === 'he' ? indicator.targetHe : indicator.target}
+                            isRtl={lang === 'he'}
+                          />
                         </div>
                       )
                     )}
@@ -2053,13 +2148,17 @@ export function Step1Triage({
                           <span className="font-mono">{meta.startYear}</span>
                           {meta.cycleBadgeHe && (
                             <span
+                              dir={lang === 'he' ? 'rtl' : 'ltr'}
                               className={`truncate px-1.5 py-0.2 rounded-sm font-medium ${
                                 isCyclical
                                   ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
                                   : 'text-slate-500 dark:text-slate-400'
                               }`}
                             >
-                              {lang === 'he' ? meta.cycleBadgeHe : meta.cycleBadgeEn}
+                              <BidiText
+                                text={lang === 'he' ? meta.cycleBadgeHe : meta.cycleBadgeEn}
+                                isRtl={lang === 'he'}
+                              />
                             </span>
                           )}
                           <span className="font-mono">{meta.endYear}</span>
@@ -2072,10 +2171,16 @@ export function Step1Triage({
                 {/* Quick Detail / Explanation */}
                 <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
                   <p className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
-                    {lang === 'he' ? indicator.detail : indicator.detailEn || indicator.detail}
+                    <BidiText
+                      text={lang === 'he' ? indicator.detail : indicator.detailEn || indicator.detail}
+                      isRtl={lang === 'he'}
+                    />
                   </p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                    {lang === 'he' ? indicator.metricSummaryHe : indicator.metricSummary}
+                    <BidiText
+                      text={lang === 'he' ? indicator.metricSummaryHe : indicator.metricSummary}
+                      isRtl={lang === 'he'}
+                    />
                   </p>
                 </div>
               </div>
