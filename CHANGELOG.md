@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
-> Active `1.2.4` release train on `develop` (staged prior to `main` promotion).
+> Active `1.2.5` release train on `develop` (staged prior to `main` promotion).
 
 ### Added
 - Step 1 Triage Gatekeeper UI, Vertex AI `generateAiSummary` Cloud Function, and admin cache/ingestion controls (`PR #316`).
@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Pinned Playwright E2E workflow runners to `ubuntu-24.04` (`PR #316`) and enabled `CodeQL Advanced` on `develop` (`PR #320`).
 
 ### Fixed
+- Resolved 49 ESLint errors (`no-undef` `global` → `globalThis` and unused variables) in `src/services/__tests__/edgarApi.test.js` and `src/utils/__tests__/gaapNormalizer.test.js` (#353).
 - Eliminated `secTickers` HTTP `502` / SEC `429` directory outages via a 4-tier resilient Cloud Functions loader (24h in-memory cache + in-flight deduplication, shared Firestore `systemCache/secTickers`, bounded `429`/`503` retries with a valid contact User-Agent, and bundled `sec-tickers-snapshot.json.gz` fallback) plus client `localStorage` caching and dot/hyphen share-class resolution (`#349`).
 - Fixed company-name search UX by adding `sanitizeSearchQuery` (preserving spaces and up to 60 characters), ranked multi-word & company-name matching (`scoreTickerMatches`), smart `Enter` auto-resolution to best matching ticker, friendly inline guidance instead of error-page crashes on unmatched company names, and classified error feedback (`#347`).
 - Added full IFRS (`ifrs-full` / Form `20-F`) normalization support (`IFRS_TAG_MAP`, `CY\d{4}(I4|Q4I)?` balance-sheet frames, highest-frequency primary filing currency detection, empty share-array fallthrough, and multi-currency formatting in Step 1 & Key Metrics — unblocking foreign filers such as `SAP SE`) (`#348`).

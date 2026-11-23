@@ -417,18 +417,6 @@ describe('P1 #15: Missing shares outstanding', () => {
   });
 
   it('should NOT flag when shares outstanding are present', () => {
-    const facts = createCompanyFactsWithMetrics({
-      CommonStockSharesOutstanding: [
-        {
-          end: '2023-12-31',
-          val: 15000000000,
-          form: '10-K',
-          frame: 'CY2023',
-          filed: '2024-02-15',
-        },
-      ],
-    });
-
     // Note: shares use 'shares' unit, not USD
     const factsWithShares = createCompanyFacts({
       facts: {

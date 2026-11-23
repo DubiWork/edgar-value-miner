@@ -119,7 +119,7 @@ describe('edgarApi', () => {
 
   beforeEach(() => {
     // Save original fetch
-    originalFetch = global.fetch;
+    originalFetch = globalThis.fetch;
 
     // Clear tickers cache before each test
     clearTickersCache();
@@ -130,7 +130,7 @@ describe('edgarApi', () => {
 
   afterEach(() => {
     // Restore original fetch
-    global.fetch = originalFetch;
+    globalThis.fetch = originalFetch;
   });
 
   // =============================================================================
@@ -175,7 +175,7 @@ describe('edgarApi', () => {
 
   describe('fetchCompanyTickers', () => {
     beforeEach(() => {
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -208,39 +208,39 @@ describe('edgarApi', () => {
     it('should cache tickers and return from cache on second call', async () => {
       // First call
       await fetchCompanyTickers();
-      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
 
       // Second call should use cache
       await fetchCompanyTickers();
-      expect(global.fetch).toHaveBeenCalledTimes(1); // Still 1
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1); // Still 1
     });
 
     it('should force refresh when forceRefresh=true', async () => {
       // First call
       await fetchCompanyTickers();
-      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
 
       // Force refresh
       await fetchCompanyTickers(true);
-      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     });
 
     it.skip('should include User-Agent header', async () => {
       // Create a mock that captures arguments
-      const mockFetch = vi.fn((url, options) => {
+      const mockFetch = vi.fn(() => {
         return Promise.resolve({
           ok: true,
           status: 200,
           json: () => Promise.resolve(mockCompanyTickersResponse),
         });
       });
-      global.fetch = mockFetch;
+      globalThis.fetch = mockFetch;
 
       await fetchCompanyTickers();
 
       // Verify fetch was called with headers
       expect(mockFetch).toHaveBeenCalled();
-      const [[url, options]] = mockFetch.mock.calls;
+      const [[, options]] = mockFetch.mock.calls;
 
       expect(options).toBeDefined();
       expect(options.headers).toBeDefined();
@@ -248,14 +248,14 @@ describe('edgarApi', () => {
     });
 
     it('should handle network errors', async () => {
-      global.fetch = vi.fn(() => Promise.reject(new Error('Network error')));
+      globalThis.fetch = vi.fn(() => Promise.reject(new Error('Network error')));
 
       await expect(fetchCompanyTickers()).rejects.toThrow(EdgarApiError);
     });
 
     it('should handle HTTP errors', async () => {
       let attemptCount = 0;
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         attemptCount++;
         // Always fail with 500
         return Promise.resolve({
@@ -273,7 +273,7 @@ describe('edgarApi', () => {
 
     it('should retry on 429 rate limit error', async () => {
       let callCount = 0;
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         callCount++;
         if (callCount === 1) {
           return Promise.resolve({
@@ -290,12 +290,12 @@ describe('edgarApi', () => {
 
       const tickers = await fetchCompanyTickers();
       expect(tickers).toBeDefined();
-      expect(global.fetch).toHaveBeenCalledTimes(2); // Initial + 1 retry
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2); // Initial + 1 retry
     });
 
     it('should retry on 500 server error', async () => {
       let callCount = 0;
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         callCount++;
         if (callCount === 1) {
           return Promise.resolve({
@@ -312,7 +312,7 @@ describe('edgarApi', () => {
 
       const tickers = await fetchCompanyTickers();
       expect(tickers).toBeDefined();
-      expect(global.fetch).toHaveBeenCalledTimes(2); // Initial + 1 retry
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2); // Initial + 1 retry
     });
 
     it('should deduplicate concurrent in-flight fetchCompanyTickers calls', async () => {
@@ -322,7 +322,7 @@ describe('edgarApi', () => {
       ]);
 
       expect(first).toEqual(second);
-      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     });
 
     it('should serve fresh tickers from localStorage without network fetch and fall back to stale localStorage on outage', async () => {
@@ -346,7 +346,7 @@ describe('edgarApi', () => {
         });
         const fresh = await fetchCompanyTickers();
         expect(fresh.SAP).toEqual({ cik: 1000184, name: 'SAP SE', ticker: 'SAP' });
-        expect(global.fetch).not.toHaveBeenCalled();
+        expect(globalThis.fetch).not.toHaveBeenCalled();
 
         // Reset memory cache cleanly by clearing & re-seeding stale entry (>24h old)
         clearTickersCache();
@@ -354,7 +354,7 @@ describe('edgarApi', () => {
           ts: Date.now() - 48 * 60 * 60 * 1000,
           items: [[1000184, 'SAP', 'SAP SE']],
         });
-        global.fetch = vi.fn(() => Promise.reject(new Error('Network down')));
+        globalThis.fetch = vi.fn(() => Promise.reject(new Error('Network down')));
         const staleFallback = await fetchCompanyTickers();
         expect(staleFallback.SAP).toEqual({ cik: 1000184, name: 'SAP SE', ticker: 'SAP' });
       } finally {
@@ -373,7 +373,7 @@ describe('edgarApi', () => {
 
   describe('mapTickerToCik', () => {
     beforeEach(() => {
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -430,7 +430,7 @@ describe('edgarApi', () => {
 
   describe('fetchCompanyFacts', () => {
     beforeEach(() => {
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -453,12 +453,12 @@ describe('edgarApi', () => {
 
       // URL contains the padded CIK — either as path segment (DEV: CIK0000320193)
       // or as query param (PROD: ?cik=0000320193)
-      const calledUrl = global.fetch.mock.calls[0][0];
+      const calledUrl = globalThis.fetch.mock.calls[0][0];
       expect(calledUrl).toMatch(/CIK0000320193|cik=0000320193/);
     });
 
     it('should throw error for 404 not found', async () => {
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         return Promise.resolve({
           ok: false,
           status: 404,
@@ -469,7 +469,7 @@ describe('edgarApi', () => {
     });
 
     it('should enhance 404 error message with CIK context', async () => {
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         return Promise.resolve({
           ok: false,
           status: 404,
@@ -488,7 +488,7 @@ describe('edgarApi', () => {
 
   describe('fetchCompanyFactsByTicker', () => {
     beforeEach(() => {
-      global.fetch = vi.fn((url) => {
+      globalThis.fetch = vi.fn((url) => {
         if (url.includes('company_tickers.json') || url.includes('sec-tickers')) {
           return Promise.resolve({
             ok: true,
@@ -521,7 +521,7 @@ describe('edgarApi', () => {
     it('should make two API calls (tickers + facts)', async () => {
       await fetchCompanyFactsByTicker('AAPL');
 
-      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     });
 
     it('should use tickers cache on second call', async () => {
@@ -529,13 +529,13 @@ describe('edgarApi', () => {
       await fetchCompanyFactsByTicker('MSFT');
 
       // Only 3 calls: 1 for tickers (cached), 2 for facts
-      expect(global.fetch).toHaveBeenCalledTimes(3);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(3);
     });
   });
 
   describe('fetchCompanyConcept', () => {
     beforeEach(() => {
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -556,7 +556,7 @@ describe('edgarApi', () => {
       expect(result.tag).toBe('RevenueFromContractWithCustomerExcludingAssessedTax');
       expect(result.units.USD).toHaveLength(1);
 
-      const calledUrl = global.fetch.mock.calls[0][0];
+      const calledUrl = globalThis.fetch.mock.calls[0][0];
       expect(calledUrl).toMatch(/0001594805/);
       expect(calledUrl).toMatch(/us-gaap/);
       expect(calledUrl).toMatch(/RevenueFromContractWithCustomerExcludingAssessedTax/);
@@ -565,7 +565,7 @@ describe('edgarApi', () => {
     it('should default namespace to us-gaap when 2 arguments are provided', async () => {
       await fetchCompanyConcept(1594805, 'Revenues');
 
-      const calledUrl = global.fetch.mock.calls[0][0];
+      const calledUrl = globalThis.fetch.mock.calls[0][0];
       expect(calledUrl).toMatch(/0001594805/);
       expect(calledUrl).toMatch(/us-gaap/);
       expect(calledUrl).toMatch(/Revenues/);
@@ -574,7 +574,7 @@ describe('edgarApi', () => {
     it('should pad numeric CIK to 10 digits before fetching', async () => {
       await fetchCompanyConcept(320193, 'us-gaap', 'Revenues');
 
-      const calledUrl = global.fetch.mock.calls[0][0];
+      const calledUrl = globalThis.fetch.mock.calls[0][0];
       expect(calledUrl).toMatch(/0000320193/);
     });
 
@@ -599,7 +599,7 @@ describe('edgarApi', () => {
     });
 
     it('should enhance 404 error with CIK and concept context', async () => {
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         return Promise.resolve({
           ok: false,
           status: 404,
@@ -623,7 +623,7 @@ describe('edgarApi', () => {
 
     it('should retry on transient 500 error and succeed', async () => {
       let callCount = 0;
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         callCount++;
         if (callCount === 1) {
           return Promise.resolve({
@@ -650,7 +650,7 @@ describe('edgarApi', () => {
 
   describe('Rate Limiting', () => {
     beforeEach(() => {
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -717,7 +717,7 @@ describe('edgarApi', () => {
 
   describe('Error Handling', () => {
     it('should classify 404 as INVALID_TICKER', async () => {
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         return Promise.resolve({
           ok: false,
           status: 404,
@@ -735,7 +735,7 @@ describe('edgarApi', () => {
     });
 
     it('should classify 429 as RATE_LIMITED', async () => {
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         return Promise.resolve({
           ok: false,
           status: 429,
@@ -743,7 +743,7 @@ describe('edgarApi', () => {
       });
 
       // Disable retries by exhausting them
-      vi.spyOn(global, 'setTimeout').mockImplementation((cb) => cb());
+      vi.spyOn(globalThis, 'setTimeout').mockImplementation((cb) => cb());
 
       try {
         await fetchCompanyTickers();
@@ -757,14 +757,14 @@ describe('edgarApi', () => {
     });
 
     it('should classify 500 as SERVER_ERROR', async () => {
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         return Promise.resolve({
           ok: false,
           status: 500,
         });
       });
 
-      vi.spyOn(global, 'setTimeout').mockImplementation((cb) => cb());
+      vi.spyOn(globalThis, 'setTimeout').mockImplementation((cb) => cb());
 
       try {
         await fetchCompanyTickers();
@@ -778,7 +778,7 @@ describe('edgarApi', () => {
     });
 
     it('should classify network errors as NETWORK_ERROR', async () => {
-      global.fetch = vi.fn(() => Promise.reject(new Error('Network failure')));
+      globalThis.fetch = vi.fn(() => Promise.reject(new Error('Network failure')));
 
       try {
         await fetchCompanyTickers();
@@ -791,7 +791,7 @@ describe('edgarApi', () => {
     });
 
     it('should classify malformed JSON as PARSE_ERROR', async () => {
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -811,7 +811,7 @@ describe('edgarApi', () => {
     });
 
     it('should include context in PARSE_ERROR message', async () => {
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -830,7 +830,7 @@ describe('edgarApi', () => {
     });
 
     it('should handle empty response body as PARSE_ERROR', async () => {
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -849,7 +849,7 @@ describe('edgarApi', () => {
 
     it.skip('should retry network errors up to 3 times', async () => {
       let callCount = 0;
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         callCount++;
         // Fail 3 times, then succeed on 4th attempt (initial + 3 retries = 4 attempts)
         if (callCount < 4) {
@@ -875,7 +875,7 @@ describe('edgarApi', () => {
 
   describe('Cache Management', () => {
     beforeEach(() => {
-      global.fetch = vi.fn(() => {
+      globalThis.fetch = vi.fn(() => {
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -887,14 +887,14 @@ describe('edgarApi', () => {
     it('should clear tickers cache', async () => {
       // Populate cache
       await fetchCompanyTickers();
-      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
 
       // Clear cache
       clearTickersCache();
 
       // Next call should fetch again
       await fetchCompanyTickers();
-      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     });
   });
 
