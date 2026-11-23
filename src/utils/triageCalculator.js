@@ -193,11 +193,18 @@ function isNumeric(val) {
   return typeof val === 'number' && !isNaN(val) && isFinite(val);
 }
 
-function formatCompactUsd(amount) {
+function formatCompactCurrency(amount, currencySymbol = '$') {
   const abs = Math.abs(Number(amount) || 0);
-  if (abs >= 1e9) return `$${(abs / 1e9).toFixed(1)}B`;
-  if (abs >= 1e6) return `$${Math.round(abs / 1e6)}M`;
-  return `$${Math.round(abs / 1e3)}K`;
+  if (abs >= 1e9) return `${currencySymbol}${(abs / 1e9).toFixed(1)}B`;
+  if (abs >= 1e6) return `${currencySymbol}${Math.round(abs / 1e6)}M`;
+  return `${currencySymbol}${Math.round(abs / 1e3)}K`;
+}
+
+function firstNonEmptyAnnual(candidates) {
+  for (const list of candidates) {
+    if (Array.isArray(list) && list.length > 0) return list;
+  }
+  return [];
 }
 
 function analyzeSeriesShape(sparkline, kind = 'generic') {
@@ -292,25 +299,34 @@ function analyzeSeriesShape(sparkline, kind = 'generic') {
   };
 }
 
-function getMetricsObject(companyFacts) {
-  if (!companyFacts) return null;
+function getMetricsAndCurrency(companyFacts) {
+  if (!companyFacts) return { metrics: null, currencySymbol: '$' };
+
+  const resolveSymbol = (cur) =>
+    gaapNormalizer.getCurrencySymbol ? gaapNormalizer.getCurrencySymbol(cur) : '$';
 
   // Already normalized object with metrics
   if (companyFacts.metrics && typeof companyFacts.metrics === 'object') {
-    return companyFacts.metrics;
+    return {
+      metrics: companyFacts.metrics,
+      currencySymbol: resolveSymbol(companyFacts.metadata?.currency),
+    };
   }
 
-  // Raw company facts with facts.us-gaap
+  // Raw company facts (US-GAAP or IFRS)
   if (companyFacts.facts) {
     try {
       const normalized = gaapNormalizer.normalizeCompanyFacts(companyFacts, { fullHistory: true });
-      return normalized?.metrics || null;
+      return {
+        metrics: normalized?.metrics || null,
+        currencySymbol: resolveSymbol(normalized?.metadata?.currency),
+      };
     } catch {
-      return null;
+      return { metrics: null, currencySymbol: '$' };
     }
   }
 
-  return null;
+  return { metrics: null, currencySymbol: '$' };
 }
 
 // =============================================================================
@@ -320,7 +336,7 @@ function getMetricsObject(companyFacts) {
 /**
  * 1. Revenue Growth
  */
-function calculateRevenueMetric(metrics) {
+function calculateRevenueMetric(metrics, currencySymbol = '$') {
   const revList = metrics?.revenue?.annual;
   if (!Array.isArray(revList) || revList.length === 0) {
     return DEFAULT_MSFT_TRIAGE.revenue;
@@ -419,7 +435,7 @@ function calculateRevenueMetric(metrics) {
       : `Revenue declined ${Math.round(yoy)}% YoY`,
     metricSummary: `${yearsDiff > 0 ? `${yearsDiff}Y` : 'Latest'} CAGR ~${Math.round(cagr)}%${longEn}`,
     metricSummaryHe: `צמיחה שנתית (CAGR) · ${yearsDiff > 0 ? `${yearsDiff} ש׳` : 'אחרון'}: ~${Math.round(cagr)}%${longHe}`,
-    sparklineUnit: '$M',
+    sparklineUnit: `${currencySymbol}M`,
     historyMeta,
     status: isPass ? 'pass' : 'fail',
     sparkline,
@@ -658,11 +674,12 @@ function calculateShareRateTrend(allYears, { isDecreasing, isFlat }) {
 /**
  * 3. Share Dilution (Financial logic: Buybacks / decreasing = GREEN / Pass; Dilution / increasing = RED / Fail)
  */
-function calculateShareDilutionMetric(metrics) {
-  const sharesList =
-    metrics?.weightedAverageSharesDiluted?.annual ||
-    metrics?.sharesOutstanding?.annual ||
-    [];
+function calculateShareDilutionMetric(metrics, currencySymbol = '$') {
+  const sharesList = firstNonEmptyAnnual([
+    metrics?.weightedAverageSharesDiluted?.annual,
+    metrics?.weightedAverageShares?.annual,
+    metrics?.sharesOutstanding?.annual,
+  ]);
 
   if (!Array.isArray(sharesList) || sharesList.length === 0) {
     return DEFAULT_MSFT_TRIAGE.shares;
@@ -734,12 +751,12 @@ function calculateShareDilutionMetric(metrics) {
   const totalFmt = `${totalChangePct >= 0 ? '+' : ''}${totalChangePct.toFixed(1)}%`;
   const annualFmt = `${annualChangePct >= 0 ? '+' : ''}${annualChangePct.toFixed(1)}%`;
   const spendNoteHe = latestBuybackUsd
-    ? ` · רכישות אשתקד: ${formatCompactUsd(latestBuybackUsd)}${
+    ? ` · רכישות אשתקד: ${formatCompactCurrency(latestBuybackUsd, currencySymbol)}${
         buybackCagrPct !== null ? ` (קצב שנתי ${buybackCagrPct >= 0 ? '+' : ''}${Math.round(buybackCagrPct)}%)` : ''
       }`
     : '';
   const spendNoteEn = latestBuybackUsd
-    ? ` · Latest spend: ${formatCompactUsd(latestBuybackUsd)}${
+    ? ` · Latest spend: ${formatCompactCurrency(latestBuybackUsd, currencySymbol)}${
         buybackCagrPct !== null ? ` (${Math.round(buybackCagrPct)}% CAGR)` : ''
       }`
     : '';
@@ -903,16 +920,16 @@ function calculateCurrentRatioMetric(metrics) {
  * }}
  */
 export function calculateTriageMetrics(companyFacts) {
-  const metrics = getMetricsObject(companyFacts);
+  const { metrics, currencySymbol } = getMetricsAndCurrency(companyFacts);
 
   if (!metrics) {
     return DEFAULT_MSFT_TRIAGE;
   }
 
   return {
-    revenue: calculateRevenueMetric(metrics),
+    revenue: calculateRevenueMetric(metrics, currencySymbol),
     margins: calculateOperatingMarginsMetric(metrics),
-    shares: calculateShareDilutionMetric(metrics),
+    shares: calculateShareDilutionMetric(metrics, currencySymbol),
     currentRatio: calculateCurrentRatioMetric(metrics),
   };
 }

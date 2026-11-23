@@ -22,10 +22,11 @@ const ICONS = {
  * @param {Function} props.resetError - Function to reset the error state
  * @param {string} [props.errorType] - Pre-categorized error type
  */
-export function ErrorFallback({ error, resetError, errorType }) {
+export function ErrorFallback({ error, resetError, errorType, userMessage, onGoHome }) {
   const type = errorType || categorizeError(error);
   const config = ERROR_UI_CONFIG[type] || ERROR_UI_CONFIG[ERROR_TYPES.UNKNOWN];
   const Icon = ICONS[config.iconName] || AlertTriangle;
+  const displayDescription = userMessage || error?.userMessage || config.description;
 
   const handleRetry = () => {
     if (resetError) {
@@ -34,6 +35,10 @@ export function ErrorFallback({ error, resetError, errorType }) {
   };
 
   const handleGoHome = () => {
+    if (onGoHome) {
+      onGoHome();
+      return;
+    }
     if (resetError) {
       resetError();
     }
@@ -64,7 +69,7 @@ export function ErrorFallback({ error, resetError, errorType }) {
           className="mb-6 leading-relaxed"
           style={{ color: 'var(--color-text-secondary)' }}
         >
-          {config.description}
+          {displayDescription}
         </p>
 
         {/* Actions */}

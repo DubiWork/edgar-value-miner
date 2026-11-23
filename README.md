@@ -4,7 +4,7 @@
 
 ### *The AI Research Analyst for Serious Retail Investors*
 
-[![Version](https://img.shields.io/badge/Version-1.2.3--develop-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.2.4--develop-blue.svg)](./CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![React 19](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Firebase](https://img.shields.io/badge/Firebase-12-ffca28.svg)](https://firebase.google.com/)
@@ -19,7 +19,7 @@
 
 ## Why EDGAR Value Miner?
 
-- **Trustworthy & Source-Grounded:** Built on official SEC EDGAR filings (`10-K`, `10-Q`, `8-K`, `40-F`, `IFRS`) with source traceability — never an unverifiable black box.
+- **Trustworthy & Source-Grounded:** Built on official SEC EDGAR filings (`10-K`, `10-Q`, `8-K`, `20-F`, `40-F`, `IFRS`) with source traceability — never an unverifiable black box.
 - **Structured Research Flow:** Guides analysis through progressive triage and fundamental checks instead of noisy trader charts.
 - **AI Woven Into the Flow:** Step 1 Business Clarity summaries powered by Vertex AI Gemini over SEC filing context.
 - **Responsive & Theme-Aware:** Works across desktop and mobile with Dark and Light modes.

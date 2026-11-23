@@ -15,7 +15,14 @@
  * Allowed characters for ticker input: A-Z, a-z, 0-9, hyphen, period
  * @constant {RegExp}
  */
-const TICKER_ALLOWED_CHARS = /^[A-Za-z0-9.\-]+$/;
+const TICKER_ALLOWED_CHARS = /^[A-Za-z0-9.-]+$/;
+
+/**
+ * Allowed characters for company search queries (tickers + company names):
+ * A-Z, a-z, 0-9, space, hyphen, period, ampersand
+ * @constant {RegExp}
+ */
+const SEARCH_QUERY_ALLOWED_CHARS = /^[A-Za-z0-9.& -]+$/;
 
 /**
  * Pattern to detect HTML tags (including script tags)
@@ -34,6 +41,12 @@ const XSS_PATTERN = /javascript:|on\w+\s*=|<script|<\/script|<img|<svg|<iframe|d
  * @constant {number}
  */
 const MAX_TICKER_LENGTH = 10;
+
+/**
+ * Maximum allowed length for company-name search input
+ * @constant {number}
+ */
+export const MAX_SEARCH_QUERY_LENGTH = 60;
 
 // =============================================================================
 // Sanitization Functions
@@ -131,6 +144,58 @@ export function sanitizeTickerInput(input) {
 }
 
 /**
+ * Sanitizes a company-name or ticker search query while preserving spaces and
+ * common corporate punctuation (`&`, `.`, `-`) up to MAX_SEARCH_QUERY_LENGTH.
+ *
+ * @param {*} input - The raw search input from the user
+ * @returns {{ sanitized: string, isValid: boolean, original: string, warnings: string[] }}
+ */
+export function sanitizeSearchQuery(input) {
+  const warnings = [];
+
+  if (input === null || input === undefined) {
+    return { sanitized: '', isValid: false, original: String(input), warnings: ['Input is empty'] };
+  }
+
+  const original = String(input);
+
+  if (original.trim().length === 0) {
+    return { sanitized: '', isValid: false, original, warnings: ['Input is empty'] };
+  }
+
+  let working = original;
+
+  if (XSS_PATTERN.test(original)) {
+    warnings.push('Input contained potential XSS pattern');
+  }
+
+  const stripped = stripHtmlTags(working);
+  if (stripped !== working) {
+    warnings.push('Input contained HTML tags');
+    working = stripped;
+  }
+
+  const filtered = working
+    .split('')
+    .filter((char) => SEARCH_QUERY_ALLOWED_CHARS.test(char))
+    .join('')
+    .replace(/\s+/g, ' ')
+    .replace(/^\s+/, '');
+
+  const truncated = filtered.length > MAX_SEARCH_QUERY_LENGTH
+    ? filtered.slice(0, MAX_SEARCH_QUERY_LENGTH)
+    : filtered;
+
+  if (filtered.length > MAX_SEARCH_QUERY_LENGTH) {
+    warnings.push(`Input truncated from ${filtered.length} to ${MAX_SEARCH_QUERY_LENGTH} characters`);
+  }
+
+  const isValid = truncated.trim().length > 0 && truncated.length <= MAX_SEARCH_QUERY_LENGTH;
+
+  return { sanitized: truncated, isValid, original, warnings };
+}
+
+/**
  * Sanitizes a general text input string
  *
  * Strips HTML tags and dangerous patterns from arbitrary text input.
@@ -204,6 +269,8 @@ export function containsXss(input) {
 
 export default {
   sanitizeTickerInput,
+  sanitizeSearchQuery,
   sanitizeTextInput,
   containsXss,
+  MAX_SEARCH_QUERY_LENGTH,
 };

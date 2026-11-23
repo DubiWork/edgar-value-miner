@@ -314,6 +314,57 @@ describe('edgarApi', () => {
       expect(tickers).toBeDefined();
       expect(global.fetch).toHaveBeenCalledTimes(2); // Initial + 1 retry
     });
+
+    it('should deduplicate concurrent in-flight fetchCompanyTickers calls', async () => {
+      const [first, second] = await Promise.all([
+        fetchCompanyTickers(),
+        fetchCompanyTickers(),
+      ]);
+
+      expect(first).toEqual(second);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should serve fresh tickers from localStorage without network fetch and fall back to stale localStorage on outage', async () => {
+      const memStore = {};
+      const origStorage = globalThis.localStorage;
+      Object.defineProperty(globalThis, 'localStorage', {
+        configurable: true,
+        writable: true,
+        value: {
+          getItem: vi.fn((k) => memStore[k] ?? null),
+          setItem: vi.fn((k, v) => { memStore[k] = String(v); }),
+          removeItem: vi.fn((k) => { delete memStore[k]; }),
+        },
+      });
+
+      try {
+        // Fresh localStorage hit
+        memStore['edgar-sec-tickers-v1'] = JSON.stringify({
+          ts: Date.now(),
+          items: [[1000184, 'SAP', 'SAP SE']],
+        });
+        const fresh = await fetchCompanyTickers();
+        expect(fresh.SAP).toEqual({ cik: 1000184, name: 'SAP SE', ticker: 'SAP' });
+        expect(global.fetch).not.toHaveBeenCalled();
+
+        // Reset memory cache cleanly by clearing & re-seeding stale entry (>24h old)
+        clearTickersCache();
+        memStore['edgar-sec-tickers-v1'] = JSON.stringify({
+          ts: Date.now() - 48 * 60 * 60 * 1000,
+          items: [[1000184, 'SAP', 'SAP SE']],
+        });
+        global.fetch = vi.fn(() => Promise.reject(new Error('Network down')));
+        const staleFallback = await fetchCompanyTickers();
+        expect(staleFallback.SAP).toEqual({ cik: 1000184, name: 'SAP SE', ticker: 'SAP' });
+      } finally {
+        Object.defineProperty(globalThis, 'localStorage', {
+          configurable: true,
+          writable: true,
+          value: origStorage,
+        });
+      }
+    });
   });
 
   // =============================================================================
@@ -326,7 +377,10 @@ describe('edgarApi', () => {
         return Promise.resolve({
           ok: true,
           status: 200,
-          json: () => Promise.resolve(mockCompanyTickersResponse),
+          json: () => Promise.resolve({
+            ...mockCompanyTickersResponse,
+            '3': { cik_str: '1067983', ticker: 'BRK-B', title: 'BERKSHIRE HATHAWAY INC' },
+          }),
         });
       });
     });
@@ -343,6 +397,20 @@ describe('edgarApi', () => {
     it('should normalize ticker to uppercase', async () => {
       const result = await mapTickerToCik('aapl');
       expect(result.cik).toBe('0000320193');
+    });
+
+    it('should resolve share-class dot/hyphen aliases such as BRK.B -> BRK-B', async () => {
+      const dotResult = await mapTickerToCik('BRK.B');
+      expect(dotResult).toEqual({
+        cik: '0001067983',
+        name: 'BERKSHIRE HATHAWAY INC',
+      });
+
+      const hyphenResult = await mapTickerToCik('BRK-B');
+      expect(hyphenResult).toEqual({
+        cik: '0001067983',
+        name: 'BERKSHIRE HATHAWAY INC',
+      });
     });
 
     it('should throw error for invalid ticker format', async () => {
