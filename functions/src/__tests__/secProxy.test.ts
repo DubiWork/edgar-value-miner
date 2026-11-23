@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
 
 // ---------------------------------------------------------------------------
@@ -13,7 +13,7 @@ const { mockGet } = vi.hoisted(() => ({ mockGet: vi.fn() }));
 vi.mock('firebase-functions', () => ({
   default: {},
   https: { onRequest: vi.fn() },
-  logger: { error: vi.fn(), info: vi.fn() },
+  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
 // ---------------------------------------------------------------------------
@@ -27,11 +27,15 @@ vi.mock('https', () => ({
 // ---------------------------------------------------------------------------
 // Mock zlib
 // ---------------------------------------------------------------------------
-vi.mock('zlib', () => ({
-  default: {},
-  createGunzip: vi.fn(),
-  createInflate: vi.fn(),
-}));
+vi.mock('zlib', async () => {
+  const actual = await vi.importActual<typeof import('zlib')>('zlib');
+  return {
+    ...actual,
+    default: actual,
+    createGunzip: vi.fn(),
+    createInflate: vi.fn(),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Helpers to build mock req/res objects
@@ -128,7 +132,25 @@ import {
   secCompanyFactsHandler,
   secCompanyConceptHandler,
   fetchFromSec,
+  getSecTickersWithSource,
+  clearTickersCacheForTesting,
+  setBundledSnapshotEnabledForTesting,
+  setRetryDelaysForTesting,
 } from '../functions/secProxy.js';
+
+function mockSecErrorWithHeaders(statusCode: number, headers: Record<string, string>): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  mockGet.mockImplementationOnce((_url: any, _opts: any, cb: (res: MockIncomingMessage) => void) => {
+    const resEmitter = new EventEmitter() as MockIncomingMessage;
+    resEmitter.statusCode = statusCode;
+    resEmitter.headers = headers;
+    resEmitter.resume = vi.fn();
+
+    process.nextTick(() => cb(resEmitter));
+
+    return new EventEmitter();
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Tests: fetchFromSec is SSRF-safe by construction (#215)
@@ -137,6 +159,14 @@ import {
 describe('fetchFromSec SSRF-safe endpoint API', () => {
   beforeEach(() => {
     mockGet.mockReset();
+    clearTickersCacheForTesting();
+    setBundledSnapshotEnabledForTesting(false);
+    setRetryDelaysForTesting([]);
+  });
+
+  afterEach(() => {
+    setBundledSnapshotEnabledForTesting(true);
+    setRetryDelaysForTesting(null);
   });
 
   it('builds the tickers URL from constants (host www.sec.gov)', () => {
@@ -188,6 +218,14 @@ describe('fetchFromSec SSRF-safe endpoint API', () => {
 describe('secTickersHandler', () => {
   beforeEach(() => {
     mockGet.mockReset();
+    clearTickersCacheForTesting();
+    setBundledSnapshotEnabledForTesting(false);
+    setRetryDelaysForTesting([]);
+  });
+
+  afterEach(() => {
+    setBundledSnapshotEnabledForTesting(true);
+    setRetryDelaysForTesting(null);
   });
 
   it('returns 405 for non-GET methods', async () => {
@@ -248,7 +286,7 @@ describe('secTickersHandler', () => {
     expect(res.headers['Cache-Control']).toContain('max-age=86400');
   });
 
-  it('returns 502 when SEC API returns an error status', async () => {
+  it('returns 502 when SEC API returns an error status and fallback snapshot is disabled', async () => {
     mockSecError(503);
 
     const req = makeReq('GET');
@@ -260,6 +298,74 @@ describe('secTickersHandler', () => {
     expect(res.statusCode).toBe(502);
     expect(res.body).toMatchObject({ error: expect.stringContaining('Failed to fetch') });
   });
+
+  it('serves subsequent requests from 24h in-memory cache without re-calling SEC', async () => {
+    const payload = { '0': { cik_str: 320193, ticker: 'AAPL', title: 'Apple Inc.' } };
+    mockSecSuccess(payload);
+
+    const req1 = makeReq('GET');
+    const res1 = makeRes();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await secTickersHandler(req1 as any, res1 as any);
+
+    expect(res1.statusCode).toBe(200);
+    expect(res1.headers['X-Tickers-Source']).toBe('sec-live');
+
+    const req2 = makeReq('GET');
+    const res2 = makeRes();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await secTickersHandler(req2 as any, res2 as any);
+
+    expect(res2.statusCode).toBe(200);
+    expect(res2.headers['X-Tickers-Source']).toBe('memory');
+    expect(res2.body).toEqual(payload);
+    expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+
+  it('deduplicates concurrent in-flight ticker directory requests', async () => {
+    const payload = { '0': { cik_str: 789019, ticker: 'MSFT', title: 'Microsoft Corp' } };
+    mockSecSuccess(payload);
+
+    const [r1, r2] = await Promise.all([getSecTickersWithSource(), getSecTickersWithSource()]);
+
+    expect(r1.data).toEqual(payload);
+    expect(r2.data).toEqual(payload);
+    expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries transient SEC 429 responses and succeeds on subsequent 200', async () => {
+    setRetryDelaysForTesting([1, 1]);
+    const payload = { '0': { cik_str: 1000184, ticker: 'SAP', title: 'SAP SE' } };
+    mockSecErrorWithHeaders(429, { 'retry-after': '0' });
+    mockSecSuccess(payload);
+
+    const req = makeReq('GET');
+    const res = makeRes();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await secTickersHandler(req as any, res as any);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['X-Tickers-Source']).toBe('sec-live');
+    expect(res.body).toEqual(payload);
+    expect(mockGet).toHaveBeenCalledTimes(2);
+  });
+
+  it('falls back to bundled gzip snapshot returning 200 with SAP and BRK-B when SEC returns 429', async () => {
+    setBundledSnapshotEnabledForTesting(true);
+    mockSecError(429);
+
+    const req = makeReq('GET');
+    const res = makeRes();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await secTickersHandler(req as any, res as any);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['X-Tickers-Source']).toBe('bundled-snapshot');
+    const entries = Object.values(res.body as Record<string, { cik_str: number; ticker: string; title: string }>);
+    expect(entries.length).toBeGreaterThan(5000);
+    expect(entries.some((e) => e.ticker === 'SAP' && e.cik_str === 1000184)).toBe(true);
+    expect(entries.some((e) => e.ticker === 'BRK-B' && e.cik_str === 1067983)).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -268,6 +374,11 @@ describe('secTickersHandler', () => {
 describe('secCompanyFactsHandler', () => {
   beforeEach(() => {
     mockGet.mockReset();
+    setRetryDelaysForTesting([]);
+  });
+
+  afterEach(() => {
+    setRetryDelaysForTesting(null);
   });
 
   it('returns 400 when cik query param is missing', async () => {
@@ -411,6 +522,11 @@ describe('secCompanyFactsHandler', () => {
 describe('secCompanyConceptHandler', () => {
   beforeEach(() => {
     mockGet.mockReset();
+    setRetryDelaysForTesting([]);
+  });
+
+  afterEach(() => {
+    setRetryDelaysForTesting(null);
   });
 
   it('returns 405 for non-GET methods', async () => {

@@ -127,6 +127,9 @@ export function useKeyMetrics(normalizedData, stockQuote = null) {
     if (!normalizedData?.metrics) return [];
 
     const metrics = [];
+    const currencyPrefix = gaapNormalizer.getCurrencySymbol
+      ? gaapNormalizer.getCurrencySymbol(normalizedData.metadata?.currency)
+      : '$';
 
     // -----------------------------------------------------------------------
     // 1. Revenue
@@ -135,7 +138,7 @@ export function useKeyMetrics(normalizedData, stockQuote = null) {
     metrics.push({
       id: 'revenue',
       title: 'Revenue',
-      value: revenueLatest ? formatLargeNumber(revenueLatest.value) : '--',
+      value: revenueLatest ? formatLargeNumber(revenueLatest.value, currencyPrefix) : '--',
       unit: revenueLatest?.fiscalYear ? `FY${revenueLatest.fiscalYear}` : undefined,
       trend: getTrend(normalizedData.metrics.revenue?.annual),
     });
@@ -147,7 +150,7 @@ export function useKeyMetrics(normalizedData, stockQuote = null) {
     metrics.push({
       id: 'eps',
       title: 'EPS',
-      value: epsLatest ? `$${Number(epsLatest.value).toFixed(2)}` : '--',
+      value: epsLatest ? `${currencyPrefix}${Number(epsLatest.value).toFixed(2)}` : '--',
       unit: epsLatest?.fiscalYear ? `FY${epsLatest.fiscalYear}` : undefined,
       trend: getTrend(normalizedData.metrics.eps?.annual),
     });
@@ -159,7 +162,7 @@ export function useKeyMetrics(normalizedData, stockQuote = null) {
     metrics.push({
       id: 'fcf',
       title: 'FCF',
-      value: fcfLatest ? formatLargeNumber(fcfLatest.value) : '--',
+      value: fcfLatest ? formatLargeNumber(fcfLatest.value, currencyPrefix) : '--',
       unit: fcfLatest?.fiscalYear ? `FY${fcfLatest.fiscalYear}` : undefined,
       trend: getTrend(normalizedData.metrics.freeCashFlow?.annual),
     });

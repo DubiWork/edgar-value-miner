@@ -292,11 +292,15 @@ export function useCompanySearch() {
         return;
       }
 
-      // Handle fetch failure
+      // Handle fetch failure (preserve structured error code for categorization)
       if (!result.success || !result.data) {
-        throw new Error(
+        const coordinatorErr = new Error(
           result.error?.message || 'Failed to fetch company data'
         );
+        if (result.error?.code) {
+          coordinatorErr.code = result.error.code;
+        }
+        throw coordinatorErr;
       }
 
       // Use already normalized data from cache coordinator, or normalize if raw

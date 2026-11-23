@@ -31,13 +31,14 @@ vi.mock('../../services/edgarApi', () => ({
   fetchCompanyTickers: vi.fn(() => Promise.resolve(mockTickerMap)),
 }));
 
-vi.mock('../../utils/inputSanitization', () => ({
-  sanitizeTickerInput: vi.fn((input) => {
-    const str = String(input || '');
-    const sanitized = str.replace(/[^A-Za-z0-9.-]/g, '').slice(0, 10);
-    return { sanitized, isValid: sanitized.length > 0, original: str, warnings: [] };
-  }),
-}));
+vi.mock('../../utils/inputSanitization', async () => {
+  const actual = await vi.importActual('../../utils/inputSanitization');
+  return {
+    ...actual,
+    sanitizeTickerInput: vi.fn(actual.sanitizeTickerInput),
+    sanitizeSearchQuery: vi.fn(actual.sanitizeSearchQuery),
+  };
+});
 
 // =============================================================================
 // localStorage Mock
@@ -333,6 +334,53 @@ describe('TickerSearch', () => {
 
       // Dropdown should still be open, nothing should crash
       expect(screen.queryByTestId('suggestion-dropdown')).not.toBeNull();
+    });
+
+    it('should preserve spaces for multi-word company names and auto-resolve on Enter', async () => {
+      const { fetchCompanyTickers } = await import('../../services/edgarApi');
+      fetchCompanyTickers.mockResolvedValue({
+        ...mockTickerMap,
+        BAC: { cik: 70858, name: 'BANK OF AMERICA CORP', ticker: 'BAC' },
+      });
+
+      const { input, onSearch } = setup();
+      await focusAndType(input, 'Bank of America');
+      expect(input.value).toBe('BANK OF AMERICA');
+
+      await act(async () => {
+        fireEvent.keyDown(input, { key: 'Enter' });
+      });
+
+      expect(onSearch).toHaveBeenCalledWith('BAC');
+    });
+
+    it('should resolve company name "Microsoft" and "Apple" on Enter to MSFT and AAPL', async () => {
+      const first = setup();
+      await focusAndType(first.input, 'Microsoft');
+      await act(async () => {
+        fireEvent.keyDown(first.input, { key: 'Enter' });
+      });
+      expect(first.onSearch).toHaveBeenCalledWith('MSFT');
+      first.unmount();
+
+      const second = setup();
+      await focusAndType(second.input, 'Apple');
+      await act(async () => {
+        fireEvent.keyDown(second.input, { key: 'Enter' });
+      });
+      expect(second.onSearch).toHaveBeenCalledWith('AAPL');
+    });
+
+    it('should show inline feedback instead of crashing to onSearch for unmatched company name', async () => {
+      const { input, onSearch } = setup();
+      await focusAndType(input, 'Unknown Long Company');
+
+      await act(async () => {
+        fireEvent.keyDown(input, { key: 'Enter' });
+      });
+
+      expect(onSearch).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('search-inline-feedback')).not.toBeNull();
     });
   });
 

@@ -1,11 +1,78 @@
 import * as functions from 'firebase-functions';
+import { getApps } from 'firebase-admin/app';
+import * as fs from 'fs';
 import * as https from 'https';
+import * as path from 'path';
 import * as zlib from 'zlib';
 import type { Request, Response } from 'express';
 
-const SEC_USER_AGENT = 'edgar-value-miner (contact@example.com)';
+const DEFAULT_SEC_USER_AGENT = 'EdgarValueMiner/1.2 (dubigreenfeld@gmail.com)';
+const DEFAULT_RETRY_DELAYS_MS = [400, 1000];
+const MAX_RETRY_AFTER_MS = 3000;
 
 const CACHE_DURATION_SECONDS = 24 * 60 * 60; // 24 hours
+const FRESH_TICKERS_TTL_MS = CACHE_DURATION_SECONDS * 1000;
+const FALLBACK_TICKERS_TTL_MS = 15 * 60 * 1000; // 15 minutes when serving stale/snapshot fallback
+const FIRESTORE_TICKERS_COLLECTION = 'systemCache';
+const FIRESTORE_TICKERS_DOC_ID = 'secTickers';
+const BUNDLED_SNAPSHOT_PATH = path.resolve(__dirname, '..', 'data', 'sec-tickers-snapshot.json.gz');
+
+export type SecTickerWireEntry = {
+  cik_str: number | string;
+  ticker: string;
+  title: string;
+};
+
+export type SecTickersWireMap = Record<string, SecTickerWireEntry>;
+export type CompactTickerTuple = [number, string, string];
+export type TickersSource =
+  | 'memory'
+  | 'firestore'
+  | 'sec-live'
+  | 'memory-stale'
+  | 'firestore-stale'
+  | 'bundled-snapshot';
+
+interface HttpStatusError extends Error {
+  statusCode?: number;
+  retryAfterHeader?: string | string[];
+}
+
+interface MemoryTickersState {
+  data: SecTickersWireMap;
+  expiresAtMs: number;
+}
+
+let memoryTickersCache: MemoryTickersState | null = null;
+let inFlightTickersPromise: Promise<{ data: SecTickersWireMap; source: TickersSource }> | null = null;
+let bundledSnapshotEnabled = true;
+let activeRetryDelaysMs: number[] = [...DEFAULT_RETRY_DELAYS_MS];
+
+/**
+ * Resets the in-memory tickers directory cache (for deterministic unit tests).
+ */
+export function clearTickersCacheForTesting(): void {
+  memoryTickersCache = null;
+  inFlightTickersPromise = null;
+}
+
+/**
+ * Enables or disables loading the bundled SEC snapshot fallback (for testing 502 paths).
+ */
+export function setBundledSnapshotEnabledForTesting(enabled: boolean): void {
+  bundledSnapshotEnabled = enabled;
+}
+
+/**
+ * Overrides bounded 429/503 retry backoff delays (pass [] in unit tests that stub single errors).
+ */
+export function setRetryDelaysForTesting(delays: number[] | null): void {
+  activeRetryDelaysMs = delays ? [...delays] : [...DEFAULT_RETRY_DELAYS_MS];
+}
+
+function getSecUserAgent(): string {
+  return process.env.SEC_USER_AGENT || DEFAULT_SEC_USER_AGENT;
+}
 
 /**
  * Fully server-controlled SEC endpoint URLs. The only variable part — the CIK —
@@ -23,27 +90,48 @@ const SEC_ENDPOINTS = {
 const VALID_NAMESPACE_REGEX = /^[a-zA-Z0-9_-]+$/;
 const VALID_TAG_REGEX = /^[a-zA-Z0-9_]+$/;
 
-/**
- * Performs the actual HTTPS GET to a server-constructed SEC URL, handling GZip.
- * `url` here is always built from SEC_ENDPOINTS (constant host + integer CIK),
- * never from a user-supplied string.
- */
-function httpsGetJson(url: string): Promise<unknown> {
+function parseRetryAfterMs(headerVal?: string | string[], maxDelayMs = MAX_RETRY_AFTER_MS): number | null {
+  const firstVal = Array.isArray(headerVal) ? headerVal[0] : headerVal;
+  if (typeof firstVal !== 'string') return null;
+  const raw = firstVal.trim();
+  if (!raw) return null;
+
+  if (/^\d{1,5}$/.test(raw)) {
+    return Math.min(maxDelayMs, Math.max(0, Number(raw) * 1000));
+  }
+  const parsedMs = Date.parse(raw);
+  if (Number.isFinite(parsedMs)) {
+    return Math.min(maxDelayMs, Math.max(0, parsedMs - Date.now()));
+  }
+  return null;
+}
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function httpsGetJsonOnce(url: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const options = {
       headers: {
-        'User-Agent': SEC_USER_AGENT,
+        'User-Agent': getSecUserAgent(),
         'Accept': 'application/json',
         'Accept-Encoding': 'gzip, deflate',
       },
+      timeout: 25_000,
     };
 
-    https.get(url, options, (res) => {
+    const req = https.get(url, options, (res) => {
       const { statusCode, headers: resHeaders } = res;
 
       if (statusCode !== 200) {
         res.resume();
-        return reject(new Error(`SEC API returned status ${statusCode} for ${url}`));
+        const err: HttpStatusError = new Error(`SEC API returned status ${statusCode} for ${url}`);
+        err.statusCode = statusCode;
+        if (resHeaders['retry-after'] !== undefined) {
+          err.retryAfterHeader = resHeaders['retry-after'];
+        }
+        return reject(err);
       }
 
       const encoding = resHeaders['content-encoding'];
@@ -70,8 +158,256 @@ function httpsGetJson(url: string): Promise<unknown> {
           reject(new Error(`Failed to parse SEC JSON response from ${url}: ${(err as Error).message}`));
         }
       });
-    }).on('error', reject);
+    });
+
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy(new Error(`Timeout fetching ${url}`));
+    });
   });
+}
+
+/**
+ * Performs the actual HTTPS GET to a server-constructed SEC URL, handling GZip
+ * and bounded retries on transient SEC HTTP 429 / 503 rate limits.
+ * `url` here is always built from SEC_ENDPOINTS (constant host + integer CIK),
+ * never from a user-supplied string.
+ */
+async function httpsGetJson(url: string): Promise<unknown> {
+  const maxRetries = activeRetryDelaysMs.length;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await httpsGetJsonOnce(url);
+    } catch (err) {
+      lastError = err;
+      const statusErr = err as HttpStatusError;
+      const isRetryable = statusErr?.statusCode === 429 || statusErr?.statusCode === 503;
+
+      if (!isRetryable || attempt >= maxRetries) {
+        throw err;
+      }
+
+      const retryAfter = parseRetryAfterMs(statusErr.retryAfterHeader);
+      const delayMs = retryAfter !== null ? retryAfter : activeRetryDelaysMs[attempt];
+      if (delayMs > 0) {
+        await sleepMs(delayMs);
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+function expandCompactTickers(compact: CompactTickerTuple[]): SecTickersWireMap {
+  const wire: SecTickersWireMap = {};
+  for (let i = 0; i < compact.length; i++) {
+    const tuple = compact[i];
+    if (!Array.isArray(tuple) || tuple.length < 3) continue;
+    wire[String(i)] = {
+      cik_str: tuple[0],
+      ticker: tuple[1],
+      title: tuple[2],
+    };
+  }
+  return wire;
+}
+
+function compressWireTickers(data: SecTickersWireMap): CompactTickerTuple[] {
+  const compact: CompactTickerTuple[] = [];
+  for (const entry of Object.values(data)) {
+    if (!entry || typeof entry !== 'object' || !entry.ticker) continue;
+    const cik = Number(entry.cik_str);
+    if (!Number.isInteger(cik) || cik < 0) continue;
+    compact.push([cik, String(entry.ticker).trim().toUpperCase(), String(entry.title || '').trim()]);
+  }
+  return compact;
+}
+
+function logWarn(message: string, meta?: Record<string, unknown>): void {
+  const fn = functions.logger?.warn ?? functions.logger?.info;
+  if (typeof fn === 'function') {
+    fn(message, meta);
+  }
+}
+
+function loadBundledTickersSnapshot(): SecTickersWireMap | null {
+  if (!bundledSnapshotEnabled) return null;
+  try {
+    if (!fs.existsSync(BUNDLED_SNAPSHOT_PATH)) return null;
+    const gzBuffer = fs.readFileSync(BUNDLED_SNAPSHOT_PATH);
+    const compact = JSON.parse(zlib.gunzipSync(gzBuffer).toString('utf-8')) as CompactTickerTuple[];
+    if (!Array.isArray(compact) || compact.length === 0) return null;
+    return expandCompactTickers(compact);
+  } catch (err) {
+    logWarn('Failed to load bundled SEC tickers snapshot', {
+      message: (err as Error)?.message,
+    });
+    return null;
+  }
+}
+
+async function readTickersFromFirestore(): Promise<{
+  fresh: SecTickersWireMap | null;
+  stale: SecTickersWireMap | null;
+}> {
+  if (getApps().length === 0) {
+    return { fresh: null, stale: null };
+  }
+  try {
+    const { getFirestore } = await import('firebase-admin/firestore');
+    const snap = await getFirestore()
+      .collection(FIRESTORE_TICKERS_COLLECTION)
+      .doc(FIRESTORE_TICKERS_DOC_ID)
+      .get();
+
+    if (!snap.exists) {
+      return { fresh: null, stale: null };
+    }
+
+    const doc = snap.data() as {
+      gzipBase64?: string;
+      updatedAtMs?: number;
+      updatedAt?: { toMillis?: () => number };
+    } | undefined;
+
+    if (!doc?.gzipBase64 || typeof doc.gzipBase64 !== 'string') {
+      return { fresh: null, stale: null };
+    }
+
+    const compact = JSON.parse(
+      zlib.gunzipSync(Buffer.from(doc.gzipBase64, 'base64')).toString('utf-8')
+    ) as CompactTickerTuple[];
+
+    if (!Array.isArray(compact) || compact.length === 0) {
+      return { fresh: null, stale: null };
+    }
+
+    const wire = expandCompactTickers(compact);
+    const updatedAtMs =
+      typeof doc.updatedAtMs === 'number'
+        ? doc.updatedAtMs
+        : typeof doc.updatedAt?.toMillis === 'function'
+          ? doc.updatedAt.toMillis()
+          : 0;
+
+    if (updatedAtMs > 0 && Date.now() - updatedAtMs < FRESH_TICKERS_TTL_MS) {
+      return { fresh: wire, stale: null };
+    }
+    return { fresh: null, stale: wire };
+  } catch (err) {
+    logWarn('Failed to read SEC tickers cache from Firestore', {
+      message: (err as Error)?.message,
+    });
+    return { fresh: null, stale: null };
+  }
+}
+
+async function persistTickersToFirestore(data: SecTickersWireMap): Promise<void> {
+  if (getApps().length === 0) return;
+  try {
+    const compact = compressWireTickers(data);
+    if (compact.length === 0) return;
+    const gzipBase64 = zlib.gzipSync(Buffer.from(JSON.stringify(compact), 'utf-8')).toString('base64');
+    const { getFirestore, FieldValue } = await import('firebase-admin/firestore');
+    await getFirestore()
+      .collection(FIRESTORE_TICKERS_COLLECTION)
+      .doc(FIRESTORE_TICKERS_DOC_ID)
+      .set({
+        gzipBase64,
+        entryCount: compact.length,
+        updatedAtMs: Date.now(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+  } catch (err) {
+    logWarn('Failed to persist SEC tickers cache to Firestore', {
+      message: (err as Error)?.message,
+    });
+  }
+}
+
+/**
+ * Loads the SEC company tickers directory using a 4-tier resilient chain:
+ * 1. Fresh in-memory cache (24h TTL) + in-flight request deduplication
+ * 2. Firestore shared persistent cache (`systemCache/secTickers`, < 24h)
+ * 3. Live SEC EDGAR `company_tickers.json` (with 429/503 retries) + Firestore persistence
+ * 4. Graceful stale/snapshot fallbacks (`memory-stale` -> `firestore-stale` -> `bundled-snapshot`)
+ */
+export async function getSecTickersWithSource(): Promise<{
+  data: SecTickersWireMap;
+  source: TickersSource;
+}> {
+  const now = Date.now();
+  if (memoryTickersCache && now < memoryTickersCache.expiresAtMs) {
+    return { data: memoryTickersCache.data, source: 'memory' };
+  }
+
+  if (inFlightTickersPromise) {
+    return inFlightTickersPromise;
+  }
+
+  const runLoad = async (): Promise<{ data: SecTickersWireMap; source: TickersSource }> => {
+    let staleFirestoreData: SecTickersWireMap | null = null;
+
+    if (getApps().length > 0) {
+      const firestoreResult = await readTickersFromFirestore();
+      if (firestoreResult.fresh) {
+        memoryTickersCache = {
+          data: firestoreResult.fresh,
+          expiresAtMs: Date.now() + FRESH_TICKERS_TTL_MS,
+        };
+        return { data: firestoreResult.fresh, source: 'firestore' };
+      }
+      staleFirestoreData = firestoreResult.stale;
+    }
+
+    try {
+      const liveData = (await httpsGetJson(SEC_ENDPOINTS.tickers())) as SecTickersWireMap;
+      memoryTickersCache = {
+        data: liveData,
+        expiresAtMs: Date.now() + FRESH_TICKERS_TTL_MS,
+      };
+      await persistTickersToFirestore(liveData);
+      return { data: liveData, source: 'sec-live' };
+    } catch (liveErr) {
+      if (memoryTickersCache?.data) {
+        memoryTickersCache = {
+          data: memoryTickersCache.data,
+          expiresAtMs: Date.now() + FALLBACK_TICKERS_TTL_MS,
+        };
+        return { data: memoryTickersCache.data, source: 'memory-stale' };
+      }
+
+      if (staleFirestoreData) {
+        memoryTickersCache = {
+          data: staleFirestoreData,
+          expiresAtMs: Date.now() + FALLBACK_TICKERS_TTL_MS,
+        };
+        return { data: staleFirestoreData, source: 'firestore-stale' };
+      }
+
+      const snapshot = loadBundledTickersSnapshot();
+      if (snapshot) {
+        logWarn('Serving bundled SEC tickers snapshot fallback', {
+          reason: (liveErr as Error)?.message,
+        });
+        memoryTickersCache = {
+          data: snapshot,
+          expiresAtMs: Date.now() + FALLBACK_TICKERS_TTL_MS,
+        };
+        return { data: snapshot, source: 'bundled-snapshot' };
+      }
+
+      throw liveErr;
+    }
+  };
+
+  const promise = runLoad().finally(() => {
+    inFlightTickersPromise = null;
+  });
+  inFlightTickersPromise = promise;
+  return promise;
 }
 
 /**
@@ -125,7 +461,7 @@ export function fetchFromSec(
     }
     return httpsGetJson(SEC_ENDPOINTS.companyConcept(cik as number, namespace, tag));
   }
-  return httpsGetJson(SEC_ENDPOINTS.tickers());
+  return getSecTickersWithSource().then((result) => result.data);
 }
 
 /**
@@ -165,7 +501,8 @@ export async function secTickersHandler(
   }
 
   try {
-    const data = await fetchFromSec('tickers');
+    const { data, source } = await getSecTickersWithSource();
+    res.set('X-Tickers-Source', source);
     res.set('Cache-Control', `public, max-age=${CACHE_DURATION_SECONDS}, s-maxage=${CACHE_DURATION_SECONDS}`);
     res.status(200).json(data);
   } catch (err) {

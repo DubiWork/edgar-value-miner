@@ -38,11 +38,38 @@ const QUARTERLY_PERIODS = 20;
  * Forms used for annual filings
  * @constant {string[]}
  */
-export const ANNUAL_FORMS = ['10-K', '10-K/A', '40-F', '40-F/A'];
+export const ANNUAL_FORMS = ['10-K', '10-K/A', '20-F', '20-F/A', '40-F', '40-F/A'];
 
 const GAAP_NAMESPACE = 'us-gaap';
 const IFRS_NAMESPACE = 'ifrs-full';
 const DEFAULT_CURRENCY = 'USD';
+
+const CURRENCY_SYMBOLS = {
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  JPY: '¥',
+  CNY: '¥',
+  CAD: 'C$',
+  AUD: 'A$',
+  CHF: 'CHF ',
+  DKK: 'DKK ',
+  SEK: 'SEK ',
+  NOK: 'NOK ',
+  ILS: '₪',
+  TWD: 'NT$',
+};
+
+/**
+ * Returns the currency symbol/prefix for a given ISO 4217 currency code.
+ * @param {string} [currency='USD']
+ * @returns {string}
+ */
+export function getCurrencySymbol(currency) {
+  const code = String(currency || DEFAULT_CURRENCY).trim().toUpperCase();
+  if (!code) return '$';
+  return CURRENCY_SYMBOLS[code] || `${code} `;
+}
 
 /**
  * Forms used for quarterly filings
@@ -367,6 +394,174 @@ export const GAAP_TAG_MAP = {
 };
 
 /**
+ * Maps standard metric names to IFRS (`ifrs-full` / Form 20-F) XBRL tag variations.
+ *
+ * @constant {Object<string, string[]>}
+ */
+export const IFRS_TAG_MAP = {
+  revenue: [
+    'Revenue',
+    'RevenueFromContractsWithCustomers',
+    'Revenues',
+    'InterestRevenueExpense',
+  ],
+  netIncome: [
+    'ProfitLossAttributableToOwnersOfParent',
+    'ProfitLoss',
+    'ProfitLossFromContinuingOperations',
+  ],
+  grossProfit: [
+    'GrossProfit',
+  ],
+  operatingIncome: [
+    'ProfitLossFromOperatingActivities',
+    'OperatingIncomeLoss',
+  ],
+  eps: [
+    'BasicEarningsLossPerShare',
+    'BasicEarningsLossPerShareFromContinuingOperations',
+  ],
+  epsDiluted: [
+    'DilutedEarningsLossPerShare',
+    'DilutedEarningsLossPerShareFromContinuingOperations',
+  ],
+  costOfRevenue: [
+    'CostOfSales',
+  ],
+  researchAndDevelopment: [
+    'ResearchAndDevelopmentExpense',
+  ],
+  sellingGeneralAdmin: [
+    'SellingGeneralAndAdministrativeExpense',
+    'AdministrativeExpense',
+    'DistributionCosts',
+    'OperatingExpense',
+  ],
+  interestExpense: [
+    'InterestExpenseForFinancialLiabilitiesNotAtFairValueThroughProfitOrLoss',
+    'InterestExpenseOnBorrowings',
+    'InterestExpense',
+    'FinanceCosts',
+  ],
+  incomeTaxExpense: [
+    'IncomeTaxExpenseContinuingOperations',
+    'CurrentTaxExpenseIncome',
+    'DeferredTaxExpenseIncomeRecognisedInProfitOrLoss',
+  ],
+  operatingCashFlow: [
+    'CashFlowsFromUsedInOperatingActivities',
+    'CashFlowsFromUsedInOperatingActivitiesContinuingOperations',
+  ],
+  capitalExpenditures: [
+    'PurchaseOfPropertyPlantAndEquipmentIntangibleAssetsOtherThanGoodwillInvestmentPropertyAndOtherNoncurrentAssets',
+    'PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities',
+    'AdditionsOtherThanThroughBusinessCombinationsPropertyPlantAndEquipment',
+    'AdditionsOtherThanThroughBusinessCombinationsPropertyPlantAndEquipmentIncludingRightofuseAssets',
+  ],
+  investingCashFlow: [
+    'CashFlowsFromUsedInInvestingActivities',
+  ],
+  financingCashFlow: [
+    'CashFlowsFromUsedInFinancingActivities',
+  ],
+  depreciationAmortization: [
+    'DepreciationAndAmortisationExpense',
+    'DepreciationRightofuseAssets',
+  ],
+  dividendsPaid: [
+    'DividendsPaidToEquityHoldersOfParentClassifiedAsFinancingActivities',
+    'DividendsPaidClassifiedAsFinancingActivities',
+    'DividendsPaid',
+  ],
+  stockRepurchases: [
+    'PurchaseOfTreasuryShares',
+    'PaymentsToAcquireOrRedeemEntitysShares',
+  ],
+  totalAssets: [
+    'Assets',
+  ],
+  currentAssets: [
+    'CurrentAssets',
+  ],
+  cash: [
+    'CashAndCashEquivalents',
+    'CashAndCashEquivalentsIfDifferentFromStatementOfFinancialPosition',
+  ],
+  shortTermInvestments: [
+    'CurrentFinancialAssets',
+    'OtherCurrentFinancialAssets',
+  ],
+  accountsReceivable: [
+    'TradeAndOtherCurrentReceivables',
+    'CurrentTradeReceivables',
+  ],
+  inventory: [
+    'Inventories',
+    'CurrentInventories',
+  ],
+  propertyPlantEquipment: [
+    'PropertyPlantAndEquipment',
+    'PropertyPlantAndEquipmentIncludingRightofuseAssets',
+  ],
+  goodwill: [
+    'Goodwill',
+  ],
+  intangibleAssets: [
+    'IntangibleAssetsOtherThanGoodwill',
+  ],
+  totalLiabilities: [
+    'Liabilities',
+    'NoncurrentLiabilities',
+  ],
+  currentLiabilities: [
+    'CurrentLiabilities',
+  ],
+  accountsPayable: [
+    'TradeAndOtherCurrentPayables',
+  ],
+  shortTermDebt: [
+    'CurrentBorrowingsAndCurrentPortionOfNoncurrentBorrowings',
+    'ShorttermBorrowings',
+    'CurrentLeaseLiabilities',
+  ],
+  longTermDebt: [
+    'LongtermBorrowings',
+    'NoncurrentFinancialLiabilities',
+    'NoncurrentBorrowings',
+    'Borrowings',
+  ],
+  totalDebt: [
+    'Borrowings',
+  ],
+  stockholdersEquity: [
+    'EquityAttributableToOwnersOfParent',
+    'Equity',
+  ],
+  retainedEarnings: [
+    'RetainedEarnings',
+  ],
+  commonStock: [
+    'IssuedCapital',
+  ],
+  treasuryStock: [
+    'TreasuryShares',
+  ],
+  sharesOutstanding: [
+    'NumberOfSharesIssued',
+    'NumberOfSharesOutstanding',
+    'AdjustedWeightedAverageShares',
+  ],
+  weightedAverageShares: [
+    'WeightedAverageShares',
+    'AdjustedWeightedAverageShares',
+  ],
+  weightedAverageSharesDiluted: [
+    'AdjustedWeightedAverageShares',
+    'WeightedAverageShares',
+  ],
+};
+
+/**
  * Metric categories for organization
  * @constant {Object<string, string[]>}
  */
@@ -437,7 +632,7 @@ export const METRIC_CATEGORIES = {
  * @private
  */
 function devLog(level, message, data = undefined) {
-  if (import.meta.env.DEV) {
+  if (import.meta.env?.DEV) {
     const prefix = 'GaapNormalizer:';
     if (data !== undefined) {
       console[level](prefix, message, data);
@@ -531,27 +726,51 @@ function determineConfidence(dataPoint, metricName, tagIndex) {
  *   console.log(`Found ${result.tag} at priority index ${result.index}`);
  * }
  */
+function resolveActiveTaxonomy(companyFacts) {
+  const facts = companyFacts?.facts ?? {};
+  const usGaap = facts[GAAP_NAMESPACE];
+  if (usGaap && Object.keys(usGaap).length > 0) {
+    return {
+      namespace: GAAP_NAMESPACE,
+      accountingStandard: 'US-GAAP',
+      factsMap: usGaap,
+      tagMap: GAAP_TAG_MAP,
+    };
+  }
+  const ifrs = facts[IFRS_NAMESPACE];
+  if (ifrs && Object.keys(ifrs).length > 0) {
+    return {
+      namespace: IFRS_NAMESPACE,
+      accountingStandard: 'IFRS',
+      factsMap: ifrs,
+      tagMap: IFRS_TAG_MAP,
+    };
+  }
+  return null;
+}
+
 export function findGaapTag(companyFacts, metricName) {
-  const tags = GAAP_TAG_MAP[metricName];
+  const taxonomy = resolveActiveTaxonomy(companyFacts);
+  if (!taxonomy) {
+    devLog('warn', 'No us-gaap or ifrs-full facts found in company data');
+    return null;
+  }
+
+  const tags = taxonomy.tagMap[metricName];
 
   if (!tags || !Array.isArray(tags)) {
     devLog('warn', `Unknown metric: ${metricName}`);
     return null;
   }
 
-  const usGaap = companyFacts?.facts?.['us-gaap'];
-
-  if (!usGaap) {
-    devLog('warn', 'No us-gaap facts found in company data');
-    return null;
-  }
+  const activeFacts = taxonomy.factsMap;
 
   // Collect all present tags with their priority index
   const candidates = [];
   for (let i = 0; i < tags.length; i++) {
     const tag = tags[i];
-    if (usGaap[tag] && usGaap[tag].units) {
-      candidates.push({ tag, data: usGaap[tag], index: i });
+    if (activeFacts[tag] && activeFacts[tag].units) {
+      candidates.push({ tag, data: activeFacts[tag], index: i });
     }
   }
 
@@ -616,23 +835,46 @@ export function findGaapTag(companyFacts, metricName) {
  * @example
  * const annualData = extractTimeSeriesData(revenueTagData, 'annual', { maxPeriods: 5 });
  */
+function selectUnitArray(units, preferredCurrency) {
+  if (!units || typeof units !== 'object') return null;
+
+  if (preferredCurrency) {
+    if (Array.isArray(units[preferredCurrency]) && units[preferredCurrency].length > 0) {
+      return units[preferredCurrency];
+    }
+    const perShareKey = `${preferredCurrency}/shares`;
+    if (Array.isArray(units[perShareKey]) && units[perShareKey].length > 0) {
+      return units[perShareKey];
+    }
+  }
+
+  if (Array.isArray(units.USD) && units.USD.length > 0) return units.USD;
+  if (Array.isArray(units.shares) && units.shares.length > 0) return units.shares;
+  if (Array.isArray(units['USD/shares']) && units['USD/shares'].length > 0) return units['USD/shares'];
+
+  // Pick longest available non-empty array (e.g., EUR or EUR/shares)
+  let longest = null;
+  for (const arr of Object.values(units)) {
+    if (Array.isArray(arr) && (!longest || arr.length > longest.length)) {
+      longest = arr;
+    }
+  }
+  return longest;
+}
+
 export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
   const {
     fullHistory = false,
     maxPeriods = fullHistory ? Infinity : (periodType === 'annual' ? ANNUAL_YEARS : QUARTERLY_PERIODS),
     tagIndex = 0,
+    preferredCurrency = null,
   } = options || {};
 
   if (!gaapTagData?.units) {
     return [];
   }
 
-  // Get USD data (most common), fall back to shares for share-based metrics
-  // Non-USD currencies fall through to Object.values(...)[0] as last resort
-  const unitData = gaapTagData.units.USD ||
-                   gaapTagData.units.shares ||
-                   gaapTagData.units['USD/shares'] ||
-                   Object.values(gaapTagData.units)[0];
+  const unitData = selectUnitArray(gaapTagData.units, preferredCurrency);
 
   if (!unitData || !Array.isArray(unitData)) {
     return [];
@@ -647,12 +889,10 @@ export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
       return false;
     }
 
-    // For annual, prefer full-year periods (frame ends in I4 or CY[year])
+    // For annual, prefer full-year periods (frames like CY2023, CY2023I4, or balance sheet instant CY2023Q4I)
     if (periodType === 'annual') {
-      // Check frame pattern for annual data
-      // Frames like CY2023 or CY2023I4 indicate full year
       if (item.frame) {
-        const isFullYear = /^CY\d{4}(I4)?$/.test(item.frame);
+        const isFullYear = /^CY\d{4}(I4|Q4I)?$/.test(item.frame);
         if (!isFullYear) return false;
       }
     }
@@ -953,22 +1193,23 @@ export function stitchTimeSeriesData(companyFacts, metricName, periodType, optio
     return { data: primaryData.slice(0, maxPeriods), stitched: false };
   }
 
-  const usGaap = companyFacts?.facts?.['us-gaap'];
-  if (!usGaap) {
+  const taxonomy = resolveActiveTaxonomy(companyFacts);
+  if (!taxonomy) {
     const data = (fullHistory || maxPeriods === Infinity) ? primaryData : primaryData.slice(0, maxPeriods);
     return { data, stitched: false };
   }
 
-  const allTags = GAAP_TAG_MAP[metricName] || [];
+  const allTags = taxonomy.tagMap[metricName] || [];
+  const activeFacts = taxonomy.factsMap;
   const coveredYears = new Set(primaryData.map(d => d.fiscalYear));
   const merged = [...primaryData];
 
   for (let i = 0; i < allTags.length; i++) {
     const tag = allTags[i];
     if (tag === primaryTag.tag) continue;
-    if (!usGaap[tag]?.units) continue;
+    if (!activeFacts[tag]?.units) continue;
 
-    const extraData = extractTimeSeriesData(usGaap[tag], periodType, {
+    const extraData = extractTimeSeriesData(activeFacts[tag], periodType, {
       ...options,
       tagIndex: i,
       fullHistory: true,
@@ -1004,15 +1245,30 @@ export function stitchTimeSeriesData(companyFacts, metricName, periodType, optio
 export function detectFilingCurrency(companyFactsJson) {
   const facts = companyFactsJson?.facts;
   if (!facts) return DEFAULT_CURRENCY;
+
+  // Prefer the active namespace (`us-gaap` if non-empty, else `ifrs-full`)
   for (const namespaceKey of [GAAP_NAMESPACE, IFRS_NAMESPACE]) {
     const namespace = facts[namespaceKey];
-    if (!namespace) continue;
+    if (!namespace || Object.keys(namespace).length === 0) continue;
+
+    const counts = new Map();
+    let bestCurrency = null;
+    let bestCount = -1;
+
     for (const tag of Object.values(namespace)) {
-      for (const unit of Object.keys(tag?.units ?? {})) {
-        // ponytail: returns first currency found; multi-currency filers may get minority currency — fix when real case emerges
-        if (/^[A-Z]{3}$/.test(unit)) return unit;
+      for (const [unit, arr] of Object.entries(tag?.units ?? {})) {
+        if (/^[A-Z]{3}$/.test(unit)) {
+          const weight = Array.isArray(arr) && arr.length > 0 ? arr.length : 1;
+          const next = (counts.get(unit) || 0) + weight;
+          counts.set(unit, next);
+          if (next > bestCount) {
+            bestCount = next;
+            bestCurrency = unit;
+          }
+        }
       }
     }
+    if (bestCurrency) return bestCurrency;
   }
   return DEFAULT_CURRENCY;
 }
@@ -1063,15 +1319,13 @@ export function normalizeCompanyFacts(companyFactsJson, options = {}) {
   }
 
   const fullHistory = options?.fullHistory === true;
-
-  // Reject IFRS-only filers (also catches empty us-gaap object)
-  const facts = companyFactsJson.facts ?? {};
-  const hasUsGaap = facts[GAAP_NAMESPACE] && Object.keys(facts[GAAP_NAMESPACE]).length > 0;
-  if (!hasUsGaap && facts[IFRS_NAMESPACE] && Object.keys(facts[IFRS_NAMESPACE]).length > 0) {
-    throw new Error(
-      'IFRS filer detected: IFRS namespace not supported. Only US-GAAP filers are supported in this version.'
-    );
-  }
+  const taxonomy = resolveActiveTaxonomy(companyFactsJson);
+  const accountingStandard = taxonomy ? taxonomy.accountingStandard : 'US-GAAP';
+  const filingCurrency = detectFilingCurrency(companyFactsJson);
+  const normOptions = {
+    ...options,
+    preferredCurrency: filingCurrency,
+  };
 
   // Extract basic company info
   const ticker = companyFactsJson.ticker || '';
@@ -1084,7 +1338,7 @@ export function normalizeCompanyFacts(companyFactsJson, options = {}) {
   let metricsFound = 0;
 
   // Process all standard metrics
-  const allMetrics = Object.keys(GAAP_TAG_MAP);
+  const allMetrics = Object.keys(taxonomy ? taxonomy.tagMap : GAAP_TAG_MAP);
   let anyStitched = false;
 
   for (const metricName of allMetrics) {
@@ -1093,14 +1347,14 @@ export function normalizeCompanyFacts(companyFactsJson, options = {}) {
     if (tagResult) {
       // Extract time series for both annual and quarterly
       const { data: annual, stitched } = stitchTimeSeriesData(companyFactsJson, metricName, 'annual', {
-        ...options,
+        ...normOptions,
         tagIndex: tagResult.index,
         fullHistory,
         maxPeriods: fullHistory ? Infinity : (options?.maxPeriods ?? ANNUAL_YEARS),
       });
       if (stitched) anyStitched = true;
       const quarterly = extractTimeSeriesData(tagResult.data, 'quarterly', {
-        ...options,
+        ...normOptions,
         tagIndex: tagResult.index,
         fullHistory,
         maxPeriods: fullHistory ? Infinity : (options?.maxPeriods ?? QUARTERLY_PERIODS),
@@ -1207,6 +1461,9 @@ export function normalizeCompanyFacts(companyFactsJson, options = {}) {
 
   // Build warnings array
   const warnings = [];
+  if (accountingStandard === 'IFRS') {
+    warnings.push(`IFRS filer (Form 20-F) — financials reported in ${filingCurrency}`);
+  }
   const BANK_REVENUE_TAGS = ['RevenuesNetOfInterestExpense', 'InterestAndDividendIncomeOperating'];
   if (BANK_REVENUE_TAGS.includes(metrics.revenue?.tag)) {
     warnings.push('Bank/fintech revenue tag used — total revenue includes interest income');
@@ -1237,7 +1494,8 @@ export function normalizeCompanyFacts(companyFactsJson, options = {}) {
     metadata: {
       fiscalYearEnd,
       fiscalYearEndDefaulted,
-      currency: detectFilingCurrency(companyFactsJson),
+      currency: filingCurrency,
+      accountingStandard,
       normalized: true,
       normalizationVersion: NORMALIZATION_VERSION,
       normalizedAt: new Date().toISOString(),
@@ -1393,6 +1651,8 @@ export default {
 
   // Constants
   GAAP_TAG_MAP,
+  IFRS_TAG_MAP,
   METRIC_CATEGORIES,
   NORMALIZATION_VERSION,
+  getCurrencySymbol,
 };

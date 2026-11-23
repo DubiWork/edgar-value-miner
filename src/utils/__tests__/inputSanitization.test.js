@@ -15,8 +15,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   sanitizeTickerInput,
+  sanitizeSearchQuery,
   sanitizeTextInput,
   containsXss,
+  MAX_SEARCH_QUERY_LENGTH,
 } from '../../utils/inputSanitization.js';
 
 // =============================================================================
@@ -431,5 +433,37 @@ describe('incomplete multi-character sanitization (#212)', () => {
     const { sanitized } = sanitizeTickerInput(payload);
     // ticker allowlist also strips <>, but assert no tag survives regardless
     expect(sanitized).not.toMatch(/<[^>]*>/);
+  });
+});
+
+// =============================================================================
+// Company-Name Search Query Sanitization Tests (#347)
+// =============================================================================
+
+describe('sanitizeSearchQuery (#347)', () => {
+  it('preserves spaces and corporate punctuation for multi-word company names', () => {
+    const res = sanitizeSearchQuery('Bank of America');
+    expect(res.sanitized).toBe('Bank of America');
+    expect(res.isValid).toBe(true);
+
+    const amp = sanitizeSearchQuery('Procter & Gamble');
+    expect(amp.sanitized).toBe('Procter & Gamble');
+    expect(amp.isValid).toBe(true);
+  });
+
+  it('strips HTML tags and unsafe chars while collapsing excessive internal spaces', () => {
+    const xss = sanitizeSearchQuery('<script>alert(1)</script>');
+    expect(xss.sanitized).toBe('alert1');
+    expect(xss.warnings.length).toBeGreaterThan(0);
+
+    const spaced = sanitizeSearchQuery('   Microsoft   Corp  ');
+    expect(spaced.sanitized).toBe('Microsoft Corp ');
+  });
+
+  it(`truncates cleanly at ${MAX_SEARCH_QUERY_LENGTH} characters`, () => {
+    const longName = 'A'.repeat(MAX_SEARCH_QUERY_LENGTH + 25);
+    const res = sanitizeSearchQuery(longName);
+    expect(res.sanitized.length).toBe(MAX_SEARCH_QUERY_LENGTH);
+    expect(res.warnings.some((w) => w.includes('truncated'))).toBe(true);
   });
 });

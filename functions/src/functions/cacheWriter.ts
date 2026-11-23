@@ -117,7 +117,10 @@ async function resolveCikFromTicker(ticker: string): Promise<number> {
     memoryTickersCache = { map, timestamp: now };
   }
 
-  const cik = memoryTickersCache.map.get(ticker);
+  const cik =
+    memoryTickersCache.map.get(ticker) ??
+    memoryTickersCache.map.get(ticker.replace(/\./g, '-')) ??
+    memoryTickersCache.map.get(ticker.replace(/-/g, '.'));
   if (cik === undefined) {
     throw new HttpsError('not-found', `Ticker '${ticker}' not found in SEC company directory.`);
   }
