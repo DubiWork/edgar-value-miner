@@ -4,8 +4,12 @@ import * as zlib from 'zlib';
 
 const SEC_USER_AGENT = 'edgar-value-miner (contact@example.com)';
 const COMPANY_CONTEXT_COLLECTION = 'companyContext';
+const EDGAR_CACHE_COLLECTION = 'edgarCache';
 const CONTEXT_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days (1 quarter)
 const SUBMISSIONS_CHECK_COOLDOWN_MS = 12 * 60 * 60 * 1000; // 12 hours cheap SEC filing-date check
+const TICKERS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours in-memory directory cache
+const DEFAULT_MAX_RETRY_DELAY_MS = 5_000;
+const MAX_VALID_CIK = 9_999_999_999;
 
 const MAX_ITEM1_CHARS = 22_000;
 const MAX_ITEM1A_CHARS = 12_000;
@@ -53,10 +57,104 @@ export interface StoredCompanyContext {
   lastSubmissionsCheck?: string;
 }
 
+interface TickerDirectoryEntry {
+  cik: number;
+  companyName: string;
+}
+
+interface TickersDirectoryCache {
+  map: Map<string, TickerDirectoryEntry>;
+  timestamp: number;
+}
+
 const inMemoryContextStore = new Map<string, StoredCompanyContext>();
+let memoryTickersCache: TickersDirectoryCache | null = null;
+
+export function clearTickersCacheForTesting(): void {
+  memoryTickersCache = null;
+}
 
 export function resetInMemoryContextForTesting(): void {
   inMemoryContextStore.clear();
+  memoryTickersCache = null;
+}
+
+/**
+ * Validates and normalizes an optional CIK (number or zero-padded digit string).
+ */
+export function parsePositiveCik(cik?: number | string | null): number | null {
+  if (typeof cik === 'number') {
+    return Number.isInteger(cik) && cik > 0 && cik <= MAX_VALID_CIK ? cik : null;
+  }
+  if (typeof cik === 'string') {
+    const trimmed = cik.trim();
+    if (!/^\d{1,10}$/.test(trimmed)) {
+      return null;
+    }
+    const parsed = Number(trimmed);
+    return Number.isInteger(parsed) && parsed > 0 && parsed <= MAX_VALID_CIK ? parsed : null;
+  }
+  return null;
+}
+
+/**
+ * Looks up an already-known CIK for the ticker from local memory or Firestore (`companyContext` / `edgarCache`)
+ * so warm requests avoid downloading SEC's full company_tickers.json directory.
+ */
+async function loadKnownCikFromFirestore(
+  normTicker: string
+): Promise<{ cik: number; companyName?: string } | null> {
+  const mem = inMemoryContextStore.get(normTicker);
+  const memCik = parsePositiveCik(mem?.cik);
+  if (memCik) {
+    return {
+      cik: memCik,
+      ...(mem?.companyName ? { companyName: mem.companyName } : {}),
+    };
+  }
+
+  if (getApps().length === 0) {
+    return null;
+  }
+
+  try {
+    const { getFirestore } = await import('firebase-admin/firestore');
+    const db = getFirestore();
+
+    const ctxSnap = await db.collection(COMPANY_CONTEXT_COLLECTION).doc(normTicker).get();
+    if (ctxSnap.exists) {
+      const ctxData = ctxSnap.data() as Partial<StoredCompanyContext> | undefined;
+      const ctxCik = parsePositiveCik(ctxData?.cik);
+      if (ctxCik) {
+        return {
+          cik: ctxCik,
+          ...(typeof ctxData?.companyName === 'string' && ctxData.companyName.trim()
+            ? { companyName: ctxData.companyName.trim() }
+            : {}),
+        };
+      }
+    }
+
+    const cacheSnap = await db.collection(EDGAR_CACHE_COLLECTION).doc(normTicker).get();
+    if (cacheSnap.exists) {
+      const cacheData = cacheSnap.data() as Record<string, unknown> | undefined;
+      const cacheCik = parsePositiveCik(cacheData?.cik as number | string | null | undefined);
+      if (cacheCik) {
+        const name =
+          typeof cacheData?.companyName === 'string' && cacheData.companyName.trim()
+            ? cacheData.companyName.trim()
+            : undefined;
+        return {
+          cik: cacheCik,
+          ...(name ? { companyName: name } : {}),
+        };
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 /**
@@ -70,15 +168,54 @@ export function sanitizeTicker(ticker: string): string {
   return clean;
 }
 
+export interface HttpsGetOptions {
+  maxRetries?: number;
+  baseDelayMs?: number;
+  maxRetryDelayMs?: number;
+  maxRedirects?: number;
+  sleep?: (ms: number) => Promise<void>;
+  requestFn?: typeof https.get;
+}
+
+interface HttpStatusError extends Error {
+  statusCode?: number;
+  retryAfterHeader?: string | string[];
+}
+
 /**
- * Low-level HTTPS GET helper with GZip/Deflate decompression.
+ * Parses an HTTP Retry-After header (integer seconds or HTTP-date) into clamped milliseconds.
  */
-export function httpsGetRaw(
+export function parseRetryAfterMs(
+  headerVal?: string | string[],
+  nowMs = Date.now(),
+  maxDelayMs = DEFAULT_MAX_RETRY_DELAY_MS
+): number | null {
+  const firstVal = Array.isArray(headerVal) ? headerVal[0] : headerVal;
+  if (typeof firstVal !== 'string') return null;
+  const raw = firstVal.trim();
+  if (!raw) return null;
+
+  if (/^\d{1,5}$/.test(raw)) {
+    const ms = Number(raw) * 1000;
+    return Math.min(maxDelayMs, Math.max(0, ms));
+  }
+
+  const parsedMs = Date.parse(raw);
+  if (Number.isFinite(parsedMs)) {
+    return Math.min(maxDelayMs, Math.max(0, parsedMs - nowMs));
+  }
+
+  return null;
+}
+
+function httpsGetOnce(
   url: string,
-  headers: Record<string, string> = {}
+  headers: Record<string, string>,
+  redirectsLeft: number,
+  requestFn: typeof https.get
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    const req = https.get(
+    const req = requestFn(
       url,
       {
         headers: {
@@ -97,16 +234,38 @@ export function httpsGetRaw(
           resHeaders.location
         ) {
           res.resume();
-          const redirectUrl = resHeaders.location.startsWith('http')
-            ? resHeaders.location
-            : new URL(resHeaders.location, url).toString();
-          httpsGetRaw(redirectUrl, headers).then(resolve, reject);
+          if (redirectsLeft <= 0) {
+            reject(new Error(`Too many redirects when fetching ${url}`));
+            return;
+          }
+          let parsedRedirect: URL;
+          try {
+            parsedRedirect = new URL(resHeaders.location, url);
+          } catch {
+            reject(new Error(`Invalid redirect URL when fetching ${url}`));
+            return;
+          }
+          if (parsedRedirect.protocol !== 'https:') {
+            reject(new Error(`Blocked non-HTTPS redirect to ${parsedRedirect.protocol}`));
+            return;
+          }
+          httpsGetOnce(
+            parsedRedirect.toString(),
+            headers,
+            redirectsLeft - 1,
+            requestFn
+          ).then(resolve, reject);
           return;
         }
 
         if (statusCode !== 200) {
           res.resume();
-          reject(new Error(`HTTP ${statusCode} when fetching ${url}`));
+          const err: HttpStatusError = new Error(`HTTP ${statusCode} when fetching ${url}`);
+          err.statusCode = statusCode;
+          if (resHeaders['retry-after'] !== undefined) {
+            err.retryAfterHeader = resHeaders['retry-after'];
+          }
+          reject(err);
           return;
         }
 
@@ -143,6 +302,55 @@ export function httpsGetRaw(
       req.destroy(new Error(`Timeout fetching ${url}`));
     });
   });
+}
+
+/**
+ * Low-level HTTPS GET helper with GZip/Deflate decompression and bounded 429/503 retry backoff.
+ */
+export async function httpsGetRaw(
+  url: string,
+  headers: Record<string, string> = {},
+  options: HttpsGetOptions = {}
+): Promise<string> {
+  const maxRetries =
+    typeof options.maxRetries === 'number' && options.maxRetries >= 0 ? options.maxRetries : 3;
+  const baseDelayMs =
+    typeof options.baseDelayMs === 'number' && options.baseDelayMs >= 0
+      ? options.baseDelayMs
+      : 400;
+  const maxRetryDelayMs =
+    typeof options.maxRetryDelayMs === 'number' && options.maxRetryDelayMs >= 0
+      ? options.maxRetryDelayMs
+      : DEFAULT_MAX_RETRY_DELAY_MS;
+  const maxRedirects =
+    typeof options.maxRedirects === 'number' && options.maxRedirects >= 0
+      ? options.maxRedirects
+      : 5;
+  const sleep =
+    options.sleep || ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const requestFn = options.requestFn || https.get;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await httpsGetOnce(url, headers, maxRedirects, requestFn);
+    } catch (err) {
+      const httpErr = err as HttpStatusError;
+      const statusCode = httpErr?.statusCode;
+      const isRetryable = statusCode === 429 || statusCode === 503;
+      if (!isRetryable || attempt >= maxRetries) {
+        throw err;
+      }
+      const retryAfterDelay = parseRetryAfterMs(
+        httpErr.retryAfterHeader,
+        Date.now(),
+        maxRetryDelayMs
+      );
+      const exponentialDelay = Math.min(maxRetryDelayMs, baseDelayMs * Math.pow(2, attempt));
+      await sleep(retryAfterDelay ?? exponentialDelay);
+    }
+  }
+
+  throw new Error(`HTTP request failed for ${url}`);
 }
 
 const BLOCK_HTML_TAGS = new Set([
@@ -428,28 +636,44 @@ export function extract10KSections(cleanText: string): {
 }
 
 /**
- * Resolves CIK and company name from SEC company_tickers.json.
+ * Resolves CIK and company name from SEC company_tickers.json (cached in memory for 24h).
  */
 export async function resolveTickerFromSec(
   ticker: string,
-  fetcher: typeof httpsGetRaw = httpsGetRaw
+  fetcher: typeof httpsGetRaw = httpsGetRaw,
+  options: { nowMs?: number } = {}
 ): Promise<{ cik: number; companyName: string }> {
   const norm = sanitizeTicker(ticker);
-  const raw = await fetcher('https://www.sec.gov/files/company_tickers.json', {
-    Accept: 'application/json',
-  });
-  const parsed = JSON.parse(raw) as Record<
-    string,
-    { cik_str: number; ticker: string; title: string }
-  >;
+  const nowMs = typeof options.nowMs === 'number' ? options.nowMs : Date.now();
 
-  for (const entry of Object.values(parsed)) {
-    if (entry.ticker?.toUpperCase() === norm) {
-      return {
-        cik: Number(entry.cik_str),
-        companyName: entry.title || norm,
-      };
+  if (!memoryTickersCache || nowMs - memoryTickersCache.timestamp >= TICKERS_CACHE_TTL_MS) {
+    const raw = await fetcher('https://www.sec.gov/files/company_tickers.json', {
+      Accept: 'application/json',
+    });
+    const parsed = JSON.parse(raw) as Record<
+      string,
+      { cik_str?: number | string; cik?: number | string; ticker?: string; title?: string }
+    >;
+
+    const map = new Map<string, TickerDirectoryEntry>();
+    if (parsed && typeof parsed === 'object') {
+      for (const entry of Object.values(parsed)) {
+        if (!entry || typeof entry !== 'object' || !entry.ticker) continue;
+        const entryCik = parsePositiveCik(entry.cik_str ?? entry.cik);
+        if (!entryCik) continue;
+        const entryTicker = String(entry.ticker).trim().toUpperCase();
+        map.set(entryTicker, {
+          cik: entryCik,
+          companyName: entry.title ? String(entry.title).trim() : entryTicker,
+        });
+      }
     }
+    memoryTickersCache = { map, timestamp: nowMs };
+  }
+
+  const hit = memoryTickersCache.map.get(norm);
+  if (hit) {
+    return hit;
   }
 
   throw new Error(`Ticker ${norm} not found in SEC company_tickers.json`);
@@ -472,6 +696,7 @@ export async function findLatestSecFilings(
 ): Promise<{
   tenK: SecFilingMeta | null;
   eightKEarnings: SecFilingMeta | null;
+  companyName?: string;
 }> {
   const numericCik = Math.trunc(Number(cik));
   if (!Number.isFinite(numericCik) || numericCik <= 0) {
@@ -482,10 +707,16 @@ export async function findLatestSecFilings(
   const submissionsUrl = `https://data.sec.gov/submissions/CIK${paddedCik}.json`;
   const raw = await fetcher(submissionsUrl, { Accept: 'application/json' });
   const subs = JSON.parse(raw);
+  const entityName =
+    typeof subs?.name === 'string' && subs.name.trim() ? subs.name.trim() : undefined;
   const recent = subs?.filings?.recent;
 
   if (!recent || !Array.isArray(recent.form)) {
-    return { tenK: null, eightKEarnings: null };
+    return {
+      tenK: null,
+      eightKEarnings: null,
+      ...(entityName ? { companyName: entityName } : {}),
+    };
   }
 
   let tenK: SecFilingMeta | null = null;
@@ -531,7 +762,11 @@ export async function findLatestSecFilings(
     if (tenK && eightKEarnings) break;
   }
 
-  return { tenK, eightKEarnings };
+  return {
+    tenK,
+    eightKEarnings,
+    ...(entityName ? { companyName: entityName } : {}),
+  };
 }
 
 /**
@@ -731,10 +966,13 @@ export async function getOrFetchCompanyContext(
   options: {
     forceRefresh?: boolean;
     fetcher?: typeof httpsGetRaw;
+    cik?: number | string | null;
+    companyName?: string;
   } = {}
 ): Promise<StoredCompanyContext> {
   const norm = sanitizeTicker(ticker);
   const fetcher = options.fetcher || httpsGetRaw;
+  const explicitCik = parsePositiveCik(options.cik);
 
   if (!options.forceRefresh) {
     const cached = await loadCachedCompanyContext(norm);
@@ -748,7 +986,10 @@ export async function getOrFetchCompanyContext(
           return cached;
         }
         // Otherwise verify filing dates cheaply (~$0 LLM cost) before serving cached context
-        const freshness = await checkAndRefreshCompanyContext(norm, { fetcher });
+        const freshness = await checkAndRefreshCompanyContext(norm, {
+          fetcher,
+          cik: explicitCik ?? cached.cik,
+        });
         if (freshness.context?.tenK?.item1Business) {
           return freshness.context;
         }
@@ -765,20 +1006,39 @@ export async function getOrFetchCompanyContext(
   };
 
   let cik = 0;
-  let companyName = norm;
+  let companyName =
+    typeof options.companyName === 'string' && options.companyName.trim()
+      ? options.companyName.trim()
+      : norm;
 
   try {
-    const resolved = await resolveTickerFromSec(norm, fetcher);
-    cik = resolved.cik;
-    companyName = resolved.companyName;
+    if (explicitCik) {
+      cik = explicitCik;
+    } else {
+      const known = await loadKnownCikFromFirestore(norm);
+      if (known) {
+        cik = known.cik;
+        if (known.companyName && companyName === norm) {
+          companyName = known.companyName;
+        }
+      } else {
+        const resolved = await resolveTickerFromSec(norm, fetcher);
+        cik = resolved.cik;
+        companyName = resolved.companyName || companyName;
+      }
+    }
   } catch (err) {
+    const previous = await loadCachedCompanyContext(norm);
+    if (previous?.tenK?.item1Business) {
+      return previous;
+    }
     const errMsg = (err as Error)?.message || 'Failed to resolve CIK';
     ingestionStatus.tenK = { status: 'error', error: errMsg };
     ingestionStatus.eightK = { status: 'error', error: errMsg };
     const fallbackCtx: StoredCompanyContext = {
       ticker: norm,
       cik: 0,
-      companyName: norm,
+      companyName,
       tenK: null,
       earnings: null,
       ingestionStatus,
@@ -792,7 +1052,14 @@ export async function getOrFetchCompanyContext(
   let earningsData: StoredCompanyContext['earnings'] = null;
 
   try {
-    const { tenK, eightKEarnings } = await findLatestSecFilings(cik, fetcher);
+    const {
+      tenK,
+      eightKEarnings,
+      companyName: subsCompanyName,
+    } = await findLatestSecFilings(cik, fetcher);
+    if (subsCompanyName && companyName === norm) {
+      companyName = subsCompanyName;
+    }
 
     // 1. Fetch & extract 10-K / 20-F sections
     if (tenK) {
@@ -957,6 +1224,7 @@ export async function checkAndRefreshCompanyContext(
     clientFilingDates?: { tenKDate?: string | null; eightKDate?: string | null } | null;
     fetcher?: typeof httpsGetRaw;
     nowMs?: number;
+    cik?: number | string | null;
   } = {}
 ): Promise<{
   context: StoredCompanyContext | null;
@@ -986,7 +1254,11 @@ export async function checkAndRefreshCompanyContext(
 
   if (incomplete || cooldownExpired) {
     try {
-      let cik = current.cik;
+      let cik =
+        parsePositiveCik(current.cik) ??
+        parsePositiveCik(options.cik) ??
+        (await loadKnownCikFromFirestore(norm))?.cik ??
+        0;
       if (!cik) {
         const resolved = await resolveTickerFromSec(norm, fetcher);
         cik = resolved.cik;
@@ -1009,7 +1281,11 @@ export async function checkAndRefreshCompanyContext(
       );
 
       if (needsTenKRefresh || needsEightKRefresh) {
-        current = await getOrFetchCompanyContext(norm, { forceRefresh: true, fetcher });
+        current = await getOrFetchCompanyContext(norm, {
+          forceRefresh: true,
+          fetcher,
+          cik,
+        });
         refreshed = true;
       } else {
         current = {

@@ -403,6 +403,7 @@ function App() {
             company={{
               ticker: data.ticker || 'MSFT',
               name: data.companyName || 'Microsoft Corporation',
+              cik: data.cik,
             }}
             companyFacts={data}
             isAdmin={isAdmin}

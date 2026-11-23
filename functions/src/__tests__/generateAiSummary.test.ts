@@ -163,4 +163,16 @@ describe('generateAiSummaryHandler', () => {
     ).rejects.toThrow(/AI_BUDGET_EXHAUSTED/);
     expect(mockGenerateContent).toHaveBeenCalledTimes(1);
   });
+
+  it('accepts optional cik in getCompanyContextStatus and generateAiSummary requests cleanly (#324)', async () => {
+    const statusRes = await generateAiSummaryHandler(
+      makeReq({
+        action: 'getCompanyContextStatus',
+        ticker: 'MA',
+        cik: '0001141391',
+      })
+    );
+    expect(statusRes.ingestionStatus).toBeNull();
+    expect(statusRes.budget?.status).toBe('active');
+  });
 });

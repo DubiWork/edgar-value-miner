@@ -112,7 +112,7 @@ CompanyLogo.propTypes = {
 /**
  * Computes transparent data-grounding status from the summary source and SEC ingestionStatus.
  */
-function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading) {
+function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgrading = false) {
   const isHe = lang === 'he'
   if (isLoading) {
     return {
@@ -120,6 +120,20 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading) {
       verifiedCount: 0,
       badgeLabel: isHe ? 'בודק מקורות מידע...' : 'Checking data sources...',
       subtitle: isHe ? 'מאמת זמינות דוח 10-K, 8-K ותמליל שיחת ועידה...' : 'Verifying SEC 10-K, 8-K & transcript sources...',
+      toneClass:
+        'bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 border-sky-300/40 dark:border-sky-800/50',
+      checks: [],
+    }
+  }
+
+  if (isUpgrading) {
+    return {
+      isMock: false,
+      verifiedCount: 0,
+      badgeLabel: isHe ? 'שולף דוחות SEC...' : 'Fetching SEC filings...',
+      subtitle: isHe
+        ? 'מאמת ושולף דוחות SEC 10-K / 8-K לעדכון התקציר...'
+        : 'Fetching missing SEC 10-K / 8-K filings to ground summary...',
       toneClass:
         'bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 border-sky-300/40 dark:border-sky-800/50',
       checks: [],
@@ -523,16 +537,18 @@ export function Step1Triage({
   const [isBladeOpen, setIsBladeOpen] = useState(false)
   const [lang, setLang] = useState('he')
   const [isTranslating, setIsTranslating] = useState(false)
+  const [isUpgradingSummary, setIsUpgradingSummary] = useState(false)
   const autoRefreshedTickerRef = useRef(null)
 
   const ticker = company?.ticker || companyFacts?.ticker || 'MSFT'
   const companyName = company?.name || companyFacts?.companyName || ticker
+  const companyCik = company?.cik ?? companyFacts?.cik ?? null
 
   const refreshAdminBudget = useCallback(async () => {
     if (!isAdmin) return
     const [status, ctxStatus] = await Promise.all([
       getAiBudgetStatus(),
-      getCompanyContextStatus(ticker),
+      getCompanyContextStatus(ticker, null, { cik: companyCik }),
     ])
     if (status) {
       setAiBudget(status)
@@ -540,7 +556,7 @@ export function Step1Triage({
     if (ctxStatus) {
       setIngestionStatus(ctxStatus)
     }
-  }, [isAdmin, ticker])
+  }, [isAdmin, ticker, companyCik])
 
   useEffect(() => {
     if (isAdmin) {
@@ -552,12 +568,14 @@ export function Step1Triage({
   useEffect(() => {
     let isCancelled = false
     setIsLoadingSummary(true)
+    setIsUpgradingSummary(false)
     setAdminStatusMessage(null)
     setIngestionStatus(null)
 
     getOrFetchCompanySummary(ticker, {
       name: companyName,
       sector: company?.sector,
+      cik: companyCik,
     })
       .then(async (result) => {
         if (isCancelled) return
@@ -569,49 +587,72 @@ export function Step1Triage({
             tenKDate: result?.ingestionStatus?.tenK?.date || null,
             eightKDate: result?.ingestionStatus?.eightK?.date || null,
           }
-          const ctxStatus = await getCompanyContextStatus(ticker, clientDates)
+          const ctxStatus = await getCompanyContextStatus(ticker, clientDates, {
+            cik: companyCik,
+          })
           if (isCancelled) return
           if (ctxStatus) {
             setIngestionStatus(ctxStatus)
+            const budgetExhausted = ctxStatus?.budgetStatus === 'exhausted'
             const origSrc = result?.originalSource || result?.source
-            const serverHasSec =
-              ctxStatus?.tenK?.status === 'ok' || ctxStatus?.eightK?.status === 'ok'
-            const cachedMissedTenK =
-              result?.ingestionStatus?.tenK?.status !== 'ok' && ctxStatus?.tenK?.status === 'ok'
-            const cachedMissedEightK =
-              result?.ingestionStatus?.eightK?.status !== 'ok' && ctxStatus?.eightK?.status === 'ok'
-            const cachedWasMock =
-              (origSrc === 'mock-dynamic' || origSrc === 'mock-preset') && serverHasSec
+            const isCachedMock = origSrc === 'mock-dynamic' || origSrc === 'mock-preset'
+            const cachedHasTenK = result?.ingestionStatus?.tenK?.status === 'ok'
+            const cachedHasEightK =
+              result?.ingestionStatus?.eightK?.status === 'ok' ||
+              result?.ingestionStatus?.transcript?.status === 'fallback_8k'
+            const serverHasTenK = ctxStatus?.tenK?.status === 'ok'
+            const serverHasEightK =
+              ctxStatus?.eightK?.status === 'ok' ||
+              ctxStatus?.transcript?.status === 'fallback_8k'
+            const serverContextMissing = Boolean(ctxStatus?._contextMissing)
+            const serverHadSecError =
+              ctxStatus?.tenK?.status === 'error' || ctxStatus?.eightK?.status === 'error'
+            const cachedMissedTenK = !cachedHasTenK && serverHasTenK
+            const cachedMissedEightK = !cachedHasEightK && serverHasEightK
+            const cachedUngrounded = !cachedHasTenK && !cachedHasEightK
             const needsUpgrade =
-              cachedMissedTenK ||
-              cachedMissedEightK ||
-              cachedWasMock ||
-              Boolean(ctxStatus?.hasNewerFilings)
+              !budgetExhausted &&
+              (isCachedMock ||
+                serverContextMissing ||
+                serverHadSecError ||
+                cachedMissedTenK ||
+                cachedMissedEightK ||
+                cachedUngrounded ||
+                Boolean(ctxStatus?.hasNewerFilings))
 
             if (needsUpgrade && autoRefreshedTickerRef.current !== ticker) {
               autoRefreshedTickerRef.current = ticker
+              setIsUpgradingSummary(true)
               try {
                 await invalidateCachedSummary(ticker)
                 const upgraded = await getOrFetchCompanySummary(
                   ticker,
-                  { name: companyName, sector: company?.sector },
-                  { forceRefresh: true }
+                  { name: companyName, sector: company?.sector, cik: companyCik },
+                  { forceRefresh: true, cik: companyCik }
                 )
                 if (!isCancelled && upgraded) {
-                  setAiSummary(upgraded)
+                  const upgradedIsMock =
+                    upgraded.source === 'mock-dynamic' || upgraded.source === 'mock-preset'
+                  if (upgraded.source === 'ai-live' || !result?.summary || !upgradedIsMock) {
+                    setAiSummary(upgraded)
+                  }
                   if (upgraded.ingestionStatus) {
                     setIngestionStatus(upgraded.ingestionStatus)
                   }
                 }
               } catch {
                 // Keep cached summary cleanly if live upgrade or budget fails
+              } finally {
+                if (!isCancelled) {
+                  setIsUpgradingSummary(false)
+                }
               }
             }
           }
         } else if (result?.ingestionStatus) {
           setIngestionStatus(result.ingestionStatus)
         } else {
-          const ctxStatus = await getCompanyContextStatus(ticker)
+          const ctxStatus = await getCompanyContextStatus(ticker, null, { cik: companyCik })
           if (!isCancelled && ctxStatus) {
             setIngestionStatus(ctxStatus)
           }
@@ -632,7 +673,7 @@ export function Step1Triage({
     return () => {
       isCancelled = true
     }
-  }, [ticker, companyName, company?.sector, isAdmin, refreshAdminBudget])
+  }, [ticker, companyName, companyCik, company?.sector, isAdmin, refreshAdminBudget])
 
   // Admin handler: Clear cached AI summary for this ticker and force a fresh Vertex AI generation
   const handleRefreshAiSummary = useCallback(async () => {
@@ -644,8 +685,9 @@ export function Step1Triage({
         {
           name: companyName,
           sector: company?.sector,
+          cik: companyCik,
         },
-        { forceRefresh: true }
+        { forceRefresh: true, cik: companyCik }
       )
       setAiSummary(freshResult)
       await refreshAdminBudget()
@@ -666,7 +708,7 @@ export function Step1Triage({
     } finally {
       setIsLoadingSummary(false)
     }
-  }, [ticker, companyName, company?.sector, refreshAdminBudget])
+  }, [ticker, companyName, companyCik, company?.sector, refreshAdminBudget])
 
   // Admin handler: Clear both EDGAR + AI caches and force refresh company facts from SEC into Firestore DB
   const handleFullCompanyCacheReset = useCallback(async () => {
@@ -675,12 +717,12 @@ export function Step1Triage({
     if (onForceRefreshCompany) {
       await onForceRefreshCompany(ticker)
     }
-    const freshCtx = await refreshCompanyContext(ticker)
+    const freshCtx = await refreshCompanyContext(ticker, { cik: companyCik })
     if (freshCtx) {
       setIngestionStatus(freshCtx)
     }
     await handleRefreshAiSummary()
-  }, [ticker, onForceRefreshCompany, handleRefreshAiSummary])
+  }, [ticker, companyCik, onForceRefreshCompany, handleRefreshAiSummary])
 
   const handleSaveManualTranscript = useCallback(async () => {
     if (!manualTranscriptInput.trim()) return
@@ -854,8 +896,8 @@ export function Step1Triage({
   const moatTheme = getMoatTheme(activeMoat?.rating)
 
   const grounding = useMemo(
-    () => buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoadingSummary),
-    [aiSummary, ingestionStatus, lang, isLoadingSummary]
+    () => buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoadingSummary, isUpgradingSummary),
+    [aiSummary, ingestionStatus, lang, isLoadingSummary, isUpgradingSummary]
   )
 
   const activeInfographic = useMemo(
@@ -1309,6 +1351,14 @@ export function Step1Triage({
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 border border-sky-300/40 dark:border-sky-800/50 animate-pulse">
                 <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping" />
                 {lang === 'he' ? 'מנתח...' : 'AI Thinking...'}
+              </span>
+            ) : isUpgradingSummary ? (
+              <span
+                data-testid="grounding-upgrading-indicator"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 border border-sky-300/40 dark:border-sky-800/50 animate-pulse"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping" />
+                {lang === 'he' ? 'שולף דוחות SEC ומאמת תקציר...' : 'Fetching SEC filings & upgrading...'}
               </span>
             ) : (
               <ResponsiveTooltip
