@@ -30,6 +30,7 @@ import {
   CACHE_ERROR_CODES,
   TTL_CONFIG,
 } from '../edgarCache.js';
+import { NORMALIZATION_VERSION } from '../../utils/gaapNormalizer.js';
 
 // =============================================================================
 // Mock Data
@@ -46,7 +47,7 @@ const mockCompanyFacts = {
     fiscalYearEnd: '09-30',
     currency: 'USD',
     normalized: true,
-    normalizationVersion: '1.0.0',
+    normalizationVersion: NORMALIZATION_VERSION,
     normalizedAt: '2024-01-01T00:00:00.000Z',
     metricsFound: 1,
     metricsTotal: 10,
@@ -542,18 +543,145 @@ describe('edgarCache', () => {
       expect(result).toBeNull();
     });
 
-    it('should accept entry with proper normalized structure', async () => {
+    it('should accept entry with proper normalized structure and current NORMALIZATION_VERSION', async () => {
       await setCompanyFacts('GOOD', {
         ticker: 'GOOD',
         cik: '0000000005',
         companyName: 'Good Company',
         metrics: { revenue: [] },
-        metadata: { normalized: true },
+        metadata: { normalized: true, normalizationVersion: NORMALIZATION_VERSION },
       }, '0000000005');
 
       const result = await getCompanyFacts('GOOD');
       expect(result).not.toBeNull();
       expect(result.data.companyName).toBe('Good Company');
+    });
+
+    it('should reject and delete entries with missing, legacy string, or mismatched normalizationVersion', async () => {
+      const staleVariants = [
+        { ticker: 'NO_VER', metadata: { normalized: true } },
+        { ticker: 'STR_VER', metadata: { normalized: true, normalizationVersion: '1.0.0' } },
+        { ticker: 'V1_VER', metadata: { normalized: true, normalizationVersion: 1 } },
+        { ticker: 'MISMATCH_VER', metadata: { normalized: true, normalizationVersion: NORMALIZATION_VERSION + 10 } },
+      ];
+
+      for (const variant of staleVariants) {
+        await setCompanyFacts(variant.ticker, {
+          ticker: variant.ticker,
+          cik: '0000000009',
+          companyName: 'Stale Corp',
+          metrics: { revenue: [] },
+          metadata: variant.metadata,
+        }, '0000000009');
+
+        const cached = await getCompanyFacts(variant.ticker);
+        expect(cached).toBeNull();
+      }
+
+      const stats = await getCacheStats();
+      expect(stats.companyFacts.count).toBe(0);
+    });
+
+    it('should clear v3 companyFacts store on upgrade to DB_VERSION 4 while preserving tickerMappings', async () => {
+      const freshFactory = new IDBFactory();
+      globalThis.indexedDB = freshFactory;
+
+      // Seed a v3 database directly
+      await new Promise((resolve, reject) => {
+        const openReq = freshFactory.open('edgar-value-miner', 3);
+        openReq.onupgradeneeded = (event) => {
+          const db = event.target.result;
+          const cf = db.createObjectStore('companyFacts', { keyPath: 'ticker' });
+          cf.createIndex('cik', 'cik', { unique: false });
+          cf.createIndex('lastUpdated', 'lastUpdated', { unique: false });
+          cf.createIndex('expiresAt', 'expiresAt', { unique: false });
+
+          const tm = db.createObjectStore('tickerMappings', { keyPath: 'ticker' });
+          tm.createIndex('cik', 'cik', { unique: false });
+          tm.createIndex('lastUpdated', 'lastUpdated', { unique: false });
+          tm.createIndex('expiresAt', 'expiresAt', { unique: false });
+        };
+        openReq.onsuccess = (event) => {
+          const db = event.target.result;
+          const now = Date.now();
+          const tx1 = db.transaction('companyFacts', 'readwrite');
+          tx1.objectStore('companyFacts').put({
+            ticker: 'AAPL',
+            cik: '0000320193',
+            data: {
+              ticker: 'AAPL',
+              metrics: { revenue: [] },
+              metadata: { normalized: true, normalizationVersion: 1 },
+            },
+            lastUpdated: now,
+            expiresAt: now + 60000,
+          });
+          tx1.oncomplete = () => {
+            const tx2 = db.transaction('tickerMappings', 'readwrite');
+            tx2.objectStore('tickerMappings').put({
+              ticker: 'AAPL',
+              cik: '0000320193',
+              companyName: 'Apple Inc.',
+              lastUpdated: now,
+              expiresAt: now + 60000,
+            });
+            tx2.oncomplete = () => {
+              db.close();
+              resolve();
+            };
+          };
+        };
+        openReq.onerror = () => reject(openReq.error);
+      });
+
+      vi.resetModules();
+      const upgradedModule = await import('../edgarCache.js');
+      const facts = await upgradedModule.getCompanyFacts('AAPL');
+      const mapping = await upgradedModule.getCikForTicker('AAPL');
+
+      expect(facts).toBeNull();
+      expect(mapping).not.toBeNull();
+      expect(mapping.cik).toBe('0000320193');
+
+      vi.resetModules();
+    });
+
+    it('should handle IndexedDB onblocked gracefully without permanently disabling support and allow retries', async () => {
+      const freshFactory = new IDBFactory();
+      globalThis.indexedDB = freshFactory;
+
+      const realOpen = freshFactory.open.bind(freshFactory);
+      let callCount = 0;
+      const openSpy = vi.spyOn(freshFactory, 'open').mockImplementation((name, version) => {
+        callCount++;
+        if (callCount === 1) {
+          const fakeReq = {};
+          Promise.resolve().then(() => {
+            if (typeof fakeReq.onblocked === 'function') {
+              fakeReq.onblocked(new Event('blocked'));
+            }
+          });
+          return fakeReq;
+        }
+        return realOpen(name, version);
+      });
+
+      vi.resetModules();
+      const blockedModule = await import('../edgarCache.js');
+
+      // First call hits onblocked -> degrades gracefully to null instead of hanging
+      const firstRead = await blockedModule.getCompanyFacts('AAPL');
+      expect(firstRead).toBeNull();
+
+      // Support was NOT permanently disabled; retry succeeds once blocking tab closes
+      const saved = await blockedModule.setCompanyFacts('AAPL', mockCompanyFacts, '0000320193');
+      expect(saved).toBe(true);
+      const retryRead = await blockedModule.getCompanyFacts('AAPL');
+      expect(retryRead).not.toBeNull();
+      expect(retryRead.data).toEqual(mockCompanyFacts);
+
+      openSpy.mockRestore();
+      vi.resetModules();
     });
 
     it('should clean up corrupt entry so it can be re-saved', async () => {
