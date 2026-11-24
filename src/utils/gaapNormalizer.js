@@ -20,7 +20,7 @@
  * Increment when making breaking changes to metric mappings
  * @constant {number}
  */
-export const NORMALIZATION_VERSION = 1;
+export const NORMALIZATION_VERSION = 2;
 
 /**
  * Number of years of annual data to extract
@@ -80,6 +80,24 @@ const QUARTERLY_FORMS = ['10-Q', '10-Q/A'];
 // =============================================================================
 // GAAP Tag Mappings
 // =============================================================================
+
+/**
+ * Cash-basis fallback tags for interest expense (used ONLY if accrual tags yield zero points).
+ * Never mixed into GAAP_TAG_MAP.interestExpense so a newer 10-Q InterestPaidNet date cannot
+ * override a valid accrual InterestExpense tag.
+ * @constant {string[]}
+ */
+export const INTEREST_EXPENSE_CASH_FALLBACK_TAGS = ['InterestPaidNet'];
+
+/**
+ * Bank / financial-spread revenue tags that include interest income.
+ * @constant {string[]}
+ */
+export const BANK_REVENUE_TAGS = [
+  'RevenuesNetOfInterestExpense',
+  'InterestAndDividendIncomeOperating',
+  'InterestRevenueExpense',
+];
 
 /**
  * Maps standard metric names to possible GAAP tag variations.
@@ -164,9 +182,10 @@ export const GAAP_TAG_MAP = {
     'SellingAndMarketingExpense',
   ],
 
-  /** Interest expense */
+  /** Interest expense (accrual tags only — never override with cash InterestPaidNet) */
   interestExpense: [
     'InterestExpense',
+    'InterestExpenseOperating',
     'InterestExpenseDebt',
     'InterestAndDebtExpense',
   ],
@@ -194,7 +213,6 @@ export const GAAP_TAG_MAP = {
   capitalExpenditures: [
     'PaymentsToAcquirePropertyPlantAndEquipment',
     'PaymentsToAcquireProductiveAssets',
-    'CapitalExpendituresIncurredButNotYetPaid',
     'PaymentsForCapitalImprovements',
   ],
 
@@ -233,6 +251,13 @@ export const GAAP_TAG_MAP = {
     'PaymentsForRepurchaseOfCommonStock',
     'PaymentsForRepurchaseOfEquity',
     'StockRepurchasedDuringPeriodValue',
+  ],
+
+  /** Stock-based compensation */
+  stockBasedCompensation: [
+    'ShareBasedCompensation',
+    'AllocatedShareBasedCompensationExpense',
+    'EmployeeBenefitsAndShareBasedCompensation',
   ],
 
   // -------------------------------------------------------------------------
@@ -295,7 +320,6 @@ export const GAAP_TAG_MAP = {
   intangibleAssets: [
     'IntangibleAssetsNetExcludingGoodwill',
     'FiniteLivedIntangibleAssetsNet',
-    'IntangibleAssetsNetIncludingGoodwill',
   ],
 
   // -------------------------------------------------------------------------
@@ -305,12 +329,18 @@ export const GAAP_TAG_MAP = {
   /** Total liabilities */
   totalLiabilities: [
     'Liabilities',
-    'LiabilitiesAndStockholdersEquity',
   ],
 
   /** Current liabilities */
   currentLiabilities: [
     'LiabilitiesCurrent',
+  ],
+
+  /** Deferred revenue (current) */
+  deferredRevenueCurrent: [
+    'ContractWithCustomerLiabilityCurrent',
+    'DeferredRevenueCurrent',
+    'DeferredRevenueAndCreditsCurrent',
   ],
 
   /** Accounts payable */
@@ -337,7 +367,6 @@ export const GAAP_TAG_MAP = {
   /** Total debt */
   totalDebt: [
     'DebtLongtermAndShorttermCombinedAmount',
-    'LongTermDebtAndCapitalLeaseObligationsCurrent',
   ],
 
   // -------------------------------------------------------------------------
@@ -416,6 +445,7 @@ export const IFRS_TAG_MAP = {
   operatingIncome: [
     'ProfitLossFromOperatingActivities',
     'OperatingIncomeLoss',
+    'ProfitLossBeforeTax',
   ],
   eps: [
     'BasicEarningsLossPerShare',
@@ -477,6 +507,11 @@ export const IFRS_TAG_MAP = {
     'PurchaseOfTreasuryShares',
     'PaymentsToAcquireOrRedeemEntitysShares',
   ],
+  stockBasedCompensation: [
+    'ExpenseFromSharebasedPaymentTransactionsInWhichGoodsOrServicesReceivedDidNotQualifyForRecognitionAsAssets',
+    'ExpenseFromEquitysettledShareBasedPaymentTransactionsInWhichGoodsOrServicesReceivedDidNotQualifyForRecognitionAsAssets',
+    'AdjustmentsForSharebasedPayments',
+  ],
   totalAssets: [
     'Assets',
   ],
@@ -511,10 +546,14 @@ export const IFRS_TAG_MAP = {
   ],
   totalLiabilities: [
     'Liabilities',
-    'NoncurrentLiabilities',
   ],
   currentLiabilities: [
     'CurrentLiabilities',
+  ],
+  deferredRevenueCurrent: [
+    'CurrentContractLiabilities',
+    'CurrentDeferredIncomeIncludingCurrentContractLiabilities',
+    'CurrentDeferredIncomeOtherThanCurrentContractLiabilities',
   ],
   accountsPayable: [
     'TradeAndOtherCurrentPayables',
@@ -587,6 +626,7 @@ export const METRIC_CATEGORIES = {
     'depreciationAmortization',
     'dividendsPaid',
     'stockRepurchases',
+    'stockBasedCompensation',
   ],
   balanceSheetAssets: [
     'totalAssets',
@@ -602,6 +642,7 @@ export const METRIC_CATEGORIES = {
   balanceSheetLiabilities: [
     'totalLiabilities',
     'currentLiabilities',
+    'deferredRevenueCurrent',
     'accountsPayable',
     'shortTermDebt',
     'longTermDebt',
@@ -1072,6 +1113,196 @@ export function calculateFreeCashFlow(operatingCashFlow, capitalExpenditures) {
 }
 
 /**
+ * Detects whether a time series represents quarterly data (without misclassifying
+ * annual balance sheet instant frames like CY2023Q4I as quarterly).
+ * @param {Array<Object>} series
+ * @returns {boolean}
+ * @private
+ */
+function hasQuarterlyEntries(series) {
+  if (!Array.isArray(series) || series.length === 0) return false;
+  const seenYears = new Set();
+  for (const item of series) {
+    if (!item) continue;
+    if (item.fiscalQuarter != null) return true;
+    if (item.fp && item.fp !== 'FY') return true;
+    if (item.form && QUARTERLY_FORMS.includes(item.form)) return true;
+    if (typeof item.frame === 'string' && /^CY\d{4}Q([1-4]|[1-3]I)$/.test(item.frame)) return true;
+    if (typeof item.period === 'string' && /^CY\d{4}Q([1-4]|[1-3]I)$/.test(item.period)) return true;
+    if (item.fiscalYear != null) {
+      if (seenYears.has(item.fiscalYear)) return true;
+      seenYears.add(item.fiscalYear);
+    }
+  }
+  return false;
+}
+
+/**
+ * Resolves a matching period key for derived metric joins.
+ * @param {Object} item
+ * @param {boolean} isQuarterly
+ * @returns {string|number|null}
+ * @private
+ */
+function getDerivedMatchKey(item, isQuarterly) {
+  if (!item) return null;
+  if (isQuarterly) {
+    if (item.frame) return item.frame;
+    if (item.period) return item.period;
+    if (item.fiscalYear != null && item.fiscalQuarter != null) {
+      return `${item.fiscalYear}_Q${item.fiscalQuarter}`;
+    }
+    return item.end || null;
+  }
+  return item.fiscalYear != null ? item.fiscalYear : (item.period || item.end || null);
+}
+
+/**
+ * Sorts derived time series most-recent-first.
+ * @param {Array<Object>} items
+ * @returns {Array<Object>}
+ * @private
+ */
+function sortDerivedSeriesDescending(items) {
+  return items.sort((a, b) => {
+    const yearDiff = (b.fiscalYear ?? 0) - (a.fiscalYear ?? 0);
+    if (yearDiff !== 0) return yearDiff;
+    const quarterDiff = (b.fiscalQuarter ?? 0) - (a.fiscalQuarter ?? 0);
+    if (quarterDiff !== 0) return quarterDiff;
+    return String(b.frame || b.period || '').localeCompare(String(a.frame || a.period || ''));
+  });
+}
+
+/**
+ * Calculates derived Total Liabilities = Total Assets - Stockholders' Equity
+ * when direct Total Liabilities XBRL tags are absent.
+ *
+ * @param {Array<Object>} totalAssetsSeries - Total assets time series
+ * @param {Array<Object>} equitySeries - Stockholders' equity time series
+ * @param {Object} [options={}]
+ * @param {'annual'|'quarterly'} [options.periodType]
+ * @returns {Array<Object>} Derived total liabilities time series
+ */
+export function calculateDerivedTotalLiabilities(totalAssetsSeries, equitySeries, options = {}) {
+  if (!Array.isArray(totalAssetsSeries) || !Array.isArray(equitySeries)) {
+    return [];
+  }
+
+  const isQuarterly =
+    options?.periodType === 'quarterly'
+      ? true
+      : options?.periodType === 'annual'
+      ? false
+      : hasQuarterlyEntries(totalAssetsSeries) || hasQuarterlyEntries(equitySeries);
+
+  const equityByKey = new Map();
+  for (const item of equitySeries) {
+    const key = getDerivedMatchKey(item, isQuarterly);
+    if (key != null && isValidNumber(item.value) && !equityByKey.has(key)) {
+      equityByKey.set(key, item);
+    }
+  }
+
+  const derived = [];
+  const seenKeys = new Set();
+  for (const assets of totalAssetsSeries) {
+    const key = getDerivedMatchKey(assets, isQuarterly);
+    if (key == null || seenKeys.has(key) || !isValidNumber(assets.value)) continue;
+    const equity = equityByKey.get(key);
+    if (!equity || !isValidNumber(equity.value)) continue;
+
+    seenKeys.add(key);
+    derived.push({
+      value: assets.value - equity.value,
+      period: assets.period,
+      frame: assets.frame || null,
+      fiscalYear: assets.fiscalYear,
+      fiscalQuarter: assets.fiscalQuarter ?? null,
+      filedDate: assets.filedDate ?? null,
+      form: assets.form,
+      confidence: 'medium',
+      calculated: true,
+      components: {
+        totalAssets: assets.value,
+        stockholdersEquity: equity.value,
+      },
+    });
+  }
+
+  return sortDerivedSeriesDescending(derived);
+}
+
+/**
+ * Calculates derived Total Debt = (shortTermDebt ?? 0) + (longTermDebt ?? 0)
+ * for periods where at least one debt component is a valid finite number.
+ *
+ * @param {Array<Object>} shortTermDebtSeries - Short-term debt time series
+ * @param {Array<Object>} longTermDebtSeries - Long-term debt time series
+ * @param {Object} [options={}]
+ * @param {'annual'|'quarterly'} [options.periodType]
+ * @returns {Array<Object>} Derived total debt time series
+ */
+export function calculateDerivedTotalDebt(shortTermDebtSeries, longTermDebtSeries, options = {}) {
+  const shortList = Array.isArray(shortTermDebtSeries) ? shortTermDebtSeries : [];
+  const longList = Array.isArray(longTermDebtSeries) ? longTermDebtSeries : [];
+  if (shortList.length === 0 && longList.length === 0) {
+    return [];
+  }
+
+  const isQuarterly =
+    options?.periodType === 'quarterly'
+      ? true
+      : options?.periodType === 'annual'
+      ? false
+      : hasQuarterlyEntries(shortList) || hasQuarterlyEntries(longList);
+
+  const byKey = new Map();
+  for (const item of shortList) {
+    const key = getDerivedMatchKey(item, isQuarterly);
+    if (key == null || !isValidNumber(item.value)) continue;
+    if (!byKey.has(key)) {
+      byKey.set(key, { short: item, long: null });
+    }
+  }
+
+  for (const item of longList) {
+    const key = getDerivedMatchKey(item, isQuarterly);
+    if (key == null || !isValidNumber(item.value)) continue;
+    const existing = byKey.get(key);
+    if (existing) {
+      if (!existing.long) existing.long = item;
+    } else {
+      byKey.set(key, { short: null, long: item });
+    }
+  }
+
+  const derived = [];
+  for (const { short, long } of byKey.values()) {
+    const template = long || short;
+    const shortVal = short ? short.value : null;
+    const longVal = long ? long.value : null;
+
+    derived.push({
+      value: (shortVal ?? 0) + (longVal ?? 0),
+      period: template.period,
+      frame: template.frame || null,
+      fiscalYear: template.fiscalYear,
+      fiscalQuarter: template.fiscalQuarter ?? null,
+      filedDate: template.filedDate ?? null,
+      form: template.form,
+      confidence: 'medium',
+      calculated: true,
+      components: {
+        shortTermDebt: shortVal,
+        longTermDebt: longVal,
+      },
+    });
+  }
+
+  return sortDerivedSeriesDescending(derived);
+}
+
+/**
  * Gets the most recent value for a metric
  *
  * @param {Object} metric - Metric object with annual/quarterly arrays
@@ -1383,7 +1614,110 @@ export function normalizeCompanyFacts(companyFactsJson, options = {}) {
     }
   }
 
+  // Helper to replace an empty primary metric with a fallback/derived metric
+  const markMetricResolved = (metricName, resolvedMetric) => {
+    metrics[metricName] = resolvedMetric;
+    const missingIdx = missingMetrics.indexOf(metricName);
+    if (missingIdx !== -1) {
+      missingMetrics.splice(missingIdx, 1);
+    }
+    metricsFound++;
+  };
+
+  // Cash-basis fallback for interestExpense ONLY if accrual tags yielded zero points
+  if (
+    taxonomy?.namespace === GAAP_NAMESPACE &&
+    metrics.interestExpense &&
+    metrics.interestExpense.annual.length === 0 &&
+    metrics.interestExpense.quarterly.length === 0
+  ) {
+    for (const fallbackTag of INTEREST_EXPENSE_CASH_FALLBACK_TAGS) {
+      const fallbackData = taxonomy.factsMap[fallbackTag];
+      if (!fallbackData?.units) continue;
+
+      const fallbackAnnual = extractTimeSeriesData(fallbackData, 'annual', {
+        ...normOptions,
+        tagIndex: 2,
+        fullHistory,
+        maxPeriods: fullHistory ? Infinity : (options?.maxPeriods ?? ANNUAL_YEARS),
+      });
+      const fallbackQuarterly = extractTimeSeriesData(fallbackData, 'quarterly', {
+        ...normOptions,
+        tagIndex: 2,
+        fullHistory,
+        maxPeriods: fullHistory ? Infinity : (options?.maxPeriods ?? QUARTERLY_PERIODS),
+      });
+
+      if (fallbackAnnual.length > 0 || fallbackQuarterly.length > 0) {
+        markMetricResolved('interestExpense', {
+          annual: fallbackAnnual,
+          quarterly: fallbackQuarterly,
+          tag: fallbackTag,
+          isCashFallback: true,
+        });
+        break;
+      }
+    }
+  }
+
   // Calculate derived metrics
+  // Total Liabilities fallback = Total Assets - Stockholders' Equity
+  if (
+    metrics.totalLiabilities &&
+    metrics.totalLiabilities.annual.length === 0 &&
+    metrics.totalLiabilities.quarterly.length === 0 &&
+    metrics.totalAssets &&
+    metrics.stockholdersEquity
+  ) {
+    const derivedLiabAnnual = calculateDerivedTotalLiabilities(
+      metrics.totalAssets.annual,
+      metrics.stockholdersEquity.annual,
+      { periodType: 'annual' }
+    );
+    const derivedLiabQuarterly = calculateDerivedTotalLiabilities(
+      metrics.totalAssets.quarterly,
+      metrics.stockholdersEquity.quarterly,
+      { periodType: 'quarterly' }
+    );
+
+    if (derivedLiabAnnual.length > 0 || derivedLiabQuarterly.length > 0) {
+      markMetricResolved('totalLiabilities', {
+        annual: derivedLiabAnnual,
+        quarterly: derivedLiabQuarterly,
+        tag: null,
+        calculated: true,
+      });
+    }
+  }
+
+  // Total Debt fallback = Short-Term Debt + Long-Term Debt
+  if (
+    metrics.totalDebt &&
+    metrics.totalDebt.annual.length === 0 &&
+    metrics.totalDebt.quarterly.length === 0 &&
+    (metrics.shortTermDebt || metrics.longTermDebt)
+  ) {
+    const derivedDebtAnnual = calculateDerivedTotalDebt(
+      metrics.shortTermDebt?.annual || [],
+      metrics.longTermDebt?.annual || [],
+      { periodType: 'annual' }
+    );
+    const derivedDebtQuarterly = calculateDerivedTotalDebt(
+      metrics.shortTermDebt?.quarterly || [],
+      metrics.longTermDebt?.quarterly || [],
+      { periodType: 'quarterly' }
+    );
+
+    if (derivedDebtAnnual.length > 0 || derivedDebtQuarterly.length > 0) {
+      markMetricResolved('totalDebt', {
+        annual: derivedDebtAnnual,
+        quarterly: derivedDebtQuarterly,
+        tag: null,
+        calculated: true,
+      });
+    }
+  }
+
   // Free Cash Flow = Operating Cash Flow - Capital Expenditures
   if (metrics.operatingCashFlow && metrics.capitalExpenditures) {
     const fcfAnnual = calculateFreeCashFlow(
@@ -1464,7 +1798,6 @@ export function normalizeCompanyFacts(companyFactsJson, options = {}) {
   if (accountingStandard === 'IFRS') {
     warnings.push(`IFRS filer (Form 20-F) — financials reported in ${filingCurrency}`);
   }
-  const BANK_REVENUE_TAGS = ['RevenuesNetOfInterestExpense', 'InterestAndDividendIncomeOperating'];
   if (BANK_REVENUE_TAGS.includes(metrics.revenue?.tag)) {
     warnings.push('Bank/fintech revenue tag used — total revenue includes interest income');
   }
@@ -1638,6 +1971,8 @@ export default {
 
   // Calculated metrics
   calculateFreeCashFlow,
+  calculateDerivedTotalLiabilities,
+  calculateDerivedTotalDebt,
 
   // Accessors
   getLatestValue,
@@ -1653,6 +1988,8 @@ export default {
   GAAP_TAG_MAP,
   IFRS_TAG_MAP,
   METRIC_CATEGORIES,
+  INTEREST_EXPENSE_CASH_FALLBACK_TAGS,
+  BANK_REVENUE_TAGS,
   NORMALIZATION_VERSION,
   getCurrencySymbol,
 };
