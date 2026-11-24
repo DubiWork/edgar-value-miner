@@ -2,27 +2,32 @@ import { describe, it, expect } from 'vitest';
 import { calculateTriageMetrics } from '../triageCalculator.js';
 
 describe('triageCalculator', () => {
-  it('returns default MSFT triage metrics when companyFacts is null or empty', () => {
-    const metrics = calculateTriageMetrics(null);
+  it('returns unavailable status (never fake MSFT defaults) when companyFacts is null or empty', () => {
+    for (const input of [null, undefined, {}, { metrics: {} }]) {
+      const metrics = calculateTriageMetrics(input);
 
-    expect(metrics).toHaveProperty('revenue');
-    expect(metrics).toHaveProperty('margins');
-    expect(metrics).toHaveProperty('shares');
-    expect(metrics).toHaveProperty('currentRatio');
+      expect(metrics).toHaveProperty('revenue');
+      expect(metrics).toHaveProperty('margins');
+      expect(metrics).toHaveProperty('shares');
+      expect(metrics).toHaveProperty('currentRatio');
 
-    expect(metrics.currentRatio.title).toBe('Current Ratio (Liquidity)');
-    expect(metrics.currentRatio.target).toBe('Target: > 1.0');
-    expect(metrics.shares.target).toBe('Target: Decreasing');
+      expect(metrics.currentRatio.title).toBe('Current Ratio (Liquidity)');
+      expect(metrics.currentRatio.target).toBe('Target: >= 1.5x');
+      expect(metrics.shares.target).toBe('Target: Decreasing');
 
-    expect(metrics.revenue.status).toBe('pass');
-    expect(metrics.margins.status).toBe('pass');
-    expect(metrics.shares.status).toBe('pass');
-    expect(metrics.currentRatio.status).toBe('pass');
-
-    expect(metrics.revenue.sparkline.length).toBeGreaterThanOrEqual(10);
-    expect(metrics.margins.sparkline.length).toBeGreaterThanOrEqual(10);
-    expect(metrics.shares.sparkline.length).toBeGreaterThanOrEqual(10);
-    expect(metrics.currentRatio.sparkline.length).toBeGreaterThanOrEqual(10);
+      for (const key of ['revenue', 'margins', 'shares', 'currentRatio']) {
+        expect(metrics[key].status).toBe('unavailable');
+        expect(metrics[key].value).toBe('No SEC Data');
+        expect(metrics[key].valueHe).toBe('אין נתוני SEC');
+        expect(metrics[key].badge).toBe('No SEC Data');
+        expect(metrics[key].badgeHe).toBe('אין נתוני SEC');
+        expect(metrics[key].metricSummary).toBe('Unavailable');
+        expect(metrics[key].metricSummaryHe).toBe('לא זמין בדיווחי SEC');
+        expect(metrics[key].latestValue).toBeNull();
+        expect(metrics[key].historyMeta).toBeNull();
+        expect(metrics[key].sparkline).toEqual([]);
+      }
+    }
   });
 
   it('calculates metrics correctly from normalized data with pass statuses', () => {
@@ -87,10 +92,12 @@ describe('triageCalculator', () => {
     expect(result.shares.value).toBe('Share Buybacks');
     expect(result.shares.badge).toBe('Buybacks');
 
-    // Current Ratio (1.5 >= 1 = PASS)
+    // Current Ratio (1.5 >= 1.5 = PASS)
     expect(result.currentRatio.status).toBe('pass');
     expect(result.currentRatio.value).toBe('1.50x');
-    expect(result.currentRatio.target).toBe('Target: > 1.0');
+    expect(result.currentRatio.target).toBe('Target: >= 1.5x');
+    expect(result.currentRatio.badge).toBe('Safe (>= 1.5x)');
+    expect(result.currentRatio.badgeHe).toBe('בטוח (מעל 1.5x)');
     expect(result.currentRatio.latestValue).toBe(1.5);
   });
 
@@ -199,15 +206,21 @@ describe('triageCalculator', () => {
 
     const result = calculateTriageMetrics(facts);
 
-    // Must show 5Y CAGR (~10%), NOT 4Y, with Hebrew-first ordering (#344)!
+    // Must show 5Y CAGR (~10%), NOT 4Y, with Hebrew-first ordering (#344) & explicit YoY/CAGR label!
+    expect(result.revenue.status).toBe('warn');
+    expect(result.revenue.badge).toBe('Cyclical Growth');
+    expect(result.revenue.badgeHe).toBe('צמיחה מחזורית');
+    expect(result.revenue.valueHe).toContain('(שנה אחרונה / YoY)');
     expect(result.revenue.metricSummary).toContain('5Y CAGR ~10%');
     expect(result.revenue.metricSummaryHe).toBe('צמיחה שנתית (CAGR) · 5 ש׳: ~10% · 9 ש׳: ~5%');
-    expect(result.currentRatio.badgeHe).toBe('בטוח (מעל 1.0)');
-    expect(result.currentRatio.detail).toBe('יחס שוטף תקין (מעל 1.0)');
+    expect(result.currentRatio.status).toBe('pass');
+    expect(result.currentRatio.badgeHe).toBe('בטוח (מעל 1.5x)');
+    expect(result.currentRatio.detail).toContain('מעל 1.5x');
     expect(result.revenue.historyMeta.startYear).toBe(2016);
     expect(result.revenue.historyMeta.endYear).toBe(2025);
 
-    // Narrow cyclical margins flagged as cyclical with min-max range
+    // Narrow cyclical margins flagged as fail (< 10%) & cyclical with min-max range
+    expect(result.margins.status).toBe('fail');
     expect(result.margins.historyMeta.cycleType).toBe('cyclical');
     expect(result.margins.historyMeta.cycleBadgeHe).toContain('מחזורי');
     expect(result.margins.historyMeta.cycleBadgeHe).toContain('2.0%–7.0%');
@@ -236,6 +249,9 @@ describe('triageCalculator', () => {
         [2024, 113.4], // +0.35% -> still diluting > 0.2% vs +5.8% prior
       ])
     );
+    expect(slowingDilution.shares.status).toBe('warn');
+    expect(slowingDilution.shares.badge).toBe('Moderate Dilution');
+    expect(slowingDilution.shares.badgeHe).toBe('דילול מתון');
     expect(slowingDilution.shares.valueHe).toBe('↑ +0.4% מניות (דילול)');
     expect(slowingDilution.shares.trendDirection).toBe('slowing');
     expect(slowingDilution.shares.trendTone).toBe('improving');
@@ -348,5 +364,205 @@ describe('triageCalculator', () => {
     expect(sapMetrics.shares.latestValue).toBe(1165000000);
     expect(sapMetrics.shares.status).toBe('pass');
     expect(sapMetrics.currentRatio.value).toBe('1.25x');
+    expect(sapMetrics.currentRatio.status).toBe('warn');
+    expect(sapMetrics.currentRatio.badge).toBe('Borderline (1.0–1.5x)');
+    expect(sapMetrics.currentRatio.badgeHe).toBe('גבולי (1.0x–1.5x)');
+  });
+
+  it('catches AER-style Weakest-Link traps: 48.0% latest margin with -14.3% loss year -> fail, and 5 down revenue yrs -> fail', () => {
+    const aerLikeFacts = {
+      metrics: {
+        revenue: {
+          annual: [
+            { fiscalYear: 2018, value: 5000000000 },
+            { fiscalYear: 2019, value: 4900000000 }, // down 1
+            { fiscalYear: 2020, value: 4500000000 }, // down 2
+            { fiscalYear: 2021, value: 4300000000 }, // down 3
+            { fiscalYear: 2022, value: 4100000000 }, // down 4
+            { fiscalYear: 2023, value: 3900000000 }, // down 5
+            { fiscalYear: 2024, value: 4100000000 }, // slight bounce, yet 5 consecutive down yrs in history
+          ],
+        },
+        operatingIncome: {
+          annual: [
+            { fiscalYear: 2018, value: 1800000000 }, // 36.0%
+            { fiscalYear: 2019, value: 1715000000 }, // 35.0%
+            { fiscalYear: 2020, value: -643500000 }, // -14.3% loss year!
+            { fiscalYear: 2021, value: 1290000000 }, // 30.0%
+            { fiscalYear: 2022, value: 1435000000 }, // 35.0%
+            { fiscalYear: 2023, value: 1638000000 }, // 42.0%
+            { fiscalYear: 2024, value: 1968000000 }, // 48.0%
+          ],
+        },
+      },
+    };
+
+    const result = calculateTriageMetrics(aerLikeFacts);
+
+    // Revenue failed due to >= 3 consecutive down years even though latest YoY > 0
+    expect(result.revenue.status).toBe('fail');
+    expect(result.revenue.badgeHe).toBe('ירידה בהכנסות');
+    expect(result.revenue.valueHe).toContain('שנה אחרונה / YoY');
+
+    // Operating margin failed due to historical loss year (-14.3%), NOT green >= 25%!
+    expect(result.margins.status).toBe('fail');
+    expect(result.margins.badge).toBe('Volatile (Loss Year)');
+    expect(result.margins.badgeHe).toBe('תנודתיים (שנת הפסד)');
+    expect(result.margins.detail).toContain('בין -14.3% ל-48.0%');
+    expect(result.margins.value).toBe('48.0%');
+
+    // Missing shares & currentRatio return unavailable (no fake MSFT fallback)
+    expect(result.shares.status).toBe('unavailable');
+    expect(result.currentRatio.status).toBe('unavailable');
+  });
+
+  it('enforces 3-tier scoring across Revenue, Margins, Share Dilution (no loophole), and Current Ratio', () => {
+    // 1. Margins: latest < 0 -> fail ('Negative Margins'); volatile spread > 20 with no loss year -> warn
+    const negativeLatestMargin = calculateTriageMetrics({
+      metrics: {
+        revenue: { annual: [{ fiscalYear: 2024, value: 100 }] },
+        operatingIncome: { annual: [{ fiscalYear: 2024, value: -14.3 }] },
+      },
+    });
+    expect(negativeLatestMargin.margins.status).toBe('fail');
+    expect(negativeLatestMargin.margins.badge).toBe('Negative Margins');
+    expect(negativeLatestMargin.margins.badgeHe).toBe('שוליים שליליים');
+    expect(negativeLatestMargin.margins.value).toBe('-14.3%');
+
+    const volatileSpreadMargin = calculateTriageMetrics({
+      metrics: {
+        revenue: {
+          annual: [
+            { fiscalYear: 2021, value: 100 },
+            { fiscalYear: 2022, value: 100 },
+            { fiscalYear: 2023, value: 100 },
+            { fiscalYear: 2024, value: 100 },
+          ],
+        },
+        operatingIncome: {
+          annual: [
+            { fiscalYear: 2021, value: 12 }, // 12%
+            { fiscalYear: 2022, value: 14 }, // 14%
+            { fiscalYear: 2023, value: 16 }, // 16%
+            { fiscalYear: 2024, value: 36 }, // 36% -> spread = 24 (> 20) even though latest >= 25%!
+          ],
+        },
+      },
+    });
+    expect(volatileSpreadMargin.margins.status).toBe('warn');
+    expect(volatileSpreadMargin.margins.badge).toBe('Volatile / Cyclical');
+    expect(volatileSpreadMargin.margins.badgeHe).toBe('תנודתיים / מחזוריים');
+
+    const healthyModerateMargin = calculateTriageMetrics({
+      metrics: {
+        revenue: {
+          annual: [
+            { fiscalYear: 2022, value: 100 },
+            { fiscalYear: 2023, value: 110 },
+            { fiscalYear: 2024, value: 120 },
+          ],
+        },
+        operatingIncome: {
+          annual: [
+            { fiscalYear: 2022, value: 18 }, // 18%
+            { fiscalYear: 2023, value: 20 }, // 18.2%
+            { fiscalYear: 2024, value: 22.8 }, // 19.0%
+          ],
+        },
+      },
+    });
+    expect(healthyModerateMargin.margins.status).toBe('pass');
+    expect(healthyModerateMargin.margins.badge).toBe('Healthy Margins');
+    expect(healthyModerateMargin.margins.badgeHe).toBe('שוליים תקינים');
+
+    // 2. Revenue: slow CAGR (< 5%) -> warn; sharp deceleration (cagr >= 5 && cagr - yoy >= 10) -> warn
+    const slowRevenue = calculateTriageMetrics({
+      metrics: {
+        revenue: {
+          annual: [
+            { fiscalYear: 2021, value: 100000000 },
+            { fiscalYear: 2022, value: 102000000 },
+            { fiscalYear: 2023, value: 104000000 },
+            { fiscalYear: 2024, value: 106000000 },
+          ],
+        },
+      },
+    });
+    expect(slowRevenue.revenue.status).toBe('warn');
+    expect(slowRevenue.revenue.badgeHe).toBe('צמיחה איטית');
+
+    const deceleratingRevenue = calculateTriageMetrics({
+      metrics: {
+        revenue: {
+          annual: [
+            { fiscalYear: 2020, value: 100000000 },
+            { fiscalYear: 2021, value: 125000000 },
+            { fiscalYear: 2022, value: 155000000 },
+            { fiscalYear: 2023, value: 195000000 },
+            { fiscalYear: 2024, value: 200000000 }, // ~19% CAGR, +2.6% YoY => cagr - yoy >= 10
+          ],
+        },
+      },
+    });
+    expect(deceleratingRevenue.revenue.status).toBe('warn');
+
+    // 3. Share Dilution loophole closed: lower than 2020 yet latest year diluted +5.56% -> MUST FAIL
+    const loopholeClosed = calculateTriageMetrics({
+      metrics: {
+        weightedAverageSharesDiluted: {
+          annual: [
+            { fiscalYear: 2020, value: 120000000 },
+            { fiscalYear: 2021, value: 110000000 },
+            { fiscalYear: 2022, value: 100000000 },
+            { fiscalYear: 2023, value: 90000000 },
+            { fiscalYear: 2024, value: 95000000 }, // +5.56% YoY dilution!
+          ],
+        },
+      },
+    });
+    expect(loopholeClosed.shares.status).toBe('fail');
+    expect(loopholeClosed.shares.badge).toBe('Diluting');
+
+    const flatShares = calculateTriageMetrics({
+      metrics: {
+        weightedAverageSharesDiluted: {
+          annual: [
+            { fiscalYear: 2023, value: 100000000 },
+            { fiscalYear: 2024, value: 100100000 }, // +0.1% <= 0.2%
+          ],
+        },
+      },
+    });
+    expect(flatShares.shares.status).toBe('pass');
+    expect(flatShares.shares.badge).toBe('No Dilution');
+
+    // 4. Current Ratio 3 tiers
+    const crSafe = calculateTriageMetrics({
+      metrics: {
+        currentAssets: { annual: [{ fiscalYear: 2024, value: 160 }] },
+        currentLiabilities: { annual: [{ fiscalYear: 2024, value: 100 }] },
+      },
+    });
+    expect(crSafe.currentRatio.status).toBe('pass');
+    expect(crSafe.currentRatio.badge).toBe('Safe (>= 1.5x)');
+
+    const crBorderline = calculateTriageMetrics({
+      metrics: {
+        currentAssets: { annual: [{ fiscalYear: 2024, value: 120 }] },
+        currentLiabilities: { annual: [{ fiscalYear: 2024, value: 100 }] },
+      },
+    });
+    expect(crBorderline.currentRatio.status).toBe('warn');
+    expect(crBorderline.currentRatio.badge).toBe('Borderline (1.0–1.5x)');
+    expect(crBorderline.currentRatio.badgeHe).toBe('גבולי (1.0x–1.5x)');
+
+    const crFail = calculateTriageMetrics({
+      metrics: {
+        currentAssets: { annual: [{ fiscalYear: 2024, value: 90 }] },
+        currentLiabilities: { annual: [{ fiscalYear: 2024, value: 100 }] },
+      },
+    });
+    expect(crFail.currentRatio.status).toBe('fail');
+    expect(crFail.currentRatio.badge).toBe('At Risk (< 1.0)');
   });
 });
