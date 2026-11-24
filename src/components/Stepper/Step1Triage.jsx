@@ -354,32 +354,116 @@ const DESKTOP_TOOLTIP_ARROW_MAP = {
   center: 'lg:left-1/2 lg:-translate-x-1/2',
 }
 
-const LTR_BIDI_TOKEN_REGEX =
-  /([~$+-]?\d+(?:[.,]\d+)?[%xKMBT]?(?:[–-][~$+-]?\d+(?:[.,]\d+)?[%xKMBT]?)?|[A-Za-z][A-Za-z0-9./-]*)/g
+const CARD_STATUS_STYLES = {
+  pass: {
+    iconBox: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    badge: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20',
+    dot: 'bg-emerald-500',
+    sparkline: '#10b981',
+  },
+  warn: {
+    iconBox: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    badge: 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/25',
+    dot: 'bg-amber-500',
+    sparkline: '#f59e0b',
+  },
+  fail: {
+    iconBox: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
+    badge: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20',
+    dot: 'bg-rose-500',
+    sparkline: '#f43f5e',
+  },
+  unavailable: {
+    iconBox: 'bg-slate-500/10 text-slate-500 dark:text-slate-400',
+    badge:
+      'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-700',
+    dot: 'bg-slate-400',
+    sparkline: '#94a3b8',
+  },
+}
+
+const LTR_TOKEN_REGEX =
+  /\d+-[A-Za-z][A-Za-z0-9]*(?:[./-][A-Za-z0-9]+)*|(?:[~+-][$€£¥₪]?|[$€£¥₪])?\d+(?:[.,]\d+)*[%xKMBT]?(?:[–-](?:[~+-][$€£¥₪]?|[$€£¥₪])?\d+(?:[.,]\d+)*[%xKMBT]?)*|[A-Za-z][A-Za-z0-9]*(?:[./-][A-Za-z0-9]+)*/g
+
+function isHebrewCharCode(code) {
+  return code >= 0x0590 && code <= 0x05ff
+}
+
+/**
+ * Linear-time O(n), lookbehind-free BiDi tokenizer (Safari-safe, ReDoS-safe).
+ * Keeps Hebrew prefix + hyphen (e.g. ל-48.0%, מ-10%, ב-9, ל-1.0) in RTL while isolating
+ * numbers, signs, ranges, currency values, and Latin/form tokens as LTR segments.
+ *
+ * @param {string|number|null|undefined} text
+ * @returns {Array<{ text: string, isLtr: boolean }>}
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function tokenizeBidiText(text) {
+  if (text === null || text === undefined) return []
+  const str = String(text)
+  if (!str) return []
+
+  const tokens = []
+  const pushToken = (chunk, isLtr) => {
+    if (!chunk) return
+    const prev = tokens[tokens.length - 1]
+    if (prev && prev.isLtr === isLtr) {
+      prev.text += chunk
+    } else {
+      tokens.push({ text: chunk, isLtr })
+    }
+  }
+
+  LTR_TOKEN_REGEX.lastIndex = 0
+  let cursor = 0
+  let match
+
+  while ((match = LTR_TOKEN_REGEX.exec(str)) !== null) {
+    const idx = match.index
+    const val = match[0]
+
+    // Leading '-' right after a Hebrew letter is a Hebrew prefix hyphen (ל-48.0%), not a minus sign
+    if (val.charCodeAt(0) === 45 && idx > 0 && isHebrewCharCode(str.charCodeAt(idx - 1))) {
+      LTR_TOKEN_REGEX.lastIndex = idx + 1
+      continue
+    }
+
+    if (idx > cursor) {
+      pushToken(str.slice(cursor, idx), false)
+    }
+    pushToken(val, true)
+    cursor = idx + val.length
+  }
+
+  if (cursor < str.length) {
+    pushToken(str.slice(cursor), false)
+  }
+
+  return tokens
+}
 
 /**
  * Isolates numbers, signs (+/-/%/x), ranges, and Latin tokens with <bdi dir="ltr"> inside RTL Hebrew prose
- * so punctuation and parentheses never reverse in bidirectional rendering (#344).
+ * so punctuation and parentheses never reverse in bidirectional rendering (#344, #356).
  */
 function BidiText({ text, isRtl = true }) {
   if (text === null || text === undefined) return null
   const str = String(text)
   if (!isRtl || !str) return str
 
-  const parts = str.split(LTR_BIDI_TOKEN_REGEX)
-  if (parts.length <= 1) return str
+  const tokens = tokenizeBidiText(str)
+  if (tokens.length === 0) return str
+  if (tokens.length === 1 && !tokens[0].isLtr) return str
 
-  return parts.map((part, idx) => {
-    if (!part) return null
-    if (idx % 2 === 1) {
-      return (
-        <bdi key={`${idx}-${part}`} dir="ltr">
-          {part}
-        </bdi>
-      )
-    }
-    return part
-  })
+  return tokens.map((token, idx) =>
+    token.isLtr ? (
+      <bdi key={`${idx}-${token.text}`} dir="ltr">
+        {token.text}
+      </bdi>
+    ) : (
+      token.text
+    )
+  )
 }
 
 BidiText.propTypes = {
@@ -574,7 +658,7 @@ function InfoTooltip({ text, align = 'center', dir = 'rtl' }) {
         </button>
       )}
     >
-      {text}
+      <BidiText text={text} isRtl={dir === 'rtl'} />
     </ResponsiveTooltip>
   )
 }
@@ -854,9 +938,9 @@ export function Step1Triage({
       sparklineUnit: triageData.revenue.sparklineUnit || '$M',
       historyMeta: triageData.revenue.historyMeta,
       tooltip:
-        'צמיחה בהכנסות: עסק בריא הוא עסק שצומח. אנחנו מחפשים חברות שמצליחות להגדיל את ההכנסות (Top Line) בעקביות. הגרף מציג עד 15 שנות היסטוריה כדי לחשוף מחזוריות, בעוד קצב הצמיחה השנתי (CAGR) מחושב ל-5 השנים האחרונות ולטווח המלא.',
+        'צמיחה בהכנסות: עסק בריא מגדיל את המכירות שלו לאורך זמן. המספר המרכזי מציג את השינוי בשנה האחרונה (YoY — שנה מול שנה), והסיכום למטה מציג את קצב הצמיחה השנתי הממוצע (CAGR) ל-5 שנים ולטווח המלא (עד 15 שנה בגרף). ירוק = צמיחה עקבית וחיובית; צהוב = צמיחה איטית (מתחת ל-5%), מחזוריות או האטה חדה; אדום = התכווצות (3+ שנות ירידה רצופות או מגמת ירידה שלילית).',
       tooltipEn:
-        'Revenue Growth: Healthy businesses expand top-line demand consistently. The sparkline covers up to 15 years to surface cyclicality alongside 5Y CAGR momentum.',
+        'Revenue Growth: Healthy businesses expand sales over time. The headline shows the latest annual change (YoY), while the summary tracks multi-year compound growth (CAGR) across up to 15 years. Green = steady positive growth; Yellow = slow (<5%), cyclical dips, or sharp deceleration; Red = 3+ consecutive down years or declining trend.',
       tooltipAlign: 'start',
       icon: TrendingUp,
     },
@@ -879,9 +963,9 @@ export function Step1Triage({
       sparklineUnit: triageData.margins.sparklineUnit || '%',
       historyMeta: triageData.margins.historyMeta,
       tooltip:
-        'שולי רווח תפעולי: המדד ליעילות וכוח תמחור. קו האמצע המקווקו בגרף מסמן את הממוצע הרב-שנתי כדי שתוכל לזהות במבט ראשון האם השוליים יציבים או מחזוריים.',
+        'שולי רווח תפעולי: כמה אחוזים מכל שקל או דולר מכירות נשארים כרווח מפעילות העסק לפני מס וריבית — מדד ישיר ליעילות ולכוח תמחור. הקו המקווקו בגרף מסמן את הממוצע הרב-שנתי (לזיהוי מחזוריות לפי גישת "המשקיע הנבון" ובאפט). ירוק = שוליים יציבים מעל 10% (מעל 25% = גבוהים ויציבים); צהוב = מעל 10% אך תנודתיים (פער של מעל 20 נק׳ אחוז או ירידה חדה); אדום = הפסד בשנה האחרונה, מתחת ל-10%, או שנת הפסד בהיסטוריה.',
       tooltipEn:
-        'Operating Margins: Measures operational efficiency and pricing power. The dashed baseline marks the multi-year average to spot cyclical swings quickly.',
+        'Operating Margins: Percentage of revenue kept as operating profit before interest and taxes—a direct gauge of efficiency and pricing power. The dashed line marks the multi-year average. Green = stable >= 10% (>= 25% high & stable); Yellow = >= 10% but cyclical/volatile (>20pp spread or >=10pp drop); Red = negative latest margin, < 10%, or any historical loss year.',
       tooltipAlign: 'start',
       icon: Percent,
     },
@@ -907,9 +991,9 @@ export function Step1Triage({
       sparklineUnit: triageData.shares.sparklineUnit || 'sharesM',
       historyMeta: triageData.shares.historyMeta,
       tooltip:
-        'דילול מניות: כשהחברה מנפיקה עוד מניות, הנתח שלנו כמשקיעים קטן (דילול). באידיאל, נחפש חברות שלא מדללות באגרסיביות, או עדיף - חברות שרוכשות מניות חזרה (Buybacks) ומקטינות את כמות המניות נטו לאורך זמן.',
+        'דילול מניות ורכישה עצמית (Buybacks): כשחברה מנפיקה מניות חדשות, חלקנו בעוגה קטן (דילול); כשהיא רוכשת מניות חזרה מהשוק (Buybacks) ומבטלת אותן, חלקו של כל משקיע גדל. הבדיקה מודדת את השינוי בכמות המניות בשנה האחרונה לצד המגמה הרב-שנתית. ירוק = ירידה בכמות המניות או יציבות (עד +0.2%); צהוב = דילול מתון (+0.2% עד +3.0% בשנה); אדום = דילול אגרסיבי (מעל +3.0% בשנה).',
       tooltipEn:
-        'Share Dilution: Issuing shares dilutes your ownership stake. Ideally we favor companies retiring shares net of compensation via disciplined buybacks.',
+        'Share Dilution & Buybacks: Issuing new shares shrinks your ownership slice; buying back and retiring shares (Buybacks) increases it. Evaluates latest-year share change alongside multi-year trend. Green = shrinking or flat (<= +0.2%); Yellow = moderate dilution (+0.2% to +3.0%/yr); Red = aggressive dilution (> +3.0%/yr).',
       tooltipAlign: 'end',
       icon: Coins,
     },
@@ -921,7 +1005,7 @@ export function Step1Triage({
       value: triageData.currentRatio.value,
       valueHe: triageData.currentRatio.valueHe || triageData.currentRatio.value,
       target: triageData.currentRatio.target,
-      targetHe: triageData.currentRatio.targetHe || 'תנאי למעבר: מעל 1.0',
+      targetHe: triageData.currentRatio.targetHe || 'תנאי למעבר: מעל 1.5x',
       badge: triageData.currentRatio.badge,
       badgeHe: triageData.currentRatio.badgeHe || triageData.currentRatio.badge,
       detail: triageData.currentRatio.detail,
@@ -932,15 +1016,36 @@ export function Step1Triage({
       sparklineUnit: triageData.currentRatio.sparklineUnit || 'x',
       historyMeta: triageData.currentRatio.historyMeta,
       tooltip:
-        'יחס שוטף (Current Ratio): אנחנו רוצים לישון בשקט בלילה. יחס שוטף מעל 1 אומר שלחברה יש מספיק נכסים נזילים כדי לכסות את התחייבויותיה הקרובות, ומונע סיכון מיידי של פשיטת רגל.',
+        'יחס שוטף (Current Ratio): היחס בין הנכסים השוטפים (מזומן, לקוחות, מלאי) להתחייבויות השוטפות שיש לשלם ב-12 החודשים הקרובים — מרווח הביטחון של העסק לטווח קצר. ירוק = 1.5x ומעלה (מרווח ביטחון בריא); צהוב = גבולי (1.0x–1.5x); אדום = מתחת ל-1.0x (ההתחייבויות הקרובות עולות על הנכסים הנזילים).',
       tooltipEn:
-        'Current Ratio: Measures short-term solvency. A ratio above 1.0 confirms liquid assets exceed near-term liabilities.',
+        'Current Ratio: Short-term assets divided by liabilities due within 12 months—your near-term solvency cushion. Green = >= 1.5x (comfortable safety margin); Yellow = 1.0x–1.5x (borderline buffer); Red = < 1.0x (near-term liabilities exceed liquid assets).',
       tooltipAlign: 'end',
       icon: ShieldCheck,
     },
   ]
 
-  const passedCount = fundamentalIndicators.filter((i) => i.status === 'pass').length
+  const availableIndicators = fundamentalIndicators.filter((i) => i.status !== 'unavailable')
+  const availableCount = availableIndicators.length
+  const passedCount = availableIndicators.filter((i) => i.status === 'pass').length
+  const failedCount = availableIndicators.filter((i) => i.status === 'fail').length
+
+  const summaryBadgeTone =
+    availableCount === 0
+      ? 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700'
+      : passedCount === availableCount
+      ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500/20'
+      : failedCount === 0 || (passedCount > 0 && passedCount >= availableCount / 2)
+      ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-500/20'
+      : 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border-rose-500/20'
+
+  const summaryBadgeLabel =
+    availableCount === 0
+      ? lang === 'he'
+        ? 'אין נתוני SEC זמינים'
+        : 'No SEC Data Available'
+      : lang === 'he'
+      ? `${passedCount} מתוך ${availableCount} עברו`
+      : `${passedCount} of ${availableCount} Passed`
 
   const handleLanguageSwitch = useCallback(
     async (nextLang) => {
@@ -1992,24 +2097,18 @@ export function Step1Triage({
           </div>
           <div
             data-testid="fundamentals-passed-badge"
-            className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
-              passedCount === 4
-                ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500/20'
-                : passedCount >= 2
-                ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-500/20'
-                : 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border-rose-500/20'
-            }`}
+            className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${summaryBadgeTone}`}
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
-            {lang === 'he' ? `${passedCount} מתוך 4 עברו` : `${passedCount} of 4 Passed`}
+            {summaryBadgeLabel}
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {fundamentalIndicators.map((indicator) => {
             const Icon = indicator.icon
-            const isPass = indicator.status === 'pass'
-            const sparklineColor = isPass ? '#10b981' : '#f43f5e'
+            const statusStyle = CARD_STATUS_STYLES[indicator.status] || CARD_STATUS_STYLES.fail
+            const sparklineColor = statusStyle.sparkline
             const meta = indicator.historyMeta
             const isCyclical = meta?.cycleType === 'cyclical'
 
@@ -2017,32 +2116,19 @@ export function Step1Triage({
               <div
                 key={indicator.id}
                 data-testid={`fundamental-card-${indicator.id}`}
+                data-status={indicator.status}
                 className="group relative rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-4 sm:p-5 hover:border-slate-300 dark:hover:border-slate-700 transition-all shadow-xs flex flex-col justify-between"
               >
                 <div>
-                  {/* Card Header: Icon + Pass/Fail Badge */}
+                  {/* Card Header: Icon + 4-State Badge (Pass / Warn / Fail / Unavailable) */}
                   <div className="flex items-center justify-between mb-3">
-                    <div
-                      className={`p-2 rounded-lg ${
-                        isPass
-                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                          : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                      }`}
-                    >
+                    <div className={`p-2 rounded-lg ${statusStyle.iconBox}`}>
                       <Icon className="w-4 h-4" />
                     </div>
                     <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                        isPass
-                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20'
-                          : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20'
-                      }`}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${statusStyle.badge}`}
                     >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          isPass ? 'bg-emerald-500' : 'bg-rose-500'
-                        }`}
-                      />
+                      <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
                       <BidiText
                         text={lang === 'he' ? indicator.badgeHe : indicator.badge}
                         isRtl={lang === 'he'}
@@ -2095,77 +2181,87 @@ export function Step1Triage({
                     )}
                   </div>
 
-                  {/* Minimalist Interactive Sparkline with Mean Reference Line, Hover Data & Timeline */}
-                  {indicator.sparkline && indicator.sparkline.length > 1 && (
-                    <div className="my-2.5">
-                      <div className="h-12 w-full">
-                        <ResponsiveContainer width="100%" height={48}>
-                          <LineChart
-                            data={indicator.sparkline}
-                            margin={{ top: 4, right: 3, bottom: 4, left: 3 }}
-                          >
-                            <YAxis domain={['dataMin', 'dataMax']} hide />
-                            {typeof meta?.avg === 'number' && (
-                              <ReferenceLine
-                                y={meta.avg}
-                                stroke={sparklineColor}
-                                strokeOpacity={0.3}
-                                strokeDasharray="3 3"
-                              />
-                            )}
-                            <Tooltip
-                              allowEscapeViewBox={{ x: false, y: true }}
-                              wrapperStyle={{ zIndex: 40, pointerEvents: 'none' }}
-                              content={
-                                <SparklineTooltip
-                                  unit={indicator.sparklineUnit}
-                                  isHe={lang === 'he'}
-                                />
-                              }
-                              cursor={{
-                                stroke: sparklineColor,
-                                strokeWidth: 1,
-                                strokeOpacity: 0.45,
-                              }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="value"
-                              stroke={sparklineColor}
-                              strokeWidth={2}
-                              dot={false}
-                              activeDot={{ r: 3.5 }}
-                              isAnimationActive={false}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-                      {meta && (
-                        <div
-                          dir="ltr"
-                          data-testid={`sparkline-timeline-${indicator.id}`}
-                          className="flex items-center justify-between gap-1 text-[10px] text-slate-400 dark:text-slate-500 mt-0.5"
-                        >
-                          <span className="font-mono">{meta.startYear}</span>
-                          {meta.cycleBadgeHe && (
-                            <span
-                              dir={lang === 'he' ? 'rtl' : 'ltr'}
-                              className={`truncate px-1.5 py-0.2 rounded-sm font-medium ${
-                                isCyclical
-                                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
-                                  : 'text-slate-500 dark:text-slate-400'
-                              }`}
-                            >
-                              <BidiText
-                                text={lang === 'he' ? meta.cycleBadgeHe : meta.cycleBadgeEn}
-                                isRtl={lang === 'he'}
-                              />
-                            </span>
-                          )}
-                          <span className="font-mono">{meta.endYear}</span>
-                        </div>
-                      )}
+                  {/* Minimalist Interactive Sparkline or Neutral Placeholder when SEC data is unavailable */}
+                  {indicator.status === 'unavailable' ? (
+                    <div
+                      data-testid={`sparkline-unavailable-${indicator.id}`}
+                      className="my-2.5 h-12 w-full rounded-lg border border-dashed border-slate-200 dark:border-slate-700/70 bg-slate-50/70 dark:bg-slate-800/30 flex items-center justify-center text-[11px] text-slate-500 dark:text-slate-400 px-2 text-center"
+                    >
+                      {lang === 'he' ? 'אין היסטוריית SEC להצגת גרף' : 'No SEC history available'}
                     </div>
+                  ) : (
+                    indicator.sparkline &&
+                    indicator.sparkline.length > 1 && (
+                      <div className="my-2.5">
+                        <div className="h-12 w-full">
+                          <ResponsiveContainer width="100%" height={48}>
+                            <LineChart
+                              data={indicator.sparkline}
+                              margin={{ top: 4, right: 3, bottom: 4, left: 3 }}
+                            >
+                              <YAxis domain={['dataMin', 'dataMax']} hide />
+                              {typeof meta?.avg === 'number' && (
+                                <ReferenceLine
+                                  y={meta.avg}
+                                  stroke={sparklineColor}
+                                  strokeOpacity={0.3}
+                                  strokeDasharray="3 3"
+                                />
+                              )}
+                              <Tooltip
+                                allowEscapeViewBox={{ x: false, y: true }}
+                                wrapperStyle={{ zIndex: 40, pointerEvents: 'none' }}
+                                content={
+                                  <SparklineTooltip
+                                    unit={indicator.sparklineUnit}
+                                    isHe={lang === 'he'}
+                                  />
+                                }
+                                cursor={{
+                                  stroke: sparklineColor,
+                                  strokeWidth: 1,
+                                  strokeOpacity: 0.45,
+                                }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="value"
+                                stroke={sparklineColor}
+                                strokeWidth={2}
+                                dot={false}
+                                activeDot={{ r: 3.5 }}
+                                isAnimationActive={false}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                        {meta && (
+                          <div
+                            dir="ltr"
+                            data-testid={`sparkline-timeline-${indicator.id}`}
+                            className="flex items-center justify-between gap-1 text-[10px] text-slate-400 dark:text-slate-500 mt-0.5"
+                          >
+                            <span className="font-mono">{meta.startYear}</span>
+                            {meta.cycleBadgeHe && (
+                              <span
+                                dir={lang === 'he' ? 'rtl' : 'ltr'}
+                                className={`truncate px-1.5 py-0.2 rounded-sm font-medium ${
+                                  isCyclical
+                                    ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                                    : 'text-slate-500 dark:text-slate-400'
+                                }`}
+                              >
+                                <BidiText
+                                  text={lang === 'he' ? meta.cycleBadgeHe : meta.cycleBadgeEn}
+                                  isRtl={lang === 'he'}
+                                />
+                              </span>
+                            )}
+                            <span className="font-mono">{meta.endYear}</span>
+                          </div>
+                        )}
+                      </div>
+                    )
                   )}
                 </div>
 
