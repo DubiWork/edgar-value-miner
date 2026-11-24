@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
-> Active `1.2.5` release train on `develop` (staged prior to `main` promotion).
+> Active `1.2.6` release train on `develop` (staged prior to `main` promotion).
 
 ### Added
+- Canonical Step 1 Inversion, Red-Flag Engine & Trust Gatekeeper master specification (`docs/specs/step1_inversion_master_spec.md`) for Epic #355 (#356).
 - Step 1 Triage Gatekeeper UI, Vertex AI `generateAiSummary` Cloud Function, and admin cache/ingestion controls (`PR #316`).
 - Step 1 `10-K`/`8-K` & transcript SEC grounding pipeline with Firestore L2 cache and filing freshness check (`#318`, `PR #320`).
 - Step 1 Generative UI Tear Sheet Blade with Hebrew RTL/LTR toggle, 4-stage Business Flow Infographic, relative-scale peer chips, Industry Jargon Glossary, and Moat rating guardrails (`#319`, `PR #320`).
@@ -23,6 +24,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Pinned Playwright E2E workflow runners to `ubuntu-24.04` (`PR #316`) and enabled `CodeQL Advanced` on `develop` (`PR #320`).
 
 ### Fixed
+- Fixed 5 XBRL/IFRS normalization bugs in `gaapNormalizer.js` (removed erroneous `LiabilitiesAndStockholdersEquity`, IFRS `NoncurrentLiabilities`, `LongTermDebtAndCapitalLeaseObligationsCurrent`, `IntangibleAssetsNetIncludingGoodwill`, and `CapitalExpendituresIncurredButNotYetPaid` fallbacks; added derived `totalLiabilities` and `totalDebt`, `InterestExpenseOperating`, fallback-only `InterestPaidNet` with `isCashFallback`, `stockBasedCompensation`, `deferredRevenueCurrent`, IFRS `ProfitLossBeforeTax`, and `'InterestRevenueExpense'` in `BANK_REVENUE_TAGS`) and bumped `NORMALIZATION_VERSION` to `2` (#356).
+- Upgraded `edgarCache.js` IndexedDB schema to `DB_VERSION = 4` (clearing stale v1–v3 `companyFacts` entries), enforced `normalizationVersion === NORMALIZATION_VERSION` validation, and added a non-fatal `request.onblocked` handler (#356).
+- Removed fabricated `DEFAULT_MSFT_TRIAGE` fallback in `triageCalculator.js` in favor of explicit `unavailable` (`אין נתוני SEC`) states, and implemented 3-tier Weakest-Link scoring (`pass`/`warn`/`fail`/`unavailable`) with loss-year/cyclicality checks evaluated before `>= 25%` margins, explicit `YoY` vs `CAGR` labels, closed share-dilution loophole, and tiered `Current Ratio` (`>= 1.5x` / `1.0x–1.5x` / `< 1.0x`) (#356).
+- Replaced `Step1Triage.jsx` BiDi regex splitting with linear `O(n)`, lookbehind-free `tokenizeBidiText` (fixing `ל-48.0%-` Hebrew prefix hyphen reversal), added 4-state card/placeholder rendering, and enriched KPI tooltips with plain-Hebrew beginner explanations (#356).
 - Resolved 49 ESLint errors (`no-undef` `global` → `globalThis` and unused variables) in `src/services/__tests__/edgarApi.test.js` and `src/utils/__tests__/gaapNormalizer.test.js` (#353).
 - Eliminated `secTickers` HTTP `502` / SEC `429` directory outages via a 4-tier resilient Cloud Functions loader (24h in-memory cache + in-flight deduplication, shared Firestore `systemCache/secTickers`, bounded `429`/`503` retries with a valid contact User-Agent, and bundled `sec-tickers-snapshot.json.gz` fallback) plus client `localStorage` caching and dot/hyphen share-class resolution (`#349`).
 - Fixed company-name search UX by adding `sanitizeSearchQuery` (preserving spaces and up to 60 characters), ranked multi-word & company-name matching (`scoreTickerMatches`), smart `Enter` auto-resolution to best matching ticker, friendly inline guidance instead of error-page crashes on unmatched company names, and classified error feedback (`#347`).
