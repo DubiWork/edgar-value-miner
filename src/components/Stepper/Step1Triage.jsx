@@ -19,6 +19,10 @@ import {
   Package,
   Banknote,
   BookOpen,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Info,
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -768,6 +772,460 @@ InfoTooltip.propTypes = {
   dir: PropTypes.oneOf(['rtl', 'ltr']),
 }
 
+const INVERSION_STRIP_STYLES = {
+  fail: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-b border-rose-500/20 hover:bg-rose-500/15',
+  warn: 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-b border-amber-500/20 hover:bg-amber-500/15',
+  pass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-b border-emerald-500/20 hover:bg-emerald-500/15',
+  unavailable:
+    'bg-slate-100/80 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800',
+}
+
+const INVERSION_FLAG_TONES = {
+  red: {
+    container:
+      'border-rose-500/30 bg-rose-50/70 dark:bg-rose-950/20',
+    badge:
+      'bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/25',
+    dot: 'bg-rose-500',
+    quoteBox: 'border-rose-500/20 bg-white/80 dark:bg-slate-900/70',
+  },
+  yellow: {
+    container:
+      'border-amber-500/30 bg-amber-50/70 dark:bg-amber-950/20',
+    badge:
+      'bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/25',
+    dot: 'bg-amber-500',
+    quoteBox: 'border-amber-500/20 bg-white/80 dark:bg-slate-900/70',
+  },
+  info: {
+    container:
+      'border-sky-500/25 bg-sky-50/60 dark:bg-sky-950/20',
+    badge:
+      'bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/25',
+    dot: 'bg-sky-500',
+    quoteBox: 'border-sky-500/20 bg-white/80 dark:bg-slate-900/70',
+  },
+}
+
+const YELLOW_WARNINGS_PREVIEW_CAP = 3
+
+/**
+ * Calm Slate/Sky Accounting Guardrail Pill with 1-sentence plain-Hebrew responsive explanation.
+ */
+function GuardrailInfoPill({
+  tagHe,
+  tagEn,
+  explanationHe,
+  explanationEn,
+  lang = 'he',
+  testId = 'guardrail-info-pill',
+}) {
+  const isHe = lang === 'he'
+  const label = isHe ? tagHe : tagEn
+  const tip = isHe ? explanationHe : explanationEn
+  if (!label) return null
+
+  return (
+    <ResponsiveTooltip
+      placement="top"
+      align="start"
+      widthClass="lg:w-80"
+      dir={isHe ? 'rtl' : 'ltr'}
+      showArrow
+      trigger={({ isOpen, onToggle }) => (
+        <button
+          type="button"
+          data-testid={testId}
+          aria-label={isHe ? 'הסבר הקשר חשבונאי' : 'Accounting guardrail explanation'}
+          aria-expanded={isOpen}
+          onClick={onToggle}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/25 hover:bg-sky-500/15 transition-colors cursor-help focus:outline-none focus:ring-1 focus:ring-sky-500"
+        >
+          <BidiText text={label} isRtl={isHe} />
+        </button>
+      )}
+    >
+      <span className="block leading-relaxed text-slate-200">
+        <BidiText text={tip} isRtl={isHe} />
+      </span>
+    </ResponsiveTooltip>
+  )
+}
+
+GuardrailInfoPill.propTypes = {
+  tagHe: PropTypes.string,
+  tagEn: PropTypes.string,
+  explanationHe: PropTypes.string,
+  explanationEn: PropTypes.string,
+  lang: PropTypes.oneOf(['he', 'en']),
+  testId: PropTypes.string,
+}
+
+const INVERSION_CATEGORY_LABELS = {
+  solvency: { he: 'מינוף וחוב', en: 'Solvency & Debt' },
+  liquidity: { he: 'נזילות קצרה', en: 'Short-Term Liquidity' },
+  margins: { he: 'שולי רווח', en: 'Profit Margins' },
+  growth: { he: 'צמיחה', en: 'Revenue Growth' },
+  cashflow: { he: 'תזרים מזומנים', en: 'Cash Conversion' },
+  dilution: { he: 'דילול ו-SBC', en: 'Dilution & SBC' },
+  goodwill: { he: 'מוניטין / רכישות', en: 'Goodwill / M&A' },
+  'capital-allocation': { he: 'החזרי הון', en: 'Capital Returns' },
+  archetype: { he: 'חוק ענפי', en: 'Sector Benchmark' },
+  qualitative: { he: 'סריקת SEC', en: 'SEC Filing Risk' },
+}
+
+/**
+ * Single Inversion Flag Row with plain-Hebrew self-contained explanation and expandable
+ * Benjamin Graham / Warren Buffett / SEC Filing quote drawer.
+ */
+function InversionFlagItem({ flag, lang = 'he' }) {
+  const [isQuoteOpen, setIsQuoteOpen] = useState(false)
+  const isHe = lang === 'he'
+  const tone = INVERSION_FLAG_TONES[flag.severity] || INVERSION_FLAG_TONES.yellow
+  const catLabel = INVERSION_CATEGORY_LABELS[flag.category]
+  const badgeText =
+    flag.severity === 'info'
+      ? isHe
+        ? flag.badgeHe
+        : flag.badgeEn
+      : catLabel
+      ? isHe
+        ? catLabel.he
+        : catLabel.en
+      : isHe
+      ? flag.badgeHe
+      : flag.badgeEn
+  const titleText = isHe ? flag.titleHe : flag.titleEn
+  const valueText = isHe ? flag.valueDisplayHe : flag.valueDisplayEn
+  const explanationText = isHe ? flag.explanationHe : flag.explanationEn
+  const quote = flag.quote
+
+  return (
+    <div
+      data-testid={`inversion-flag-${flag.id}`}
+      data-severity={flag.severity}
+      className={`rounded-xl border p-3.5 space-y-2 ${tone.container}`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold ${tone.badge}`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${tone.dot}`} aria-hidden="true" />
+            <BidiText text={badgeText} isRtl={isHe} />
+          </span>
+          <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+            <BidiText text={titleText} isRtl={isHe} />
+          </h4>
+        </div>
+        {valueText && (
+          <span className="text-[11px] font-mono font-semibold text-slate-700 dark:text-slate-200 bg-white/70 dark:bg-slate-900/60 px-2 py-0.5 rounded-md border border-slate-200/80 dark:border-slate-700/70">
+            <BidiText text={valueText} isRtl={isHe} />
+          </span>
+        )}
+      </div>
+
+      {explanationText && (
+        <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+          <BidiText text={explanationText} isRtl={isHe} />
+        </p>
+      )}
+
+      {quote && (quote.insightHe || quote.quoteEn) && (
+        <div>
+          <button
+            type="button"
+            data-testid={`quote-toggle-${flag.id}`}
+            aria-expanded={isQuoteOpen}
+            onClick={() => setIsQuoteOpen((prev) => !prev)}
+            className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-sky-700 dark:text-sky-300 hover:text-sky-600 dark:hover:text-sky-200 cursor-pointer"
+          >
+            <BookOpen className="w-3.5 h-3.5 shrink-0" />
+            <span>
+              {isHe
+                ? `תובנה וציטוט (${quote.attributionHe})`
+                : `Investor Lesson & Quote (${quote.attributionEn})`}
+            </span>
+            {isQuoteOpen ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </button>
+
+          {isQuoteOpen && (
+            <div
+              data-testid={`quote-drawer-${flag.id}`}
+              className={`mt-2 rounded-lg border p-2.5 space-y-1.5 text-xs ${tone.quoteBox}`}
+            >
+              {(isHe ? quote.insightHe : quote.insightEn) && (
+                <p className="font-semibold text-slate-800 dark:text-slate-200">
+                  <BidiText text={isHe ? quote.insightHe : quote.insightEn} isRtl={isHe} />
+                </p>
+              )}
+              {quote.quoteEn && (
+                <blockquote
+                  dir="ltr"
+                  className="text-[11px] italic text-slate-600 dark:text-slate-400 border-l-2 border-slate-300 dark:border-slate-600 pl-2.5 leading-relaxed"
+                >
+                  "{quote.quoteEn}"
+                </blockquote>
+              )}
+              <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                — {isHe ? quote.attributionHe : quote.attributionEn}
+                {quote.sourceRef ? ` · ${quote.sourceRef}` : ''}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+InversionFlagItem.propTypes = {
+  flag: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    severity: PropTypes.oneOf(['red', 'yellow', 'info']).isRequired,
+    category: PropTypes.string,
+    badgeHe: PropTypes.string,
+    badgeEn: PropTypes.string,
+    titleHe: PropTypes.string,
+    titleEn: PropTypes.string,
+    valueDisplayHe: PropTypes.string,
+    valueDisplayEn: PropTypes.string,
+    explanationHe: PropTypes.string,
+    explanationEn: PropTypes.string,
+    quote: PropTypes.shape({
+      attributionHe: PropTypes.string,
+      attributionEn: PropTypes.string,
+      insightHe: PropTypes.string,
+      insightEn: PropTypes.string,
+      quoteEn: PropTypes.string,
+      sourceRef: PropTypes.string,
+    }),
+  }).isRequired,
+  lang: PropTypes.oneOf(['he', 'en']),
+}
+
+/**
+ * Option C Bottom Card (`#step1-risk-breakdown`):
+ * Collapses cleanly on healthy companies, shows tiered Red / capped Yellow (+N) / calm Blue Context.
+ */
+function RiskBreakdownCard({ inversion, lang = 'he', isHighlighted = false, sectionRef = null }) {
+  const [showAllYellow, setShowAllYellow] = useState(false)
+  const isHe = lang === 'he'
+
+  const tier1Red = inversion?.tier1Red || []
+  const tier2Yellow = inversion?.tier2Yellow || []
+  const tier3Context = inversion?.tier3Context || []
+  const summary = inversion?.summary || {
+    redCount: 0,
+    yellowCount: 0,
+    contextCount: 0,
+    overallStatus: 'unavailable',
+    isCleanPass: false,
+  }
+
+  const visibleYellow = showAllYellow
+    ? tier2Yellow
+    : tier2Yellow.slice(0, YELLOW_WARNINGS_PREVIEW_CAP)
+  const hiddenYellowCount = Math.max(0, tier2Yellow.length - YELLOW_WARNINGS_PREVIEW_CAP)
+
+  const highlightRing = isHighlighted
+    ? 'ring-2 ring-sky-500 ring-offset-2 dark:ring-offset-slate-950'
+    : ''
+
+  if (summary.overallStatus === 'unavailable' && tier3Context.length === 0) {
+    return (
+      <div
+        id="step1-risk-breakdown"
+        ref={sectionRef}
+        data-testid="step1-risk-breakdown"
+        dir={isHe ? 'rtl' : 'ltr'}
+        className={`rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 px-4 py-3 text-xs text-slate-600 dark:text-slate-400 transition-all ${highlightRing}`}
+      >
+        <div className="flex items-center gap-2 font-medium">
+          <Info className="w-4 h-4 shrink-0 text-slate-400" />
+          <span>
+            {isHe
+              ? 'סינון סיכונים מעמיק (Inversion Breakdown) יופיע כאן מיד עם טעינת הדוחות הכספיים מה-SEC.'
+              : 'Full Inversion Risk & Guardrail Breakdown will appear once SEC financials are loaded.'}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  if (summary.isCleanPass && tier3Context.length === 0) {
+    return (
+      <div
+        id="step1-risk-breakdown"
+        ref={sectionRef}
+        data-testid="step1-risk-breakdown"
+        dir={isHe ? 'rtl' : 'ltr'}
+        className={`rounded-2xl border border-emerald-500/25 bg-emerald-50/70 dark:bg-emerald-950/20 px-4 py-3.5 transition-all ${highlightRing}`}
+      >
+        <div
+          data-testid="risk-breakdown-clean-pass"
+          className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm font-semibold text-emerald-800 dark:text-emerald-300"
+        >
+          <span className="inline-flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <BidiText
+              text={
+                isHe
+                  ? '✓ 0 דגלים אדומים · סינון נקי (כל בדיקות היציבות, התזרים והמינוף תקינות)'
+                  : '✓ 0 Red Flags · Clean Pass (All solvency, 3Y cash flow, and guardrail checks passed)'
+              }
+              isRtl={isHe}
+            />
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      id="step1-risk-breakdown"
+      ref={sectionRef}
+      data-testid="step1-risk-breakdown"
+      dir={isHe ? 'rtl' : 'ltr'}
+      className={`rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-4 sm:p-5 space-y-4 shadow-xs transition-all ${highlightRing}`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+            {isHe ? 'פירוט דגלים אדומים, אזהרות והקשר מאזני' : 'Inversion Risk & Guardrail Breakdown'}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {isHe
+              ? 'סינון "אשמה עד שתוכח חפותה" עם הסבר מובנה בעברית פשוטה וציטוטים מבאפט וגראהם'
+              : 'Structured red flags, resilience warnings, and accounting context with plain explanations'}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+          {summary.redCount > 0 && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/25">
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <BidiText
+                text={isHe ? `${summary.redCount} דגלים אדומים` : `${summary.redCount} Red`}
+                isRtl={isHe}
+              />
+            </span>
+          )}
+          {summary.yellowCount > 0 && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/25">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <BidiText
+                text={isHe ? `${summary.yellowCount} אזהרות` : `${summary.yellowCount} Warn`}
+                isRtl={isHe}
+              />
+            </span>
+          )}
+          {summary.isCleanPass && (
+            <span
+              data-testid="risk-breakdown-clean-pass"
+              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <BidiText
+                text={isHe ? '✓ 0 דגלים אדומים · סינון נקי' : '✓ 0 Red Flags · Clean Pass'}
+                isRtl={isHe}
+              />
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Tier 1: Red Disqualifying Flags */}
+      {tier1Red.length > 0 && (
+        <div data-testid="risk-tier1-red" className="space-y-2.5">
+          <div className="text-xs font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
+            {isHe ? 'דגלים אדומים פוסלים (Tier 1)' : 'Tier 1 — Disqualifying Red Flags'}
+          </div>
+          <div className="space-y-2.5">
+            {tier1Red.map((flag) => (
+              <InversionFlagItem key={flag.id} flag={flag} lang={lang} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tier 2: Yellow Warnings (Capped at 3 with +N expand) */}
+      {tier2Yellow.length > 0 && (
+        <div data-testid="risk-tier2-yellow" className="space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+              {isHe ? 'אזהרות למעקב (Tier 2)' : 'Tier 2 — Cautions to Watch'}
+            </span>
+            {hiddenYellowCount > 0 && (
+              <button
+                type="button"
+                data-testid="risk-yellow-expand-btn"
+                onClick={() => setShowAllYellow((prev) => !prev)}
+                className="text-xs font-semibold text-amber-700 dark:text-amber-300 hover:underline cursor-pointer"
+              >
+                {showAllYellow
+                  ? isHe
+                    ? 'הצג פחות'
+                    : 'Show fewer'
+                  : isHe
+                  ? `+${hiddenYellowCount} אזהרות נוספות`
+                  : `+${hiddenYellowCount} more warnings`}
+              </button>
+            )}
+          </div>
+          <div className="space-y-2.5">
+            {visibleYellow.map((flag) => (
+              <InversionFlagItem key={flag.id} flag={flag} lang={lang} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tier 3: Calm Accounting Context & A1 Guardrails (Not counted as warnings/red flags) */}
+      {tier3Context.length > 0 && (
+        <div
+          data-testid="risk-tier3-context"
+          className="pt-2 border-t border-slate-200/80 dark:border-slate-800 space-y-2.5"
+        >
+          <div className="text-xs font-bold text-sky-700 dark:text-sky-400">
+            {isHe
+              ? 'הקשר חשבונאי והגנות סקטור (אינם נספרים כדגל אדום או אזהרה)'
+              : 'Accounting Context & Guardrails (Not Counted as Flags)'}
+          </div>
+          <div className="space-y-2">
+            {tier3Context.map((item) => (
+              <InversionFlagItem key={item.id} flag={item} lang={lang} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+RiskBreakdownCard.propTypes = {
+  inversion: PropTypes.shape({
+    tier1Red: PropTypes.array,
+    tier2Yellow: PropTypes.array,
+    tier3Context: PropTypes.array,
+    summary: PropTypes.shape({
+      redCount: PropTypes.number,
+      yellowCount: PropTypes.number,
+      contextCount: PropTypes.number,
+      overallStatus: PropTypes.string,
+      isCleanPass: PropTypes.bool,
+    }),
+  }),
+  lang: PropTypes.oneOf(['he', 'en']),
+  isHighlighted: PropTypes.bool,
+  sectionRef: PropTypes.oneOfType([PropTypes.func, PropTypes.object]),
+}
+
 /**
  * Step1Triage - 10-Second Gatekeeper & Business Clarity Screen
  * Inspired by Stock Simplifier's guided investment flow.
@@ -805,7 +1263,10 @@ export function Step1Triage({
   const [lang, setLang] = useState('he')
   const [isTranslating, setIsTranslating] = useState(false)
   const [isUpgradingSummary, setIsUpgradingSummary] = useState(false)
+  const [isRiskHighlighted, setIsRiskHighlighted] = useState(false)
   const autoRefreshedTickerRef = useRef(null)
+  const riskBreakdownRef = useRef(null)
+  const riskHighlightTimerRef = useRef(null)
 
   const ticker = company?.ticker || companyFacts?.ticker || 'MSFT'
   const companyName = company?.name || companyFacts?.companyName || ticker
@@ -815,6 +1276,33 @@ export function Step1Triage({
     () => inferArchetypeFromXbrlAndMeta(companyFacts, company),
     [companyFacts, company]
   )
+  const resolvedArchetype = aiSummary?.businessArchetype || deterministicArchetype.archetype
+  const resolvedSubType =
+    aiSummary?.financialSubType && aiSummary.financialSubType !== 'NONE'
+      ? aiSummary.financialSubType
+      : deterministicArchetype.financialSubType
+
+  useEffect(() => {
+    return () => {
+      if (riskHighlightTimerRef.current) {
+        clearTimeout(riskHighlightTimerRef.current)
+      }
+    }
+  }, [])
+
+  const handleScrollToRiskBreakdown = useCallback(() => {
+    const el = riskBreakdownRef.current || document.getElementById('step1-risk-breakdown')
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+    setIsRiskHighlighted(true)
+    if (riskHighlightTimerRef.current) {
+      clearTimeout(riskHighlightTimerRef.current)
+    }
+    riskHighlightTimerRef.current = setTimeout(() => {
+      setIsRiskHighlighted(false)
+    }, 1800)
+  }, [])
 
   const refreshAdminBudget = useCallback(async () => {
     if (!isAdmin) return
@@ -1029,10 +1517,24 @@ export function Step1Triage({
     }
   }, [ticker, manualTranscriptInput, handleRefreshAiSummary])
 
-  // Calculate real fundamental indicators & 10-15Y historical sparklines
+  // Calculate real fundamental indicators, A1 guardrails & Inversion Risk Breakdown
   const triageData = useMemo(() => {
-    return calculateTriageMetrics(companyFacts)
-  }, [companyFacts])
+    return calculateTriageMetrics(companyFacts, {
+      archetype: resolvedArchetype,
+      financialSubType: resolvedSubType,
+      aiSummary,
+    })
+  }, [companyFacts, resolvedArchetype, resolvedSubType, aiSummary])
+
+  const inversion = triageData.inversion
+  const buybackGuardrail = inversion?.guardrails?.buybackCannibal?.active
+    ? inversion.guardrails.buybackCannibal
+    : null
+  const saasGuardrail = inversion?.guardrails?.saasDeferredRevenue?.active
+    ? inversion.guardrails.saasDeferredRevenue
+    : null
+  const useBuybackHeadline =
+    Boolean(buybackGuardrail) && triageData.currentRatio.status === 'unavailable'
 
   // 4 Fast Fundamentals Indicators with Sparklines
   const fundamentalIndicators = [
@@ -1164,19 +1666,60 @@ export function Step1Triage({
     },
     {
       id: 'balance-sheet',
-      title: triageData.currentRatio.title,
-      titleHe: triageData.currentRatio.titleHe || 'יחס שוטף (נזילות)',
-      status: triageData.currentRatio.status,
-      value: triageData.currentRatio.value,
-      valueHe: triageData.currentRatio.valueHe || triageData.currentRatio.value,
+      title: useBuybackHeadline ? 'Balance Sheet Soundness' : triageData.currentRatio.title,
+      titleHe: useBuybackHeadline
+        ? 'חוסן מאזני (רכישה עצמית)'
+        : triageData.currentRatio.titleHe || 'יחס שוטף (נזילות)',
+      status: useBuybackHeadline ? triageData.capitalStructure.status : triageData.currentRatio.status,
+      value: useBuybackHeadline
+        ? triageData.capitalStructure.primaryValueEn
+        : triageData.currentRatio.value,
+      valueHe: useBuybackHeadline
+        ? triageData.capitalStructure.primaryValueHe
+        : triageData.currentRatio.valueHe || triageData.currentRatio.value,
       target: triageData.currentRatio.target,
       targetHe: triageData.currentRatio.targetHe || 'תנאי למעבר: מעל 1.5x',
-      badge: triageData.currentRatio.badge,
-      badgeHe: triageData.currentRatio.badgeHe || triageData.currentRatio.badge,
-      detail: triageData.currentRatio.detail,
-      detailEn: triageData.currentRatio.detailEn || triageData.currentRatio.detail,
-      metricSummary: triageData.currentRatio.metricSummary,
-      metricSummaryHe: triageData.currentRatio.metricSummaryHe || triageData.currentRatio.metricSummary,
+      reportedSublabelHe: triageData.currentRatio.reportedSublabelHe || null,
+      reportedSublabelEn: triageData.currentRatio.reportedSublabelEn || null,
+      guardrailPill: saasGuardrail
+        ? {
+            testId: 'guardrail-pill-saas',
+            tagHe: saasGuardrail.tagHe,
+            tagEn: saasGuardrail.tagEn,
+            explanationHe: saasGuardrail.explanationHe,
+            explanationEn: saasGuardrail.explanationEn,
+          }
+        : buybackGuardrail
+        ? {
+            testId: 'guardrail-pill-buyback',
+            tagHe: buybackGuardrail.tagHe,
+            tagEn: buybackGuardrail.tagEn,
+            explanationHe: buybackGuardrail.explanationHe,
+            explanationEn: buybackGuardrail.explanationEn,
+            soundBadgeHe: buybackGuardrail.badgeHe,
+            soundBadgeEn: buybackGuardrail.badgeEn,
+            soundAnchorHe: buybackGuardrail.primaryValueHe,
+            soundAnchorEn: buybackGuardrail.primaryValueEn,
+          }
+        : null,
+      badge: useBuybackHeadline
+        ? triageData.capitalStructure.badgeEn
+        : triageData.currentRatio.badge,
+      badgeHe: useBuybackHeadline
+        ? triageData.capitalStructure.badgeHe
+        : triageData.currentRatio.badgeHe || triageData.currentRatio.badge,
+      detail: useBuybackHeadline
+        ? triageData.capitalStructure.tooltipHe
+        : triageData.currentRatio.detail,
+      detailEn: useBuybackHeadline
+        ? triageData.capitalStructure.tooltipEn
+        : triageData.currentRatio.detailEn || triageData.currentRatio.detail,
+      metricSummary: useBuybackHeadline
+        ? triageData.capitalStructure.badgeEn
+        : triageData.currentRatio.metricSummary,
+      metricSummaryHe: useBuybackHeadline
+        ? triageData.capitalStructure.badgeHe
+        : triageData.currentRatio.metricSummaryHe || triageData.currentRatio.metricSummary,
       sparkline: triageData.currentRatio.sparkline,
       sparklineUnit: triageData.currentRatio.sparklineUnit || 'x',
       historyMeta: triageData.currentRatio.historyMeta,
@@ -1603,15 +2146,34 @@ export function Step1Triage({
       {/* SECTION 1: Business Clarity & Economic Moat Tear Sheet Blade (#319) */}
       <div
         data-testid="tear-sheet-blade"
-        data-archetype={aiSummary?.businessArchetype || deterministicArchetype.archetype}
-        data-archetype-sub={
-          aiSummary?.financialSubType && aiSummary.financialSubType !== 'NONE'
-            ? aiSummary.financialSubType
-            : deterministicArchetype.financialSubType
-        }
+        data-archetype={resolvedArchetype}
+        data-archetype-sub={resolvedSubType}
         dir={lang === 'he' ? 'rtl' : 'ltr'}
         className="relative rounded-2xl border border-sky-500/20 bg-linear-to-b from-sky-50/50 via-white to-white dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900 shadow-sm p-4 sm:p-7"
       >
+        {/* Option C Locked Top Flush Single-Line Inversion Status Strip (40px height, 0px CLS) */}
+        <button
+          type="button"
+          data-testid="step1-inversion-strip"
+          onClick={handleScrollToRiskBreakdown}
+          className={`-mx-4 -mt-4 sm:-mx-7 sm:-mt-7 mb-4 w-[calc(100%+2rem)] sm:w-[calc(100%+3.5rem)] h-10 px-4 sm:px-7 rounded-t-2xl flex items-center justify-between gap-2 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap overflow-hidden ${
+            INVERSION_STRIP_STYLES[inversion?.summary?.overallStatus] ||
+            INVERSION_STRIP_STYLES.unavailable
+          }`}
+        >
+          <span className="truncate flex items-center gap-1.5">
+            <BidiText
+              text={
+                lang === 'he'
+                  ? inversion?.summary?.bannerHe
+                  : inversion?.summary?.bannerEn
+              }
+              isRtl={lang === 'he'}
+            />
+          </span>
+          <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-80" />
+        </button>
+
         <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
             <CompanyLogo ticker={ticker} companyName={companyName} isLoading={isLoadingSummary} />
@@ -2374,6 +2936,21 @@ export function Step1Triage({
                         isRtl={lang === 'he'}
                       />
                     </div>
+                    {(indicator.reportedSublabelHe || indicator.reportedSublabelEn) && (
+                      <div
+                        data-testid="balance-sheet-reported-sublabel"
+                        className="text-[11px] font-medium text-slate-500 dark:text-slate-400"
+                      >
+                        <BidiText
+                          text={
+                            lang === 'he'
+                              ? indicator.reportedSublabelHe
+                              : indicator.reportedSublabelEn
+                          }
+                          isRtl={lang === 'he'}
+                        />
+                      </div>
+                    )}
                     {(indicator.trendLabelHe || indicator.trendLabelEn) ? (
                       <div
                         data-testid={`fundamental-trend-${indicator.id}`}
@@ -2396,6 +2973,33 @@ export function Step1Triage({
                           />
                         </div>
                       )
+                    )}
+                    {indicator.guardrailPill && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        {indicator.guardrailPill.soundBadgeHe && (
+                          <span
+                            data-testid="buyback-cannibal-sound-badge"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
+                          >
+                            <BidiText
+                              text={
+                                lang === 'he'
+                                  ? `${indicator.guardrailPill.soundBadgeHe} (${indicator.guardrailPill.soundAnchorHe})`
+                                  : `${indicator.guardrailPill.soundBadgeEn} (${indicator.guardrailPill.soundAnchorEn})`
+                              }
+                              isRtl={lang === 'he'}
+                            />
+                          </span>
+                        )}
+                        <GuardrailInfoPill
+                          testId={indicator.guardrailPill.testId}
+                          tagHe={indicator.guardrailPill.tagHe}
+                          tagEn={indicator.guardrailPill.tagEn}
+                          explanationHe={indicator.guardrailPill.explanationHe}
+                          explanationEn={indicator.guardrailPill.explanationEn}
+                          lang={lang}
+                        />
+                      </div>
                     )}
                   </div>
 
@@ -2503,6 +3107,15 @@ export function Step1Triage({
           })}
         </div>
       </div>
+
+      {/* SECTION 2.5: Option C Inversion Risk & Guardrail Breakdown (#357) */}
+      <RiskBreakdownCard
+        key={ticker}
+        inversion={inversion}
+        lang={lang}
+        isHighlighted={isRiskHighlighted}
+        sectionRef={riskBreakdownRef}
+      />
 
       {/* SECTION 3: The Gatekeeper (Bottom Action Button) */}
       <div className="pt-4 pb-2">
