@@ -586,4 +586,115 @@ describe('Step1Triage Component', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByTestId('tooltip-portal-sheet')).toBeNull()
   })
+
+  it('dynamically renders actual SEC filing forms (20-F for SAP, 40-F for SHOP, 10-K for MSFT) across grounding, admin monitor, and Tear Sheet headers (#369)', async () => {
+    // 1. Foreign Private Issuer: SAP SE (Form 20-F + 6-K)
+    await setCachedSummary('SAP', {
+      ticker: 'SAP',
+      summary: 'סאפ מספקת תוכנות ERP ארגוניות וענן גלובלי.',
+      keyEngines: ['Cloud ERP Suite', 'Business Technology Platform'],
+      revenueSegments: [
+        { name: 'Applications, Technology & Support', pct: 86 },
+        { name: 'Qualtrics & Services', pct: 14 },
+      ],
+      competitors: [{ name: 'ORCL', relativeSize: 'larger', summary: 'Enterprise ERP' }],
+      source: 'ai-live',
+      ingestionStatus: {
+        tenK: { status: 'ok', form: '20-F', date: '2026-02-26', url: 'https://www.sec.gov/sap-20f' },
+        eightK: { status: 'missing', form: '6-K' },
+        transcript: { status: 'missing' },
+      },
+    })
+
+    const { unmount } = render(
+      <Step1Triage company={{ ticker: 'SAP', name: 'SAP SE' }} isAdmin={true} />
+    )
+
+    await screen.findByText('סאפ מספקת תוכנות ERP ארגוניות וענן גלובלי.')
+    expect(screen.getByTestId('grounding-subtitle').textContent).toContain('דוח 20-F')
+    expect(screen.getByTestId('grounding-subtitle').textContent).not.toContain('10-K')
+    expect(screen.getByRole('link', { name: /SEC 20-F/ })).toBeTruthy()
+
+    const sapGroundingBadge = screen.getByTestId('data-grounding-badge')
+    const sapGroundingTip = sapGroundingBadge.parentElement.querySelector('[role="tooltip"]')
+    expect(sapGroundingTip.textContent).toContain('דוח שנתי SEC 20-F (סעיפים 3, 4, 5)')
+    expect(sapGroundingTip.textContent).toContain('דיווח כספי רבעוני SEC 6-K')
+    expect(sapGroundingTip.textContent).not.toContain('סעיפים 1, 1A, 7')
+    expect(sapGroundingTip.textContent).not.toContain('Item 2.02')
+
+    expect(screen.getByTestId('admin-tenk-status').textContent).toContain('20-F (Item 3/4/5):')
+    expect(screen.getByTestId('admin-transcript-status').textContent).toContain('שיחת ועידה / 6-K:')
+
+    fireEvent.click(screen.getByTestId('toggle-tear-sheet-btn'))
+    expect(screen.getByTestId('tear-sheet-segments-card').textContent).toContain(
+      'פילוח הכנסות לפי מגזרים (20-F)'
+    )
+    fireEvent.click(screen.getByTestId('lang-btn-en'))
+    expect(screen.getByTestId('grounding-subtitle').textContent).toContain('SEC 20-F')
+    expect(screen.getByTestId('tear-sheet-segments-card').textContent).toContain('20-F Segment Mix')
+    expect(screen.getByTestId('tear-sheet-competitors-card').textContent).toContain(
+      'Competitive Landscape (20-F Peers)'
+    )
+    unmount()
+
+    // 2. Canadian MJDS Issuer: SHOP (Form 40-F — generic annual report label without 10-K Item numbers)
+    await setCachedSummary('SHOP', {
+      ticker: 'SHOP',
+      summary: 'שופיפיי מספקת פלטפורמת מסחר אלקטרוני לסוחרים.',
+      keyEngines: ['Subscription Solutions', 'Merchant Solutions'],
+      revenueSegments: [{ name: 'Merchant Solutions', pct: 74 }],
+      competitors: [{ name: 'AMZN', relativeSize: 'larger', summary: 'Commerce platform' }],
+      source: 'ai-live',
+      ingestionStatus: {
+        tenK: { status: 'ok', form: '40-F', date: '2026-02-18', url: 'https://www.sec.gov/shop-40f' },
+        eightK: { status: 'ok', form: '6-K', date: '2026-11-01' },
+        transcript: { status: 'ok', source: 'SEC' },
+      },
+    })
+
+    const shopRender = render(
+      <Step1Triage company={{ ticker: 'SHOP', name: 'Shopify Inc.' }} isAdmin={true} />
+    )
+    await screen.findByText('שופיפיי מספקת פלטפורמת מסחר אלקטרוני לסוחרים.')
+    expect(screen.getByTestId('grounding-subtitle').textContent).toContain('דוח 40-F')
+    expect(screen.getByTestId('grounding-subtitle').textContent).not.toContain('10-K')
+    const shopGroundingTip = screen
+      .getByTestId('data-grounding-badge')
+      .parentElement.querySelector('[role="tooltip"]')
+    expect(shopGroundingTip.textContent).toContain('דוח שנתי SEC 40-F')
+    expect(shopGroundingTip.textContent).not.toContain('1, 1A, 7')
+    expect(screen.getByTestId('admin-tenk-status').textContent).toContain('40-F:')
+    fireEvent.click(screen.getByTestId('toggle-tear-sheet-btn'))
+    expect(screen.getByTestId('tear-sheet-segments-card').textContent).toContain('(40-F)')
+    fireEvent.click(screen.getByTestId('lang-btn-en'))
+    expect(screen.getByTestId('tear-sheet-competitors-card').textContent).toContain(
+      'Competitive Landscape (40-F Peers)'
+    )
+    shopRender.unmount()
+
+    // 3. US Filer: MSFT (Form 10-K retains Item 1, 1A, 7 and 10-K headings)
+    await setCachedSummary('MSFT', {
+      ticker: 'MSFT',
+      summary: 'מייקרוסופט היא ענקית טכנולוגיה וענן.',
+      keyEngines: ['Azure Cloud'],
+      revenueSegments: [{ name: 'Intelligent Cloud', pct: 45 }],
+      competitors: [{ name: 'GOOGL', relativeSize: 'similar', summary: 'Cloud & AI' }],
+      source: 'ai-live',
+      ingestionStatus: {
+        tenK: { status: 'ok', form: '10-K', date: '2026-07-30', url: 'https://www.sec.gov/msft-10k' },
+        eightK: { status: 'ok', form: '8-K', date: '2026-10-29' },
+        transcript: { status: 'ok', source: 'FMP' },
+      },
+    })
+
+    render(<Step1Triage company={mockCompany} isAdmin={true} />)
+    await screen.findByText('מייקרוסופט היא ענקית טכנולוגיה וענן.')
+    expect(screen.getByTestId('grounding-subtitle').textContent).toContain('דוח 10-K')
+    const msftGroundingTip = screen
+      .getByTestId('data-grounding-badge')
+      .parentElement.querySelector('[role="tooltip"]')
+    expect(msftGroundingTip.textContent).toContain('דוח שנתי SEC 10-K (סעיפים 1, 1A, 7)')
+    expect(msftGroundingTip.textContent).toContain('דיווח כספי רבעוני SEC 8-K (Item 2.02)')
+    expect(screen.getByTestId('admin-tenk-status').textContent).toContain('10-K (Item 1/1A/7):')
+  })
 })

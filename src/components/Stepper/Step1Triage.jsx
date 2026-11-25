@@ -111,16 +111,61 @@ CompanyLogo.propTypes = {
 }
 
 /**
+ * Resolves dynamic SEC filing form identifiers and item labels (10-K, 20-F, 40-F, 8-K, 6-K).
+ */
+function getSecFormMeta(ingestionStatus) {
+  const rawTenK = typeof ingestionStatus?.tenK?.form === 'string' ? ingestionStatus.tenK.form.trim() : ''
+  const rawEightK =
+    typeof ingestionStatus?.eightK?.form === 'string' ? ingestionStatus.eightK.form.trim() : ''
+  const tenKForm = rawTenK || '10-K'
+  const eightKForm = rawEightK || '8-K'
+  const upperTenK = tenKForm.toUpperCase()
+  const upperEightK = eightKForm.toUpperCase()
+
+  let itemsHe = ''
+  let itemsEn = ''
+  let adminItems = ''
+  if (upperTenK.startsWith('10-K')) {
+    itemsHe = ' (סעיפים 1, 1A, 7)'
+    itemsEn = ' (Item 1, 1A, 7)'
+    adminItems = ' (Item 1/1A/7)'
+  } else if (upperTenK.startsWith('20-F')) {
+    itemsHe = ' (סעיפים 3, 4, 5)'
+    itemsEn = ' (Item 3, 4, 5)'
+    adminItems = ' (Item 3/4/5)'
+  }
+
+  const eightKItemSuffix = upperEightK.startsWith('8-K') ? ' (Item 2.02)' : ''
+  return {
+    tenKForm,
+    eightKForm,
+    annualTooltipLabelHe: `דוח שנתי SEC ${tenKForm}${itemsHe}`,
+    annualTooltipLabelEn: `SEC ${tenKForm} Annual Report${itemsEn}`,
+    annualAdminLabel: `${tenKForm}${adminItems}`,
+    currentTooltipLabelHe: `דיווח כספי רבעוני SEC ${eightKForm}${eightKItemSuffix}`,
+    currentTooltipLabelEn: `${
+      upperEightK.startsWith('8-K')
+        ? `SEC ${eightKForm} Earnings Release`
+        : `SEC ${eightKForm} Current Report`
+    }${eightKItemSuffix}`,
+  }
+}
+
+/**
  * Computes transparent data-grounding status from the summary source and SEC ingestionStatus.
  */
 function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgrading = false) {
   const isHe = lang === 'he'
+  const formMeta = getSecFormMeta(ingestionStatus)
+
   if (isLoading) {
     return {
       isMock: false,
       verifiedCount: 0,
       badgeLabel: isHe ? 'בודק מקורות מידע...' : 'Checking data sources...',
-      subtitle: isHe ? 'מאמת זמינות דוח 10-K, 8-K ותמליל שיחת ועידה...' : 'Verifying SEC 10-K, 8-K & transcript sources...',
+      subtitle: isHe
+        ? `מאמת זמינות דוח ${formMeta.tenKForm}, ${formMeta.eightKForm} ותמליל שיחת ועידה...`
+        : `Verifying SEC ${formMeta.tenKForm}, ${formMeta.eightKForm} & transcript sources...`,
       toneClass:
         'bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 border-sky-300/40 dark:border-sky-800/50',
       checks: [],
@@ -133,8 +178,8 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgra
       verifiedCount: 0,
       badgeLabel: isHe ? 'שולף דוחות SEC...' : 'Fetching SEC filings...',
       subtitle: isHe
-        ? 'מאמת ושולף דוחות SEC 10-K / 8-K לעדכון התקציר...'
-        : 'Fetching missing SEC 10-K / 8-K filings to ground summary...',
+        ? `מאמת ושולף דוחות SEC ${formMeta.tenKForm} / ${formMeta.eightKForm} לעדכון התקציר...`
+        : `Fetching missing SEC ${formMeta.tenKForm} / ${formMeta.eightKForm} filings to ground summary...`,
       toneClass:
         'bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 border-sky-300/40 dark:border-sky-800/50',
       checks: [],
@@ -157,7 +202,7 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgra
     {
       id: 'tenK',
       ok: hasTenK,
-      label: isHe ? 'דוח שנתי SEC 10-K (סעיפים 1, 1A, 7)' : 'SEC 10-K Annual Report (Item 1, 1A, 7)',
+      label: isHe ? formMeta.annualTooltipLabelHe : formMeta.annualTooltipLabelEn,
       detail: hasTenK
         ? isHe
           ? `חולץ (${ingestionStatus.tenK.date || 'עדכני'})`
@@ -173,7 +218,7 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgra
     {
       id: 'eightK',
       ok: hasEightK,
-      label: isHe ? 'דיווח כספי רבעוני SEC 8-K (Item 2.02)' : 'SEC 8-K Earnings Release (Item 2.02)',
+      label: isHe ? formMeta.currentTooltipLabelHe : formMeta.currentTooltipLabelEn,
       detail: hasEightK
         ? isHe
           ? `חולץ (${ingestionStatus.eightK?.date || ingestionStatus.transcript?.date || 'עדכני'})`
@@ -196,8 +241,8 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgra
           : `Available (${ingestionStatus.transcript.status === 'manual' ? 'Manual' : ingestionStatus.transcript.source || 'Verified'})`
         : !isMock && ingestionStatus?.transcript?.status === 'fallback_8k'
         ? isHe
-          ? 'אין תמליל שיחה — הסתמכות על 8-K'
-          : 'No transcript — using 8-K fallback'
+          ? `אין תמליל שיחה — הסתמכות על ${formMeta.eightKForm}`
+          : `No transcript — using ${formMeta.eightKForm} fallback`
         : isHe
         ? 'אין תמליל שיחת ועידה'
         : 'No earnings transcript available',
@@ -212,8 +257,8 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgra
       verifiedCount: 0,
       badgeLabel: isHe ? 'ביסוס נתונים: 0/3 (דוגמת תצוגה)' : 'Data Grounding: 0/3 (Demo)',
       subtitle: isHe
-        ? 'תקציר דוגמה מובנה • ללא קריאת דוח 10-K או שיחת ועידה מה-SEC'
-        : 'Structured demo summary • Live SEC 10-K & transcript not yet fetched',
+        ? `תקציר דוגמה מובנה • ללא קריאת דוח ${formMeta.tenKForm} או שיחת ועידה מה-SEC`
+        : `Structured demo summary • Live SEC ${formMeta.tenKForm} & transcript not yet fetched`,
       toneClass:
         'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30',
       checks,
@@ -226,8 +271,8 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgra
       verifiedCount: 0,
       badgeLabel: isHe ? 'ביסוס נתונים: 0/3 (AI כללי)' : 'Data Grounding: 0/3 (General AI)',
       subtitle: isHe
-        ? 'ניתוח AI כללי • טרם צורפו דוחות 10-K או תמליל שיחת ועידה מהשרת'
-        : 'General AI output • SEC 10-K and earnings call transcript not yet attached',
+        ? `ניתוח AI כללי • טרם צורפו דוחות ${formMeta.tenKForm} או תמליל שיחת ועידה מהשרת`
+        : `General AI output • SEC ${formMeta.tenKForm} and earnings call transcript not yet attached`,
       toneClass:
         'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700',
       checks,
@@ -235,14 +280,14 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgra
   }
 
   const partsHe = [
-    hasTenK ? 'דוח 10-K' : null,
-    hasEightK ? 'דיווח 8-K' : null,
+    hasTenK ? `דוח ${formMeta.tenKForm}` : null,
+    hasEightK ? `דיווח ${formMeta.eightKForm}` : null,
     hasTranscript ? 'תמליל שיחת ועידה' : null,
   ].filter(Boolean)
 
   const partsEn = [
-    hasTenK ? 'SEC 10-K' : null,
-    hasEightK ? '8-K Filing' : null,
+    hasTenK ? `SEC ${formMeta.tenKForm}` : null,
+    hasEightK ? `${formMeta.eightKForm} Filing` : null,
     hasTranscript ? 'Earnings Call' : null,
   ].filter(Boolean)
 
@@ -764,6 +809,7 @@ export function Step1Triage({
   const ticker = company?.ticker || companyFacts?.ticker || 'MSFT'
   const companyName = company?.name || companyFacts?.companyName || ticker
   const companyCik = company?.cik ?? companyFacts?.cik ?? null
+  const secFormMeta = useMemo(() => getSecFormMeta(ingestionStatus), [ingestionStatus])
 
   const refreshAdminBudget = useCallback(async () => {
     if (!isAdmin) return
@@ -869,6 +915,8 @@ export function Step1Triage({
                 }
               }
             }
+          } else if (result?.ingestionStatus) {
+            setIngestionStatus(result.ingestionStatus)
           }
         } else if (result?.ingestionStatus) {
           setIngestionStatus(result.ingestionStatus)
@@ -933,7 +981,9 @@ export function Step1Triage({
 
   // Admin handler: Clear both EDGAR + AI caches and force refresh company facts from SEC into Firestore DB
   const handleFullCompanyCacheReset = useCallback(async () => {
-    setAdminStatusMessage(`מנקה מטמון עבור ${ticker} ומרענן נתוני SEC + דוחות 10-K/8-K ל-Firestore...`)
+    setAdminStatusMessage(
+      `מנקה מטמון עבור ${ticker} ומרענן נתוני SEC + דוחות ${secFormMeta.tenKForm}/${secFormMeta.eightKForm} ל-Firestore...`
+    )
     await invalidateCachedSummary(ticker)
     if (onForceRefreshCompany) {
       await onForceRefreshCompany(ticker)
@@ -943,7 +993,14 @@ export function Step1Triage({
       setIngestionStatus(freshCtx)
     }
     await handleRefreshAiSummary()
-  }, [ticker, companyCik, onForceRefreshCompany, handleRefreshAiSummary])
+  }, [
+    ticker,
+    companyCik,
+    onForceRefreshCompany,
+    handleRefreshAiSummary,
+    secFormMeta.tenKForm,
+    secFormMeta.eightKForm,
+  ])
 
   const handleSaveManualTranscript = useCallback(async () => {
     if (!manualTranscriptInput.trim()) return
@@ -1446,7 +1503,7 @@ export function Step1Triage({
             </div>
           )}
 
-          {/* Admin Document Ingestion Monitor (10-K / Transcript / 8-K) */}
+          {/* Admin Document Ingestion Monitor (Annual Filing / Transcript / Current Report) */}
           <div
             data-testid="admin-ingestion-monitor"
             className="pt-2 border-t border-amber-500/20 flex flex-col gap-2 text-xs"
@@ -1457,7 +1514,7 @@ export function Step1Triage({
                   ניטור קבצי מקור ב-DB:
                 </span>
                 <span data-testid="admin-tenk-status">
-                  10-K (Item 1/1A/7):{' '}
+                  {secFormMeta.annualAdminLabel}:{' '}
                   <strong
                     className={
                       ingestionStatus?.tenK?.status === 'ok'
@@ -1472,7 +1529,7 @@ export function Step1Triage({
                 </span>
                 <span>&bull;</span>
                 <span data-testid="admin-transcript-status">
-                  שיחת ועידה / 8-K:{' '}
+                  שיחת ועידה / {secFormMeta.eightKForm}:{' '}
                   <strong
                     className={
                       ingestionStatus?.transcript?.status === 'ok' ||
@@ -1488,7 +1545,7 @@ export function Step1Triage({
                       : ingestionStatus?.transcript?.status === 'manual'
                       ? `תמליל ידני (${ingestionStatus.transcript.date})`
                       : ingestionStatus?.transcript?.status === 'fallback_8k'
-                      ? `גיבוי 8-K (${ingestionStatus.transcript.date})`
+                      ? `גיבוי ${secFormMeta.eightKForm} (${ingestionStatus.transcript.date})`
                       : ingestionStatus?.transcript?.error || 'חסר'}
                   </strong>
                 </span>
@@ -1572,7 +1629,7 @@ export function Step1Triage({
                     dir="ltr"
                     className="inline-flex items-center gap-0.5 font-semibold text-sky-600 dark:text-sky-400 hover:underline"
                   >
-                    SEC {ingestionStatus.tenK.form || '10-K'} ↗
+                    SEC {secFormMeta.tenKForm} ↗
                   </a>
                 )}
               </div>
@@ -1953,11 +2010,11 @@ export function Step1Triage({
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">
                     {lang === 'he'
-                      ? 'פילוח הכנסות לפי מגזרים (10-K)'
+                      ? `פילוח הכנסות לפי מגזרים (${secFormMeta.tenKForm})`
                       : 'Revenue Segments Breakdown'}
                   </h3>
                   <span className="text-xs text-slate-400">
-                    {lang === 'he' ? 'תמהיל חטיבות' : '10-K Segment Mix'}
+                    {lang === 'he' ? 'תמהיל חטיבות' : `${secFormMeta.tenKForm} Segment Mix`}
                   </span>
                 </div>
                 <div className="space-y-2.5" dir="ltr">
@@ -2118,7 +2175,7 @@ export function Step1Triage({
                   <h3 className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
                     {lang === 'he'
                       ? 'מפת תחרות ומתחרים עיקריים'
-                      : 'Competitive Landscape (10-K Peers)'}
+                      : `Competitive Landscape (${secFormMeta.tenKForm} Peers)`}
                   </h3>
                   <span className="text-[11px] text-slate-400">
                     {lang === 'he' ? 'לחץ/רחף למיקוד' : 'Tap/hover for focus'}
