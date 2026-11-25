@@ -993,20 +993,20 @@ export function Step1Triage({
       tooltipContent: {
         title: 'צמיחה בהכנסות (Revenue Growth)',
         description:
-          'עסק בריא מגדיל את המכירות שלו לאורך זמן. המספר המרכזי מציג את השינוי בשנה האחרונה (YoY — שנה מול שנה), והסיכום למטה מציג את קצב הצמיחה השנתי הממוצע (CAGR) ל-5 שנים ולטווח המלא (עד 15 שנה בגרף).',
+          'YoY = השינוי במכירות בשנה האחרונה מול קודמתה. CAGR = קצב הצמיחה השנתי הממוצע על פני תקופה (מוצג ל-5 שנים ולטווח המלא בגרף, עד 15 שנה).',
         thresholds: [
           { tone: 'pass', label: 'ירוק: צמיחה עקבית וחיובית במכירות' },
-          { tone: 'warn', label: 'צהוב: צמיחה איטית (מתחת ל-5%), מחזוריות או האטה חדה' },
-          { tone: 'fail', label: 'אדום: התכווצות (3+ שנות ירידה רצופות או מגמת ירידה שלילית)' },
+          { tone: 'warn', label: 'צהוב: קצב ממוצע מתחת ל-5%, האטה חדה או תנודתיות' },
+          { tone: 'fail', label: 'אדום: התכווצות עקבית (3+ שנות ירידה רצופות או מגמה שלילית)' },
         ],
       },
       tooltipContentEn: {
         title: 'Revenue Growth',
         description:
-          'Healthy businesses expand sales over time. The headline shows the latest annual change (YoY), while the summary tracks multi-year compound growth (CAGR) across up to 15 years.',
+          'YoY = latest annual sales change vs. prior year. CAGR = compound annual growth rate smoothed across multi-year horizons (5Y and full chart span up to 15Y).',
         thresholds: [
           { tone: 'pass', label: 'Green: Steady positive top-line growth' },
-          { tone: 'warn', label: 'Yellow: Slow (<5%), cyclical dips, or sharp deceleration' },
+          { tone: 'warn', label: 'Yellow: Average pace <5%, cyclical dips, or sharp deceleration' },
           { tone: 'fail', label: 'Red: 3+ consecutive down years or declining trend' },
         ],
       },
@@ -1034,21 +1034,21 @@ export function Step1Triage({
       tooltipContent: {
         title: 'שולי רווח תפעולי (Operating Margins)',
         description:
-          'כמה אחוזים מכל שקל או דולר מכירות נשארים כרווח מפעילות העסק לפני מס וריבית — מדד ישיר ליעילות ולכוח תמחור. הקו המקווקו בגרף מסמן את הממוצע הרב-שנתי לזיהוי מחזוריות לאורך זמן.',
+          'כמה אחוזים מכל שקל או דולר מכירות נשארים כרווח מפעילות הליבה לפני ריבית ומס — מדד ישיר לכוח תמחור וליעילות. הקו המקווקו בגרף = הממוצע ההיסטורי לכל התקופה המוצגת.',
         thresholds: [
-          { tone: 'pass', label: 'ירוק: שוליים יציבים או מתרחבים מעל 10% (מעל 25% = גבוהים ויציבים)' },
-          { tone: 'warn', label: 'צהוב: מעל 10% אך תנודתיים או מחזוריים (נפילה חדה משיא לשפל)' },
-          { tone: 'fail', label: 'אדום: הפסד בשנה האחרונה, מתחת ל-10%, או שנת הפסד בהיסטוריה' },
+          { tone: 'pass', label: 'ירוק: שוליים יציבים או מתרחבים מ-10% ומעלה (מעל 25% = חוסן גבוה)' },
+          { tone: 'warn', label: 'צהוב: שחיקה רציפה בשוליים, מחזוריות או נפילה חדה בעשור האחרון' },
+          { tone: 'fail', label: 'אדום: מתחת ל-10%, הפסד תפעולי נוכחי, או שנת הפסד היסטורית' },
         ],
       },
       tooltipContentEn: {
         title: 'Operating Margins',
         description:
-          'Percentage of revenue kept as operating profit before interest and taxes—a direct gauge of efficiency and pricing power. The dashed line marks the multi-year average to spot cyclical swings.',
+          'Share of sales kept as core operating profit before interest and tax—a direct gauge of pricing power and efficiency. Dashed line = historical average across the displayed period.',
         thresholds: [
-          { tone: 'pass', label: 'Green: Stable or expanding >= 10% (>= 25% = high & stable)' },
-          { tone: 'warn', label: 'Yellow: >= 10% but cyclical or sharp peak-to-trough drawdown' },
-          { tone: 'fail', label: 'Red: Negative latest margin, < 10%, or any historical loss year' },
+          { tone: 'pass', label: 'Green: Stable or expanding >= 10% (>= 25% = high strength)' },
+          { tone: 'warn', label: 'Yellow: Consecutive margin erosion, cyclicality, or sharp recent drawdown' },
+          { tone: 'fail', label: 'Red: Under 10%, negative latest margin, or any historical loss year' },
         ],
       },
       tooltipAlign: 'start',
@@ -1078,17 +1078,17 @@ export function Step1Triage({
       tooltipContent: {
         title: 'דילול מניות ורכישה עצמית (Buybacks)',
         description:
-          'כשחברה מנפיקה מניות חדשות, חלקנו בעוגה קטן (דילול); כשהיא רוכשת מניות חזרה מהשוק (Buybacks) ומבטלת אותן, חלקו של כל משקיע גדל. הבדיקה מודדת את השינוי בכמות המניות בשנה האחרונה לצד המגמה הרב-שנתית.',
+          'הכותרת מציגה את השינוי השנתי בכמות המניות (YoY), בעוד הפירוט מתאר את הצמצום או הגידול המצטבר לאורך טווח הגרף. רכישה עצמית (Buybacks) מגדילה את חלקך בחברה; הנפקת מניות מקטינה אותו.',
         thresholds: [
-          { tone: 'pass', label: 'ירוק: ירידה בכמות המניות או יציבות (עד +0.2%)' },
-          { tone: 'warn', label: 'צהוב: דילול מתון (+0.3% עד +3.0% בשנה)' },
-          { tone: 'fail', label: 'אדום: דילול אגרסיבי (מעל +3.0% בשנה)' },
+          { tone: 'pass', label: 'ירוק: ירידה במניות (רכישה עצמית) או יציבות (עד +0.2%)' },
+          { tone: 'warn', label: 'צהוב: דילול מתון (+0.3% עד +3.0% בשנה האחרונה)' },
+          { tone: 'fail', label: 'אדום: דילול אגרסיבי (מעל +3.0% בשנה האחרונה)' },
         ],
       },
       tooltipContentEn: {
         title: 'Share Dilution & Buybacks',
         description:
-          'Issuing new shares shrinks your ownership slice; buying back and retiring shares (Buybacks) increases it. Evaluates latest-year share change alongside the multi-year trend.',
+          'Headline tracks 1-year share change (YoY), while the note summarizes cumulative share expansion or retirement across the chart span. Buybacks grow your slice; share issuance dilutes it.',
         thresholds: [
           { tone: 'pass', label: 'Green: Shrinking or flat share count (<= +0.2%)' },
           { tone: 'warn', label: 'Yellow: Moderate dilution (+0.3% to +3.0% / yr)' },
@@ -1119,7 +1119,7 @@ export function Step1Triage({
       tooltipContent: {
         title: 'יחס שוטף / נזילות (Current Ratio)',
         description:
-          'היחס בין הנכסים השוטפים (מזומן, לקוחות, מלאי) להתחייבויות השוטפות שיש לשלם ב-12 החודשים הקרובים — מרווח הביטחון של העסק לטווח קצר.',
+          'נכסים שוטפים (מזומן, לקוחות, מלאי) חלקי התחייבויות שוטפות ל-12 החודשים הקרובים — מודד כמה בקלות העסק מכסה את חובותיו הקרובים.',
         thresholds: [
           { tone: 'pass', label: 'ירוק: 1.5x ומעלה (מרווח ביטחון בריא)' },
           { tone: 'warn', label: 'צהוב: גבולי (1.0x–1.5x)' },
@@ -1129,7 +1129,7 @@ export function Step1Triage({
       tooltipContentEn: {
         title: 'Current Ratio',
         description:
-          'Short-term assets divided by liabilities due within 12 months—your near-term solvency cushion.',
+          'Current assets (cash, receivables, inventory) divided by obligations due within 12 months—measuring short-term solvency cushion.',
         thresholds: [
           { tone: 'pass', label: 'Green: >= 1.5x (comfortable safety margin)' },
           { tone: 'warn', label: 'Yellow: 1.0x–1.5x (borderline buffer)' },

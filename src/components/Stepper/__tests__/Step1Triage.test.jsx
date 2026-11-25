@@ -147,11 +147,13 @@ describe('Step1Triage Component', () => {
 
     expect(balanceCard.textContent).toContain('תנאי למעבר: מעל 1.5x')
 
-    // Minimalist year timeline shown under sparkline + share buyback pace trend
+    // Minimalist year timeline shown under sparkline + share buyback pace trend (no duplicate arrows)
     const revTimeline = screen.getByTestId('sparkline-timeline-revenue-growth')
     expect(revTimeline.textContent).toContain('2015')
     expect(revTimeline.textContent).toContain('2024')
-    expect(screen.getByTestId('fundamental-trend-share-dilution').textContent).toContain('מגמת הבייבאקס:')
+    const shareTrendEl = screen.getByTestId('fundamental-trend-share-dilution')
+    expect(shareTrendEl.textContent).toContain('קצב רכישה עצמית:')
+    expect(shareTrendEl.textContent).not.toMatch(/[↓↑]/)
 
     // Check all 4 Hebrew descriptions + BiDi <bdi dir="ltr"> isolation (#344, #356) & pipe separator (#364)
     expect(revCard.textContent).toContain('(שנה אחרונה / YoY)')
@@ -159,10 +161,14 @@ describe('Step1Triage Component', () => {
     expect(revCard.textContent).toContain('צמיחה שנתית (CAGR) | ')
     expect(revCard.textContent).not.toContain('·')
     expect(marginsCard.textContent).toContain('שוליים יציבים מעל 40%')
-    expect(marginsCard.textContent).toContain(' | ')
+    expect(marginsCard.textContent).toContain('ממוצע ')
+    expect(marginsCard.textContent).toContain('הקו המקווקו בגרף')
     expect(marginsCard.textContent).not.toContain('·')
-    expect(sharesCard.textContent).toContain('החברה רוכשת מניות חזרה')
+    expect(sharesCard.textContent).toContain('בכמות המניות (שנה אחרונה)')
+    expect(sharesCard.textContent).toContain('פחות מניות מאז')
+    expect(sharesCard.textContent).not.toMatch(/[↓↑]/)
     expect(balanceCard.textContent).toContain('יחס שוטף תקין ובטוח')
+    expect(balanceCard.textContent).toContain('נכסים שוטפים מכסים בנוחות התחייבויות קרובות')
 
     // Verify Dedicated Status Legend in Hebrew (#364)
     const legendHe = screen.getByTestId('fundamentals-status-legend')
@@ -189,7 +195,7 @@ describe('Step1Triage Component', () => {
     expect(screen.getByText('Share Dilution', { selector: 'h4' })).toBeTruthy()
     expect(screen.getByText('Current Ratio (Liquidity)', { selector: 'h4' })).toBeTruthy()
     expect(screen.getByText('Target: >= 1.5x')).toBeTruthy()
-    expect(screen.getByTestId('fundamental-trend-share-dilution').textContent).toContain('Buyback trend:')
+    expect(screen.getByTestId('fundamental-trend-share-dilution').textContent).toContain('Buyback pace:')
   })
 
   it('renders neutral unavailable state (no fake MSFT fallback) and chart placeholders when companyFacts is null', () => {
@@ -255,25 +261,26 @@ describe('Step1Triage Component', () => {
     expect(revTooltip.textContent).toContain('צהוב:')
     expect(revTooltip.textContent).toContain('אדום:')
 
-    // 5. Structured Operating Margins Tooltip
+    // 5. Structured Operating Margins Tooltip (dashed-line historical average explanation)
     const marginsTooltip = screen
       .getByTestId('fundamental-card-operating-margins')
       .querySelector('[role="tooltip"]')
     expect(marginsTooltip).toBeTruthy()
     expect(marginsTooltip.textContent).toContain('שולי רווח תפעולי (Operating Margins)')
-    expect(marginsTooltip.textContent).toContain('כמה אחוזים מכל שקל או דולר מכירות')
+    expect(marginsTooltip.textContent).toContain('הקו המקווקו בגרף = הממוצע ההיסטורי לכל התקופה המוצגת')
     expect(marginsTooltip.querySelector('.bg-emerald-400')).toBeTruthy()
     expect(marginsTooltip.textContent).toContain('ירוק:')
     expect(marginsTooltip.textContent).toContain('צהוב:')
     expect(marginsTooltip.textContent).toContain('אדום:')
 
-    // 6. Structured Share Dilution Tooltip (explains Buybacks + colored thresholds)
+    // 6. Structured Share Dilution Tooltip (explains annual vs cumulative & Buybacks)
     const sharesTooltip = screen
       .getByTestId('fundamental-card-share-dilution')
       .querySelector('[role="tooltip"]')
     expect(sharesTooltip).toBeTruthy()
     expect(sharesTooltip.textContent).toContain('דילול מניות ורכישה עצמית (Buybacks)')
     expect(sharesTooltip.textContent).toContain('Buybacks')
+    expect(sharesTooltip.textContent).toContain('השינוי השנתי')
     expect(sharesTooltip.querySelector('.bg-amber-400')).toBeTruthy()
     expect(sharesTooltip.textContent).toContain('ירוק:')
     expect(sharesTooltip.textContent).toContain('צהוב:')
@@ -354,7 +361,8 @@ describe('Step1Triage Component', () => {
     expect(sharesCard.getAttribute('data-status')).toBe('warn')
     expect(sharesCard.innerHTML).toContain('amber')
     expect(sharesCard.textContent).toContain('דילול מתון')
-    expect(sharesCard.textContent).toContain('↑ +1.5% מניות (דילול)')
+    expect(sharesCard.textContent).toContain('+1.5% בכמות המניות (שנה אחרונה)')
+    expect(sharesCard.textContent).not.toMatch(/[↓↑]/)
 
     expect(balanceCard.getAttribute('data-status')).toBe('unavailable')
     expect(balanceCard.innerHTML).toContain('slate')
@@ -366,6 +374,7 @@ describe('Step1Triage Component', () => {
     expect(screen.getByText('5.0%')).toBeTruthy()
     expect(screen.getByText('Low Margins')).toBeTruthy()
     expect(screen.getByText('Moderate Dilution')).toBeTruthy()
+    expect(screen.getByText('+1.5% shares (YoY)')).toBeTruthy()
     expect(screen.getByText('Target: >= 1.5x')).toBeTruthy()
   })
 
