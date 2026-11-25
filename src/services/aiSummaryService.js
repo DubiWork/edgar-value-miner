@@ -573,45 +573,6 @@ export const BUSINESS_ARCHETYPES = [
 
 export const FINANCIAL_SUBTYPES = ['DEPOSIT_BANK', 'NON_BANK_FINANCE', 'NONE'];
 
-export const ARCHETYPE_LABELS = {
-  TECH_SAAS: {
-    labelHe: 'טכנולוגיה ותוכנה (SaaS / Tech)',
-    labelEn: 'Technology & SaaS',
-    descriptionHe: 'שולי רווח גולמי גבוהים והכנסות חוזרות ממנויים או מערכות ארגוניות.',
-    descriptionEn: 'High gross margin software, cloud, or scalable technology platforms.',
-  },
-  FINANCIAL_SPREAD: {
-    labelHe: 'פיננסים, ליסינג ובנקאות (Financial Spread)',
-    labelEn: 'Financial Spread & Lending',
-    descriptionHe: 'עסקים המרוויחים ממרווחי מימון, אשראי, ביטוח, ליסינג או השכרת נכסים.',
-    descriptionEn: 'Spread-driven lending, banking, leasing, insurance, or specialty finance.',
-  },
-  RETAIL_ECOMMERCE: {
-    labelHe: 'קמעונאות ומסחר (Retail & E-Commerce)',
-    labelEn: 'Retail & E-Commerce',
-    descriptionHe: 'מכירת סחורה או מסחר מקוון, עם רגישות למלאי, מחזוריות ורווחיות גולמית.',
-    descriptionEn: 'Inventory-carrying physical retail, warehouse clubs, or e-commerce.',
-  },
-  CYCLICAL_INDUSTRIAL: {
-    labelHe: 'תעשייה ומחזוריות (Cyclical & Industrial)',
-    labelEn: 'Cyclical & Industrial',
-    descriptionHe: 'תעשייה כבדה, חומרי גלם, תעופה ואנרגיה המושפעים ממחזורי ביקוש והשקעות הון.',
-    descriptionEn: 'Capital-intensive industrial, machinery, commodity, or cyclical operators.',
-  },
-  HEALTHCARE_PHARMA: {
-    labelHe: 'פארמה ובריאות (Healthcare & Pharma)',
-    labelEn: 'Healthcare & Pharma',
-    descriptionHe: 'תרופות, ביוטק ומכשור רפואי התלויים במחקר ופיתוח, רגולציה וצוקי פטנטים.',
-    descriptionEn: 'Biopharma, medical devices, and healthcare reliant on R&D and approvals.',
-  },
-  STAPLES_GENERAL: {
-    labelHe: 'צריכה שוטפת ושירותים כלליים (Staples & General)',
-    labelEn: 'Consumer Staples & General',
-    descriptionHe: 'חברות צריכה בסיסית, תשתיות ותקשורת עם ביקוש יציב יחסית לאורך זמן.',
-    descriptionEn: 'Defensive consumer staples, utilities, telecom, or general businesses.',
-  },
-};
-
 export function normalizeArchetypeCode(raw) {
   if (!raw || typeof raw !== 'string') return null;
   const upper = raw.trim().toUpperCase();
@@ -2603,7 +2564,6 @@ export default {
   AI_SUMMARY_SCHEMA_VERSION,
   BUSINESS_ARCHETYPES,
   FINANCIAL_SUBTYPES,
-  ARCHETYPE_LABELS,
   getOrFetchCompanySummary,
   getCachedSummary,
   setCachedSummary,

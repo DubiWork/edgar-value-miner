@@ -1036,7 +1036,12 @@ function RiskBreakdownCard({ inversion, lang = 'he', isHighlighted = false, sect
     ? 'ring-2 ring-sky-500 ring-offset-2 dark:ring-offset-slate-950'
     : ''
 
-  if (summary.overallStatus === 'unavailable' && tier3Context.length === 0) {
+  if (
+    summary.overallStatus === 'unavailable' &&
+    tier1Red.length === 0 &&
+    tier2Yellow.length === 0 &&
+    tier3Context.length === 0
+  ) {
     return (
       <div
         id="step1-risk-breakdown"

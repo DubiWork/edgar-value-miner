@@ -456,7 +456,11 @@ describe('inversionEngine & triageCalculator (#357 Slice 3)', () => {
         },
       };
       const dilRes = calculateTriageMetrics(dilutingRollup);
-      expect(dilRes.inversion.tier1Red.some((f) => f.id === 'goodwill-rollup-red')).toBe(true);
+      const gwFlag = dilRes.inversion.tier1Red.find((f) => f.id === 'goodwill-rollup-red');
+      expect(gwFlag).toBeDefined();
+      expect(gwFlag.valueDisplayHe).toContain('דילול 4.0%');
+      expect(gwFlag.valueDisplayEn).toContain('Dilution 4.0%');
+      expect(gwFlag.valueDisplayEn).not.toContain('דילול');
     });
 
     it('marks 42% goodwill (< 50%) as Tier 2 Yellow Warn even if ROIC is low', () => {
@@ -808,10 +812,62 @@ describe('inversionEngine & triageCalculator (#357 Slice 3)', () => {
       );
 
       expect(bioFail.inversion.tier1Red.some((f) => f.id === 'pharma-cash-runway-red')).toBe(true);
-      expect(bioFail.inversion.tier1Red.some((f) => f.id === 'fda-binary')).toBe(true);
+      const fdaFlag = bioFail.inversion.tier1Red.find((f) => f.id === 'fda-binary');
+      expect(fdaFlag).toBeDefined();
+      expect(fdaFlag.badgeHe).toBe('ממצא SEC');
+      expect(fdaFlag.badgeEn).toBe('SEC Filing Note');
       expect(
         bioFail.inversion.tier1Red.some((f) => f.id === 'qual-customer-concentration')
       ).toBe(true);
+    });
+
+    it('enforces 2%–6% retail margin cap, dedupes qualitative flags vs synthetic customer/governance risks, and surfaces qualitative flags when XBRL is missing', () => {
+      // 1. 7.5% stable retail margin exceeds 6% low-cost cap -> fails normal <10% rule
+      const midMarginRetail = calculateTriageMetrics(
+        {
+          metrics: {
+            revenue: { annual: annualSeries([[2024, 1000000000], [2025, 1100000000]]) },
+            operatingIncome: { annual: annualSeries([[2024, 75000000], [2025, 82500000]]) }, // 7.5%
+          },
+        },
+        { archetype: 'RETAIL_ECOMMERCE' }
+      );
+      expect(midMarginRetail.margins.status).toBe('fail');
+      expect(midMarginRetail.margins.isLowCostRetailException).toBe(false);
+
+      // 2. Qualitative flags dedupe matching customerConcentration & governanceAndMoatRisks AND work when companyFacts is null
+      const xbrlMissingWithQual = evaluateInversionFlags(null, {
+        aiSummary: {
+          qualitativeFlags: [
+            {
+              id: 'conc-main',
+              severity: 'fail',
+              category: 'concentration',
+              titleHe: 'תלות בלקוח עוגן (28%)',
+              titleEn: 'Anchor Customer Dependence (28%)',
+              rationaleHe: 'לקוח יחיד מהווה 28% מהמכירות.',
+              rationaleEn: 'Single customer is 28% of sales.',
+            },
+            {
+              id: 'gov-restatement',
+              severity: 'fail',
+              category: 'restatement',
+              titleHe: 'תיקון דוחות 10-K/A',
+              titleEn: '10-K/A Restatement',
+              rationaleHe: 'החברה הגישה תיקון דוח.',
+              rationaleEn: 'Filed accounting restatement.',
+            },
+          ],
+          customerConcentration: { detected: true, maxCustomerPct: 28 },
+          governanceAndMoatRisks: { hasRestatement: true },
+        },
+      });
+
+      expect(xbrlMissingWithQual.summary.overallStatus).toBe('fail');
+      expect(xbrlMissingWithQual.summary.redCount).toBe(2);
+      expect(xbrlMissingWithQual.summary.bannerEn).toContain('2 Red Flags');
+      expect(xbrlMissingWithQual.tier1Red.find((f) => f.id === 'qual-customer-concentration')).toBeUndefined();
+      expect(xbrlMissingWithQual.tier1Red.find((f) => f.id === 'qual-governance-severe')).toBeUndefined();
     });
   });
 

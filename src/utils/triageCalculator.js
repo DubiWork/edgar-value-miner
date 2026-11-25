@@ -572,7 +572,7 @@ function calculateOperatingMarginsMetric(metrics, options = {}) {
     options?.archetype === 'RETAIL_ECOMMERCE' &&
     !hasNegativeYear &&
     latest.value >= 2 &&
-    latest.value < 10 &&
+    latest.value <= 6 &&
     spread <= 2.5 &&
     !isVolatileCollapse &&
     !isCyclical &&

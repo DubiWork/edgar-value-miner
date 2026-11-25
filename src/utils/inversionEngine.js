@@ -580,7 +580,6 @@ function extractFinancialSnapshot(metrics, sharesMetric, archetype, financialSub
     cashRunwayQuarters,
     invLatest: latestInv.latest?.value ?? null,
     invPrior: latestInv.prior?.value ?? null,
-    isBankRevenueTag: Boolean(metrics?.revenue?.tag && BANK_REVENUE_TAGS.includes(metrics.revenue.tag)),
     hasAnyMetrics:
       revSeries.length > 0 ||
       assetsSeries.length > 0 ||
@@ -1143,14 +1142,26 @@ function evaluateGoodwillAndReturns(snap, sharesMetric, isBuybackCannibal, pushR
       (isNum(sharesMetric?.totalChangePct) && sharesMetric.totalChangePct > 7.5);
 
     if (isHeavy && (hasLowRoic || hasHighDebt || hasExcessDilution)) {
-      const reasons = [];
-      if (hasLowRoic) reasons.push(`ROIC ${formatPct(snap.roicPct)}`);
-      if (hasHighDebt) reasons.push(`Net Debt/FCF ${snap.netDebtToFcf === Infinity ? 'Neg FCF' : formatRatio(snap.netDebtToFcf)}`);
+      const debtLabel =
+        snap.netDebtToFcf === Infinity ? 'Neg FCF' : formatRatio(snap.netDebtToFcf);
+      const reasonsHe = [];
+      const reasonsEn = [];
+      if (hasLowRoic) {
+        const roicText = `ROIC ${formatPct(snap.roicPct)}`;
+        reasonsHe.push(roicText);
+        reasonsEn.push(roicText);
+      }
+      if (hasHighDebt) {
+        const debtText = `Net Debt/FCF ${debtLabel}`;
+        reasonsHe.push(debtText);
+        reasonsEn.push(debtText);
+      }
       if (hasExcessDilution) {
         const dilVal = isNum(sharesMetric?.changePct)
           ? sharesMetric.changePct.toFixed(1)
           : sharesMetric.totalChangePct.toFixed(1);
-        reasons.push(`דילול ${dilVal}%`);
+        reasonsHe.push(`דילול ${dilVal}%`);
+        reasonsEn.push(`Dilution ${dilVal}%`);
       }
 
       pushRed(
@@ -1163,8 +1174,8 @@ function evaluateGoodwillAndReturns(snap, sharesMetric, isBuybackCannibal, pushR
           badgeEn: `Roll-Up Risk (${Math.round(snap.goodwillToAssetsPct)}% GW)`,
           titleHe: `מלכודת Roll-Up: מוניטין ${formatPct(snap.goodwillToAssetsPct)} מהנכסים לצד חולשה פיננסית`,
           titleEn: `Roll-Up Trap: Goodwill ${formatPct(snap.goodwillToAssetsPct)} of Assets with Deteriorating Quality`,
-          valueDisplayHe: `${formatPct(snap.goodwillToAssetsPct)} (${reasons.join(' · ')})`,
-          valueDisplayEn: `${formatPct(snap.goodwillToAssetsPct)} (${reasons.join(' · ')})`,
+          valueDisplayHe: `${formatPct(snap.goodwillToAssetsPct)} (${reasonsHe.join(' · ')})`,
+          valueDisplayEn: `${formatPct(snap.goodwillToAssetsPct)} (${reasonsEn.join(' · ')})`,
           explanationHe:
             'למעלה ממחצית מנכסי החברה הם מוניטין מרכישות, ובמקביל התשואה על ההון, עומס החוב או הדילול מאותתים על תשלום יתר וסיכון למחיקות עתק.',
           explanationEn:
@@ -1725,12 +1736,14 @@ function evaluateCorePillarsAndArchetype(
 function mergeQualitativeAiFlags(aiSummary, pushRed, pushYellow, pushContext) {
   if (!aiSummary || typeof aiSummary !== 'object') return;
   const qualFlags = Array.isArray(aiSummary.qualitativeFlags) ? aiSummary.qualitativeFlags : [];
-  const presentCategories = new Set();
+  const presentKeys = new Set();
 
   for (const item of qualFlags) {
     if (!item || typeof item !== 'object') continue;
-    const cat = String(item.category || 'qualitative').trim();
-    presentCategories.add(cat);
+    const cat = String(item.category || 'qualitative').trim().toLowerCase();
+    const itemId = String(item.id || '').trim().toLowerCase();
+    presentKeys.add(cat);
+    if (itemId) presentKeys.add(itemId);
     const tier = item.severity === 'fail' ? 1 : item.severity === 'info' ? 3 : 2;
     const flag = createFlag({
       id: item.id || `qual-${cat}`,
@@ -1738,8 +1751,8 @@ function mergeQualitativeAiFlags(aiSummary, pushRed, pushYellow, pushContext) {
       category: 'qualitative',
       overlapGroup: `qual-${item.id || cat}`,
       source: 'ai-qualitative',
-      badgeHe: item.titleHe || item.title || 'ממצא איכותי מדוח SEC',
-      badgeEn: item.titleEn || item.title || 'SEC Qualitative Flag',
+      badgeHe: 'ממצא SEC',
+      badgeEn: 'SEC Filing Note',
       titleHe: item.titleHe || item.title || '',
       titleEn: item.titleEn || item.title || '',
       explanationHe: item.rationaleHe || item.rationale || '',
@@ -1761,7 +1774,11 @@ function mergeQualitativeAiFlags(aiSummary, pushRed, pushYellow, pushContext) {
   }
 
   const conc = aiSummary.customerConcentration;
-  if (conc?.detected && !presentCategories.has('customer-concentration')) {
+  const hasCustomerConcFlag =
+    presentKeys.has('customer-concentration') ||
+    presentKeys.has('concentration') ||
+    presentKeys.has('qual-customer-concentration');
+  if (conc?.detected && !hasCustomerConcFlag) {
     const isRed = isNum(conc.maxCustomerPct) && conc.maxCustomerPct > 20;
     const pctLabel = isNum(conc.maxCustomerPct) ? `${conc.maxCustomerPct}%` : '>10%';
     const targetPush = isRed ? pushRed : pushYellow;
@@ -1796,7 +1813,22 @@ function mergeQualitativeAiFlags(aiSummary, pushRed, pushYellow, pushContext) {
 
   const gov = aiSummary.governanceAndMoatRisks;
   if (gov && typeof gov === 'object') {
-    if (gov.hasRestatement || gov.hasOptionRepricing) {
+    const hasSevereGovFlag =
+      presentKeys.has('governance') ||
+      presentKeys.has('restatement') ||
+      presentKeys.has('option-repricing') ||
+      presentKeys.has('qual-governance-severe');
+    const hasWatchGovFlag =
+      presentKeys.has('governance') ||
+      presentKeys.has('executive-turnover') ||
+      presentKeys.has('turnover') ||
+      presentKeys.has('supply-chain') ||
+      presentKeys.has('sovereign-risk') ||
+      presentKeys.has('eroding-moat') ||
+      presentKeys.has('moat-erosion') ||
+      presentKeys.has('qual-governance-watch');
+
+    if ((gov.hasRestatement || gov.hasOptionRepricing) && !hasSevereGovFlag) {
       pushRed(
         createFlag({
           id: 'qual-governance-severe',
@@ -1819,7 +1851,10 @@ function mergeQualitativeAiFlags(aiSummary, pushRed, pushYellow, pushContext) {
             'Serious corporate governance disclosure warrants extra scrutiny of accounting integrity.',
         })
       );
-    } else if (gov.hasExecutiveTurnover || gov.supplyChainOrSovereignRisk || gov.erodingMoatRisk) {
+    } else if (
+      (gov.hasExecutiveTurnover || gov.supplyChainOrSovereignRisk || gov.erodingMoatRisk) &&
+      !hasWatchGovFlag
+    ) {
       pushYellow(
         createFlag({
           id: 'qual-governance-watch',
@@ -1928,13 +1963,6 @@ function buildCapitalStructureSummary(snap, guardrails, archetype, financialSubT
 }
 
 function buildCompactBannerText(redCount, yellowCount, contextCount, isUnavailable) {
-  if (isUnavailable) {
-    return {
-      bannerHe: 'אין מספיק נתוני SEC להפקת סינון סיכונים מלא',
-      bannerEn: 'Insufficient SEC data for full risk inversion screen',
-    };
-  }
-
   if (redCount > 0 || yellowCount > 0) {
     const heParts = [];
     const enParts = [];
@@ -1952,10 +1980,21 @@ function buildCompactBannerText(redCount, yellowCount, contextCount, isUnavailab
     };
   }
 
+  if (isUnavailable && contextCount === 0) {
+    return {
+      bannerHe: 'אין מספיק נתוני SEC להפקת סינון סיכונים מלא',
+      bannerEn: 'Insufficient SEC data for full risk inversion screen',
+    };
+  }
+
   if (contextCount > 0) {
     return {
-      bannerHe: `ℹ️ ${contextCount} הקשר מאזני · סינון נקי ↓`,
-      bannerEn: `ℹ️ ${contextCount} Balance-Sheet Context · Clean Pass ↓`,
+      bannerHe: isUnavailable
+        ? `ℹ️ ${contextCount} הערת SEC · לפירוט ↓`
+        : `ℹ️ ${contextCount} הקשר מאזני · סינון נקי ↓`,
+      bannerEn: isUnavailable
+        ? `ℹ️ ${contextCount} SEC Note · Details ↓`
+        : `ℹ️ ${contextCount} Balance-Sheet Context · Clean Pass ↓`,
     };
   }
 
@@ -2067,12 +2106,12 @@ export function evaluateInversionFlags(companyFacts, options = {}) {
 
   const hasRedFlags = redCount > 0;
   const hasYellowWarnings = yellowCount > 0;
-  const overallStatus = isUnavailable
-    ? 'unavailable'
-    : hasRedFlags
+  const overallStatus = hasRedFlags
     ? 'fail'
     : hasYellowWarnings
     ? 'warn'
+    : isUnavailable
+    ? 'unavailable'
     : 'pass';
   const isCleanPass = !isUnavailable && redCount === 0 && yellowCount === 0;
   const { bannerHe, bannerEn } = buildCompactBannerText(
