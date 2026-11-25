@@ -42,6 +42,7 @@ import {
   normalizeBusinessInfographic,
   normalizeCompetitors,
   normalizeGlossary,
+  inferArchetypeFromXbrlAndMeta,
 } from '../../services/aiSummaryService.js'
 
 /**
@@ -810,6 +811,10 @@ export function Step1Triage({
   const companyName = company?.name || companyFacts?.companyName || ticker
   const companyCik = company?.cik ?? companyFacts?.cik ?? null
   const secFormMeta = useMemo(() => getSecFormMeta(ingestionStatus), [ingestionStatus])
+  const deterministicArchetype = useMemo(
+    () => inferArchetypeFromXbrlAndMeta(companyFacts, company),
+    [companyFacts, company]
+  )
 
   const refreshAdminBudget = useCallback(async () => {
     if (!isAdmin) return
@@ -877,6 +882,7 @@ export function Step1Triage({
             const cachedMissedTenK = !cachedHasTenK && serverHasTenK
             const cachedMissedEightK = !cachedHasEightK && serverHasEightK
             const cachedUngrounded = !cachedHasTenK && !cachedHasEightK
+            const needsSchemaV2Upgrade = !result?.businessArchetype
             const needsUpgrade =
               !budgetExhausted &&
               (isCachedMock ||
@@ -885,13 +891,14 @@ export function Step1Triage({
                 cachedMissedTenK ||
                 cachedMissedEightK ||
                 cachedUngrounded ||
+                needsSchemaV2Upgrade ||
                 Boolean(ctxStatus?.hasNewerFilings))
 
             if (needsUpgrade && autoRefreshedTickerRef.current !== ticker) {
               autoRefreshedTickerRef.current = ticker
               setIsUpgradingSummary(true)
               try {
-                await invalidateCachedSummary(ticker)
+                // Opportunistic upgrade: keep valid cached summary intact until live v2 succeeds
                 const upgraded = await getOrFetchCompanySummary(
                   ticker,
                   { name: companyName, sector: company?.sector, cik: companyCik },
@@ -900,7 +907,7 @@ export function Step1Triage({
                 if (!isCancelled && upgraded) {
                   const upgradedIsMock =
                     upgraded.source === 'mock-dynamic' || upgraded.source === 'mock-preset'
-                  if (upgraded.source === 'ai-live' || !result?.summary || !upgradedIsMock) {
+                  if (upgraded.source === 'ai-live' || (!result?.summary && !upgradedIsMock)) {
                     setAiSummary(upgraded)
                   }
                   if (upgraded.ingestionStatus) {
@@ -1596,6 +1603,12 @@ export function Step1Triage({
       {/* SECTION 1: Business Clarity & Economic Moat Tear Sheet Blade (#319) */}
       <div
         data-testid="tear-sheet-blade"
+        data-archetype={aiSummary?.businessArchetype || deterministicArchetype.archetype}
+        data-archetype-sub={
+          aiSummary?.financialSubType && aiSummary.financialSubType !== 'NONE'
+            ? aiSummary.financialSubType
+            : deterministicArchetype.financialSubType
+        }
         dir={lang === 'he' ? 'rtl' : 'ltr'}
         className="relative rounded-2xl border border-sky-500/20 bg-linear-to-b from-sky-50/50 via-white to-white dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900 shadow-sm p-4 sm:p-7"
       >
