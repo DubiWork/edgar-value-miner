@@ -71,10 +71,10 @@ export const WISDOM_QUOTES = {
     quoteEn: 'If cash from operating activities is consistently negative, while cash from financing activities is consistently positive, the company has a habit of craving more cash than its own businesses can produce.',
   },
   cashConversionQuality: {
-    ...ATTRIBUTION.graham,
-    insightHe: 'רווח חשבונאי שאינו הופך למזומן אמיתי עלול להתגלות כאשליה.',
-    insightEn: 'Accounting earnings must convert into real owner cash over multi-year cycles.',
-    quoteEn: 'If cash from operating activities is consistently negative, while cash from financing activities is consistently positive, the company has a habit of craving more cash than its own businesses can produce.',
+    ...ATTRIBUTION.buffett,
+    insightHe: 'הרווח החשבונאי הוא רק נקודת ההתחלה — המזומן בפועל קובע.',
+    insightEn: 'Accounting earnings are only the starting point; cash conversion is reality.',
+    quoteEn: 'Managers and investors alike must understand that accounting numbers are the beginning, not the end, of business valuation.',
   },
   leverageZipWallet: {
     ...ATTRIBUTION.buffett,
@@ -649,7 +649,7 @@ function evaluateBuybackCannibalGuardrail(snap, archetype) {
     (isNum(snap.ebitInterestCoverage) && snap.ebitInterestCoverage >= 4.0) ||
     (snap.interestExp === null && isNum(snap.netDebt) && snap.netDebt <= 0 && isNum(snap.ebit) && snap.ebit > 0);
   const hasSafeNetDebtToFcf =
-    isNum(snap.fcf) && snap.fcf > 0 && isNum(snap.netDebt) && snap.netDebt / snap.fcf <= 3.0;
+    isNum(snap.fcf) && snap.fcf > 0 && isNum(snap.netDebt) && snap.netDebt / snap.fcf <= 4.0;
   const hasPositiveRetained = isNum(snap.retainedEarnings) && snap.retainedEarnings > 0;
   const hasBuybackEvidence =
     (isNum(snap.treasuryStock) && Math.abs(snap.treasuryStock) > 0) ||
@@ -677,10 +677,14 @@ function evaluateBuybackCannibalGuardrail(snap, archetype) {
     badgeEn: 'Sound Balance Sheet',
     primaryValueHe: covLabelHe,
     primaryValueEn: covLabelEn,
-    tagHe: 'ℹ️ הון שלילי מרכישה עצמית — תקין',
-    tagEn: 'ℹ️ Negative Equity from Buybacks — OK',
+    tagHe: hasEquityDeficit
+      ? 'ℹ️ הון שלילי מרכישה עצמית — תקין'
+      : 'ℹ️ מינוף חשבונאי מרכישה עצמית — תקין',
+    tagEn: hasEquityDeficit
+      ? 'ℹ️ Negative Equity from Buybacks — OK'
+      : 'ℹ️ Accounting Leverage from Buybacks — OK',
     explanationHe:
-      'החברה השתמשה ברווחים אדירים כדי לקנות בחזרה מניות של עצמה, פעולה חשבונאית שמאפסת את ההון העצמי בספרים — אך כל עוד התזרים חיובי והחוב מכוסה בקלות, זהו סימן לעוצמה ולא לפשיטת רגל.',
+      'החברה השתמשה ברווחים אדירים כדי לקנות בחזרה מניות של עצמה, פעולה חשבונאית שמקטינה או מאפסת את ההון העצמי בספרים — אך כל עוד התזרים חיובי והחוב מכוסה בקלות, זהו סימן לעוצמה ולא לפשיטת רגל.',
     explanationEn:
       'The company used strong profits to buy back its own shares, an accounting deduction that can make book equity negative—yet positive cash flow and comfortable interest coverage signal strength rather than insolvency.',
   };
@@ -1177,9 +1181,9 @@ function evaluateGoodwillAndReturns(snap, sharesMetric, isBuybackCannibal, pushR
           valueDisplayHe: `${formatPct(snap.goodwillToAssetsPct)} (${reasonsHe.join(' · ')})`,
           valueDisplayEn: `${formatPct(snap.goodwillToAssetsPct)} (${reasonsEn.join(' · ')})`,
           explanationHe:
-            'למעלה ממחצית מנכסי החברה הם מוניטין מרכישות, ובמקביל התשואה על ההון, עומס החוב או הדילול מאותתים על תשלום יתר וסיכון למחיקות עתק.',
+            'למעלה ממחצית מנכסי החברה הם מוניטין — הפרמיה ששולמה מעל שווי הנכסים המוחשיים ברכישת חברות אחרות — ובמקביל התשואה על ההון המושקע (ROIC — הרווח הכלכלי שהעסק מפיק ביחס לסך ההון והחוב המושקעים בו), עומס החוב או דילול המניות מצביעים על תשלום יתר וסיכון למחיקות ערך.',
           explanationEn:
-            'Goodwill exceeds 50% of total assets while paired with weak ROIC (<10%), heavy Net Debt/FCF (>4.0x), or dilution (>2.5%/yr).',
+            'Goodwill (the premium paid above tangible assets in past acquisitions) exceeds 50% of total assets while paired with weak return on invested capital (ROIC < 10%), heavy Net Debt/FCF (> 4.0x), or dilution (> 2.5%/yr).',
           quote: WISDOM_QUOTES.goodwillNoWill,
           metricsSnapshot: {
             goodwillToAssetsPct: snap.goodwillToAssetsPct,
@@ -1201,9 +1205,9 @@ function evaluateGoodwillAndReturns(snap, sharesMetric, isBuybackCannibal, pushR
           titleHe: `משקל מוניטין גבוה במאזן (${formatPct(snap.goodwillToAssetsPct)} מהנכסים)`,
           titleEn: `High Goodwill Weight (${formatPct(snap.goodwillToAssetsPct)} of Assets)`,
           explanationHe:
-            'שיעור המוניטין במאזן גבוה מ-40% כתוצאה מרכישות עבר. כל עוד ה-ROIC גבוה והחוב נשלט מדובר בזהירות בלבד (מניעת פסילה לחברות רכישה איכותיות), אך חשוב לעקוב אחרי הצדקה של הרכישות.',
+            'למעלה מ-40% מנכסי החברה הם מוניטין — הפרמיה ששולמה מעל שווי הנכסים המוחשיים ברכישת חברות אחרות. כל עוד התשואה על ההון המושקע (ROIC — הרווח הכלכלי ביחס לסך הכסף המושקע בעסק) גבוהה והחוב נשלט מדובר בנקודה למעקב בלבד ולא בפסילה, אך חשוב לוודא שהרכישות מצדיקות את מחירן.',
           explanationEn:
-            'Goodwill exceeds 40% of assets from prior acquisitions; watch acquisition discipline even when ROIC and debt coverage currently hold up.',
+            'Goodwill (the premium paid above tangible net assets in acquisitions) exceeds 40% of assets; while strong ROIC (profit relative to total invested capital) and controlled debt prevent disqualification, monitor acquisition discipline.',
           quote: WISDOM_QUOTES.goodwillNoWill,
           metricsSnapshot: { goodwillToAssetsPct: snap.goodwillToAssetsPct, roicPct: snap.roicPct },
         })
@@ -1625,9 +1629,14 @@ function evaluateCorePillarsAndArchetype(
     const fcfMarginPct =
       isNum(snap.fcf) && isNum(snap.revVal) && snap.revVal > 0
         ? (snap.fcf / snap.revVal) * 100
-        : margins.latestValue;
-    if (isNum(fcfMarginPct)) {
-      const ruleOf40 = revenue.growthRate + fcfMarginPct;
+        : null;
+    const opMarginPct = isNum(margins.latestValue) ? margins.latestValue : null;
+    const profitMarginPct =
+      isNum(fcfMarginPct) && isNum(opMarginPct)
+        ? Math.max(fcfMarginPct, opMarginPct)
+        : fcfMarginPct ?? opMarginPct;
+    if (isNum(profitMarginPct)) {
+      const ruleOf40 = revenue.growthRate + profitMarginPct;
       if (ruleOf40 < 40) {
         pushYellow(
           createFlag({

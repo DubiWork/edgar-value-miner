@@ -772,14 +772,6 @@ InfoTooltip.propTypes = {
   dir: PropTypes.oneOf(['rtl', 'ltr']),
 }
 
-const INVERSION_STRIP_STYLES = {
-  fail: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-b border-rose-500/20 hover:bg-rose-500/15',
-  warn: 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-b border-amber-500/20 hover:bg-amber-500/15',
-  pass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-b border-emerald-500/20 hover:bg-emerald-500/15',
-  unavailable:
-    'bg-slate-100/80 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800',
-}
-
 const INVERSION_FLAG_TONES = {
   red: {
     container:
@@ -809,58 +801,6 @@ const INVERSION_FLAG_TONES = {
 
 const YELLOW_WARNINGS_PREVIEW_CAP = 3
 
-/**
- * Calm Slate/Sky Accounting Guardrail Pill with 1-sentence plain-Hebrew responsive explanation.
- */
-function GuardrailInfoPill({
-  tagHe,
-  tagEn,
-  explanationHe,
-  explanationEn,
-  lang = 'he',
-  testId = 'guardrail-info-pill',
-}) {
-  const isHe = lang === 'he'
-  const label = isHe ? tagHe : tagEn
-  const tip = isHe ? explanationHe : explanationEn
-  if (!label) return null
-
-  return (
-    <ResponsiveTooltip
-      placement="top"
-      align="start"
-      widthClass="lg:w-80"
-      dir={isHe ? 'rtl' : 'ltr'}
-      showArrow
-      trigger={({ isOpen, onToggle }) => (
-        <button
-          type="button"
-          data-testid={testId}
-          aria-label={isHe ? 'הסבר הקשר חשבונאי' : 'Accounting guardrail explanation'}
-          aria-expanded={isOpen}
-          onClick={onToggle}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/25 hover:bg-sky-500/15 transition-colors cursor-help focus:outline-none focus:ring-1 focus:ring-sky-500"
-        >
-          <BidiText text={label} isRtl={isHe} />
-        </button>
-      )}
-    >
-      <span className="block leading-relaxed text-slate-200">
-        <BidiText text={tip} isRtl={isHe} />
-      </span>
-    </ResponsiveTooltip>
-  )
-}
-
-GuardrailInfoPill.propTypes = {
-  tagHe: PropTypes.string,
-  tagEn: PropTypes.string,
-  explanationHe: PropTypes.string,
-  explanationEn: PropTypes.string,
-  lang: PropTypes.oneOf(['he', 'en']),
-  testId: PropTypes.string,
-}
-
 const INVERSION_CATEGORY_LABELS = {
   solvency: { he: 'מינוף וחוב', en: 'Solvency & Debt' },
   liquidity: { he: 'נזילות קצרה', en: 'Short-Term Liquidity' },
@@ -878,7 +818,7 @@ const INVERSION_CATEGORY_LABELS = {
  * Single Inversion Flag Row with plain-Hebrew self-contained explanation and expandable
  * Benjamin Graham / Warren Buffett / SEC Filing quote drawer.
  */
-function InversionFlagItem({ flag, lang = 'he' }) {
+function InversionFlagItem({ flag, lang = 'he', showQuote = true }) {
   const [isQuoteOpen, setIsQuoteOpen] = useState(false)
   const isHe = lang === 'he'
   const tone = INVERSION_FLAG_TONES[flag.severity] || INVERSION_FLAG_TONES.yellow
@@ -898,7 +838,7 @@ function InversionFlagItem({ flag, lang = 'he' }) {
   const titleText = isHe ? flag.titleHe : flag.titleEn
   const valueText = isHe ? flag.valueDisplayHe : flag.valueDisplayEn
   const explanationText = isHe ? flag.explanationHe : flag.explanationEn
-  const quote = flag.quote
+  const quote = showQuote ? flag.quote : null
 
   return (
     <div
@@ -1006,19 +946,20 @@ InversionFlagItem.propTypes = {
     }),
   }).isRequired,
   lang: PropTypes.oneOf(['he', 'en']),
+  showQuote: PropTypes.bool,
 }
 
 /**
- * Option C Bottom Card (`#step1-risk-breakdown`):
- * Collapses cleanly on healthy companies, shows tiered Red / capped Yellow (+N) / calm Blue Context.
+ * Bottom Risk Breakdown Card (`#step1-risk-breakdown`):
+ * Collapses cleanly on healthy companies, shows Red flags / capped Watch items (+N) / Accounting Context.
  */
-function RiskBreakdownCard({ inversion, lang = 'he', isHighlighted = false, sectionRef = null }) {
+function RiskBreakdownCard({ inversion, lang = 'he' }) {
   const [showAllYellow, setShowAllYellow] = useState(false)
   const isHe = lang === 'he'
 
-  const tier1Red = inversion?.tier1Red || []
-  const tier2Yellow = inversion?.tier2Yellow || []
-  const tier3Context = inversion?.tier3Context || []
+  const tier1Red = useMemo(() => inversion?.tier1Red || [], [inversion])
+  const tier2Yellow = useMemo(() => inversion?.tier2Yellow || [], [inversion])
+  const tier3Context = useMemo(() => inversion?.tier3Context || [], [inversion])
   const summary = inversion?.summary || {
     redCount: 0,
     yellowCount: 0,
@@ -1027,14 +968,24 @@ function RiskBreakdownCard({ inversion, lang = 'he', isHighlighted = false, sect
     isCleanPass: false,
   }
 
+  // Show each Buffett/Graham quote at most once per company screen across Red and Watch items
+  const shownQuoteFlagIds = useMemo(() => {
+    const seenQuotes = new Set()
+    const allowedIds = new Set()
+    for (const flag of [...tier1Red, ...tier2Yellow, ...tier3Context]) {
+      const qKey = flag.quote?.quoteEn || flag.quote?.insightHe
+      if (qKey && !seenQuotes.has(qKey)) {
+        seenQuotes.add(qKey)
+        allowedIds.add(flag.id)
+      }
+    }
+    return allowedIds
+  }, [tier1Red, tier2Yellow, tier3Context])
+
   const visibleYellow = showAllYellow
     ? tier2Yellow
     : tier2Yellow.slice(0, YELLOW_WARNINGS_PREVIEW_CAP)
   const hiddenYellowCount = Math.max(0, tier2Yellow.length - YELLOW_WARNINGS_PREVIEW_CAP)
-
-  const highlightRing = isHighlighted
-    ? 'ring-2 ring-sky-500 ring-offset-2 dark:ring-offset-slate-950'
-    : ''
 
   if (
     summary.overallStatus === 'unavailable' &&
@@ -1045,17 +996,16 @@ function RiskBreakdownCard({ inversion, lang = 'he', isHighlighted = false, sect
     return (
       <div
         id="step1-risk-breakdown"
-        ref={sectionRef}
         data-testid="step1-risk-breakdown"
         dir={isHe ? 'rtl' : 'ltr'}
-        className={`rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 px-4 py-3 text-xs text-slate-600 dark:text-slate-400 transition-all ${highlightRing}`}
+        className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 px-4 py-3 text-xs text-slate-600 dark:text-slate-400"
       >
         <div className="flex items-center gap-2 font-medium">
           <Info className="w-4 h-4 shrink-0 text-slate-400" />
           <span>
             {isHe
-              ? 'סינון סיכונים מעמיק (Inversion Breakdown) יופיע כאן מיד עם טעינת הדוחות הכספיים מה-SEC.'
-              : 'Full Inversion Risk & Guardrail Breakdown will appear once SEC financials are loaded.'}
+              ? 'סינון סיכונים ודגלים אדומים יופיע כאן מיד עם טעינת הדוחות הכספיים מה-SEC.'
+              : 'Risk & Red-Flag Screening will appear once SEC financials are loaded.'}
           </span>
         </div>
       </div>
@@ -1066,10 +1016,9 @@ function RiskBreakdownCard({ inversion, lang = 'he', isHighlighted = false, sect
     return (
       <div
         id="step1-risk-breakdown"
-        ref={sectionRef}
         data-testid="step1-risk-breakdown"
         dir={isHe ? 'rtl' : 'ltr'}
-        className={`rounded-2xl border border-emerald-500/25 bg-emerald-50/70 dark:bg-emerald-950/20 px-4 py-3.5 transition-all ${highlightRing}`}
+        className="rounded-2xl border border-emerald-500/25 bg-emerald-50/70 dark:bg-emerald-950/20 px-4 py-3.5"
       >
         <div
           data-testid="risk-breakdown-clean-pass"
@@ -1094,20 +1043,19 @@ function RiskBreakdownCard({ inversion, lang = 'he', isHighlighted = false, sect
   return (
     <div
       id="step1-risk-breakdown"
-      ref={sectionRef}
       data-testid="step1-risk-breakdown"
       dir={isHe ? 'rtl' : 'ltr'}
-      className={`rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-4 sm:p-5 space-y-4 shadow-xs transition-all ${highlightRing}`}
+      className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-4 sm:p-5 space-y-4 shadow-xs"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
-            {isHe ? 'פירוט דגלים אדומים, אזהרות והקשר מאזני' : 'Inversion Risk & Guardrail Breakdown'}
+            {isHe ? 'פירוט דגלים אדומים, אזהרות והקשר מאזני' : 'Risk & Guardrail Breakdown'}
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             {isHe
-              ? 'סינון "אשמה עד שתוכח חפותה" עם הסבר מובנה בעברית פשוטה וציטוטים מבאפט וגראהם'
-              : 'Structured red flags, resilience warnings, and accounting context with plain explanations'}
+              ? 'בדיקת סיכונים ודגלים אדומים — זיהוי מוקדם של חולשות מאזניות, תזרימיות ועסקיות'
+              : 'Risk & Red-Flag Screening — early detection of balance-sheet, cash-flow, and business weaknesses'}
           </p>
         </div>
 
@@ -1145,26 +1093,31 @@ function RiskBreakdownCard({ inversion, lang = 'he', isHighlighted = false, sect
         </div>
       </div>
 
-      {/* Tier 1: Red Disqualifying Flags */}
+      {/* Disqualifying Red Flags */}
       {tier1Red.length > 0 && (
         <div data-testid="risk-tier1-red" className="space-y-2.5">
           <div className="text-xs font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
-            {isHe ? 'דגלים אדומים פוסלים (Tier 1)' : 'Tier 1 — Disqualifying Red Flags'}
+            {isHe ? 'דגלים אדומים מהותיים' : 'Disqualifying Red Flags'}
           </div>
           <div className="space-y-2.5">
             {tier1Red.map((flag) => (
-              <InversionFlagItem key={flag.id} flag={flag} lang={lang} />
+              <InversionFlagItem
+                key={flag.id}
+                flag={flag}
+                lang={lang}
+                showQuote={shownQuoteFlagIds.has(flag.id)}
+              />
             ))}
           </div>
         </div>
       )}
 
-      {/* Tier 2: Yellow Warnings (Capped at 3 with +N expand) */}
+      {/* Points to Watch (Capped at 3 with +N expand) */}
       {tier2Yellow.length > 0 && (
         <div data-testid="risk-tier2-yellow" className="space-y-2.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-              {isHe ? 'אזהרות למעקב (Tier 2)' : 'Tier 2 — Cautions to Watch'}
+              {isHe ? 'נקודות למעקב' : 'Points to Watch'}
             </span>
             {hiddenYellowCount > 0 && (
               <button
@@ -1185,13 +1138,18 @@ function RiskBreakdownCard({ inversion, lang = 'he', isHighlighted = false, sect
           </div>
           <div className="space-y-2.5">
             {visibleYellow.map((flag) => (
-              <InversionFlagItem key={flag.id} flag={flag} lang={lang} />
+              <InversionFlagItem
+                key={flag.id}
+                flag={flag}
+                lang={lang}
+                showQuote={shownQuoteFlagIds.has(flag.id)}
+              />
             ))}
           </div>
         </div>
       )}
 
-      {/* Tier 3: Calm Accounting Context & A1 Guardrails (Not counted as warnings/red flags) */}
+      {/* Accounting Context & Guardrails (Not counted as warnings/red flags) */}
       {tier3Context.length > 0 && (
         <div
           data-testid="risk-tier3-context"
@@ -1204,7 +1162,12 @@ function RiskBreakdownCard({ inversion, lang = 'he', isHighlighted = false, sect
           </div>
           <div className="space-y-2">
             {tier3Context.map((item) => (
-              <InversionFlagItem key={item.id} flag={item} lang={lang} />
+              <InversionFlagItem
+                key={item.id}
+                flag={item}
+                lang={lang}
+                showQuote={shownQuoteFlagIds.has(item.id)}
+              />
             ))}
           </div>
         </div>
@@ -1227,8 +1190,6 @@ RiskBreakdownCard.propTypes = {
     }),
   }),
   lang: PropTypes.oneOf(['he', 'en']),
-  isHighlighted: PropTypes.bool,
-  sectionRef: PropTypes.oneOfType([PropTypes.func, PropTypes.object]),
 }
 
 /**
@@ -1268,10 +1229,7 @@ export function Step1Triage({
   const [lang, setLang] = useState('he')
   const [isTranslating, setIsTranslating] = useState(false)
   const [isUpgradingSummary, setIsUpgradingSummary] = useState(false)
-  const [isRiskHighlighted, setIsRiskHighlighted] = useState(false)
   const autoRefreshedTickerRef = useRef(null)
-  const riskBreakdownRef = useRef(null)
-  const riskHighlightTimerRef = useRef(null)
 
   const ticker = company?.ticker || companyFacts?.ticker || 'MSFT'
   const companyName = company?.name || companyFacts?.companyName || ticker
@@ -1286,28 +1244,6 @@ export function Step1Triage({
     aiSummary?.financialSubType && aiSummary.financialSubType !== 'NONE'
       ? aiSummary.financialSubType
       : deterministicArchetype.financialSubType
-
-  useEffect(() => {
-    return () => {
-      if (riskHighlightTimerRef.current) {
-        clearTimeout(riskHighlightTimerRef.current)
-      }
-    }
-  }, [])
-
-  const handleScrollToRiskBreakdown = useCallback(() => {
-    const el = riskBreakdownRef.current || document.getElementById('step1-risk-breakdown')
-    if (el && typeof el.scrollIntoView === 'function') {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
-    setIsRiskHighlighted(true)
-    if (riskHighlightTimerRef.current) {
-      clearTimeout(riskHighlightTimerRef.current)
-    }
-    riskHighlightTimerRef.current = setTimeout(() => {
-      setIsRiskHighlighted(false)
-    }, 1800)
-  }, [])
 
   const refreshAdminBudget = useCallback(async () => {
     if (!isAdmin) return
@@ -1684,11 +1620,23 @@ export function Step1Triage({
         : triageData.currentRatio.valueHe || triageData.currentRatio.value,
       target: triageData.currentRatio.target,
       targetHe: triageData.currentRatio.targetHe || 'תנאי למעבר: מעל 1.5x',
-      reportedSublabelHe: triageData.currentRatio.reportedSublabelHe || null,
-      reportedSublabelEn: triageData.currentRatio.reportedSublabelEn || null,
-      guardrailPill: saasGuardrail
+      reportedSublabelHe: saasGuardrail
+        ? triageData.currentRatio.reportedSublabelHe || null
+        : buybackGuardrail
+        ? useBuybackHeadline
+          ? 'רכישה עצמית — מאזן תקין'
+          : `${buybackGuardrail.badgeHe} · ${buybackGuardrail.primaryValueHe}`
+        : null,
+      reportedSublabelEn: saasGuardrail
+        ? triageData.currentRatio.reportedSublabelEn || null
+        : buybackGuardrail
+        ? useBuybackHeadline
+          ? 'Buyback-driven equity'
+          : `${buybackGuardrail.badgeEn} · ${buybackGuardrail.primaryValueEn}`
+        : null,
+      inlineGuardrailInfo: saasGuardrail
         ? {
-            testId: 'guardrail-pill-saas',
+            testId: 'guardrail-info-saas',
             tagHe: saasGuardrail.tagHe,
             tagEn: saasGuardrail.tagEn,
             explanationHe: saasGuardrail.explanationHe,
@@ -1696,15 +1644,11 @@ export function Step1Triage({
           }
         : buybackGuardrail
         ? {
-            testId: 'guardrail-pill-buyback',
+            testId: 'guardrail-info-buyback',
             tagHe: buybackGuardrail.tagHe,
             tagEn: buybackGuardrail.tagEn,
             explanationHe: buybackGuardrail.explanationHe,
             explanationEn: buybackGuardrail.explanationEn,
-            soundBadgeHe: buybackGuardrail.badgeHe,
-            soundBadgeEn: buybackGuardrail.badgeEn,
-            soundAnchorHe: buybackGuardrail.primaryValueHe,
-            soundAnchorEn: buybackGuardrail.primaryValueEn,
           }
         : null,
       badge: useBuybackHeadline
@@ -2156,29 +2100,6 @@ export function Step1Triage({
         dir={lang === 'he' ? 'rtl' : 'ltr'}
         className="relative rounded-2xl border border-sky-500/20 bg-linear-to-b from-sky-50/50 via-white to-white dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900 shadow-sm p-4 sm:p-7"
       >
-        {/* Option C Locked Top Flush Single-Line Inversion Status Strip (40px height, 0px CLS) */}
-        <button
-          type="button"
-          data-testid="step1-inversion-strip"
-          onClick={handleScrollToRiskBreakdown}
-          className={`-mx-4 -mt-4 sm:-mx-7 sm:-mt-7 mb-4 w-[calc(100%+2rem)] sm:w-[calc(100%+3.5rem)] h-10 px-4 sm:px-7 rounded-t-2xl flex items-center justify-between gap-2 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap overflow-hidden ${
-            INVERSION_STRIP_STYLES[inversion?.summary?.overallStatus] ||
-            INVERSION_STRIP_STYLES.unavailable
-          }`}
-        >
-          <span className="truncate flex items-center gap-1.5">
-            <BidiText
-              text={
-                lang === 'he'
-                  ? inversion?.summary?.bannerHe
-                  : inversion?.summary?.bannerEn
-              }
-              isRtl={lang === 'he'}
-            />
-          </span>
-          <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-80" />
-        </button>
-
         <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
             <CompanyLogo ticker={ticker} companyName={companyName} isLoading={isLoadingSummary} />
@@ -2882,6 +2803,16 @@ export function Step1Triage({
               <span>{item.label}</span>
             </span>
           ))}
+          <span
+            data-testid="legend-dashed-avg"
+            className="inline-flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-400"
+          >
+            <span
+              className="w-4 border-t-2 border-dashed border-slate-400 dark:border-slate-500 shrink-0"
+              aria-hidden="true"
+            />
+            <span>{lang === 'he' ? 'ממוצע רב-שנתי' : 'Multi-year avg'}</span>
+          </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2941,10 +2872,10 @@ export function Step1Triage({
                         isRtl={lang === 'he'}
                       />
                     </div>
-                    {(indicator.reportedSublabelHe || indicator.reportedSublabelEn) && (
+                    {(indicator.reportedSublabelHe || indicator.reportedSublabelEn) ? (
                       <div
                         data-testid="balance-sheet-reported-sublabel"
-                        className="text-[11px] font-medium text-slate-500 dark:text-slate-400"
+                        className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400"
                       >
                         <BidiText
                           text={
@@ -2954,9 +2885,54 @@ export function Step1Triage({
                           }
                           isRtl={lang === 'he'}
                         />
+                        {indicator.inlineGuardrailInfo && (
+                          <ResponsiveTooltip
+                            placement="top"
+                            align="end"
+                            widthClass="lg:w-72"
+                            dir={lang === 'he' ? 'rtl' : 'ltr'}
+                            showArrow
+                            trigger={({ isOpen, onToggle }) => (
+                              <button
+                                type="button"
+                                data-testid={indicator.inlineGuardrailInfo.testId}
+                                aria-label={
+                                  lang === 'he'
+                                    ? 'הסבר הקשר חשבונאי'
+                                    : 'Accounting context explanation'
+                                }
+                                aria-expanded={isOpen}
+                                onClick={onToggle}
+                                className="inline-flex items-center justify-center text-sky-600 dark:text-sky-400 hover:text-sky-500 cursor-help rounded-full focus:outline-none focus:ring-1 focus:ring-sky-500"
+                              >
+                                <Info className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          >
+                            <span className="block font-bold text-sky-300 mb-1">
+                              <BidiText
+                                text={
+                                  lang === 'he'
+                                    ? indicator.inlineGuardrailInfo.tagHe
+                                    : indicator.inlineGuardrailInfo.tagEn
+                                }
+                                isRtl={lang === 'he'}
+                              />
+                            </span>
+                            <span className="block leading-relaxed text-slate-200">
+                              <BidiText
+                                text={
+                                  lang === 'he'
+                                    ? indicator.inlineGuardrailInfo.explanationHe
+                                    : indicator.inlineGuardrailInfo.explanationEn
+                                }
+                                isRtl={lang === 'he'}
+                              />
+                            </span>
+                          </ResponsiveTooltip>
+                        )}
                       </div>
-                    )}
-                    {(indicator.trendLabelHe || indicator.trendLabelEn) ? (
+                    ) : (indicator.trendLabelHe || indicator.trendLabelEn) ? (
                       <div
                         data-testid={`fundamental-trend-${indicator.id}`}
                         className={`text-[11px] font-semibold ${
@@ -2978,33 +2954,6 @@ export function Step1Triage({
                           />
                         </div>
                       )
-                    )}
-                    {indicator.guardrailPill && (
-                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                        {indicator.guardrailPill.soundBadgeHe && (
-                          <span
-                            data-testid="buyback-cannibal-sound-badge"
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
-                          >
-                            <BidiText
-                              text={
-                                lang === 'he'
-                                  ? `${indicator.guardrailPill.soundBadgeHe} (${indicator.guardrailPill.soundAnchorHe})`
-                                  : `${indicator.guardrailPill.soundBadgeEn} (${indicator.guardrailPill.soundAnchorEn})`
-                              }
-                              isRtl={lang === 'he'}
-                            />
-                          </span>
-                        )}
-                        <GuardrailInfoPill
-                          testId={indicator.guardrailPill.testId}
-                          tagHe={indicator.guardrailPill.tagHe}
-                          tagEn={indicator.guardrailPill.tagEn}
-                          explanationHe={indicator.guardrailPill.explanationHe}
-                          explanationEn={indicator.guardrailPill.explanationEn}
-                          lang={lang}
-                        />
-                      </div>
                     )}
                   </div>
 
@@ -3113,14 +3062,8 @@ export function Step1Triage({
         </div>
       </div>
 
-      {/* SECTION 2.5: Option C Inversion Risk & Guardrail Breakdown (#357) */}
-      <RiskBreakdownCard
-        key={ticker}
-        inversion={inversion}
-        lang={lang}
-        isHighlighted={isRiskHighlighted}
-        sectionRef={riskBreakdownRef}
-      />
+      {/* Risk Breakdown & Guardrails (#357) */}
+      <RiskBreakdownCard key={ticker} inversion={inversion} lang={lang} />
 
       {/* SECTION 3: The Gatekeeper (Bottom Action Button) */}
       <div className="pt-4 pb-2">

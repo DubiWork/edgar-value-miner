@@ -107,6 +107,24 @@ describe('inversionEngine & triageCalculator (#357 Slice 3)', () => {
     expect(result.inversion.summary.overallStatus).toBe('pass');
     expect(result.inversion.summary.bannerHe).toContain('0 דגלים אדומים');
     expect(result.capitalStructure.status).toBe('pass');
+
+    // Heavy AI CapEx wave lowering FCF margin to ~20% while operating margin stays 45.6% still passes Rule of 40
+    const msftAiCapex = {
+      metrics: {
+        ...msftClean.metrics,
+        capitalExpenditures: {
+          annual: annualSeries([
+            [2023, 28107000000],
+            [2024, 44477000000],
+            [2025, 80000000000], // FCF margin = 19.9% + 14.9% growth = 34.8%, while Op Margin 45.6% + 14.9% = 60.5% >= 40%
+          ]),
+        },
+      },
+    };
+    const aiCapexRes = calculateTriageMetrics(msftAiCapex, { archetype: 'TECH_SAAS' });
+    expect(
+      aiCapexRes.inversion.tier2Yellow.find((f) => f.id === 'saas-rule-of-40-warn')
+    ).toBeUndefined();
   });
 
   describe('Locked A1 Guardrail #1 — Buyback Cannibals (HD / MCD)', () => {
@@ -209,7 +227,33 @@ describe('inversionEngine & triageCalculator (#357 Slice 3)', () => {
       });
       expect(exempted.guardrails.buybackCannibal.active).toBe(true);
       expect(exempted.guardrails.buybackCannibal.exemptedHighLeverage).toBe(true);
+      expect(exempted.guardrails.buybackCannibal.tagHe).toBe('ℹ️ מינוף חשבונאי מרכישה עצמית — תקין');
       expect(exempted.tier1Red.find((f) => f.id === 'high-leverage-fail')).toBeUndefined();
+
+      // Post-SRS acquisition HD-style calibration: Net Debt / FCF = 3.5x (between 3.0x and 4.0x) STILL exempts
+      const hdPostAcquisition = {
+        metrics: {
+          ...thinPositiveEquity.metrics,
+          stockholdersEquity: { annual: annualSeries([[2025, -1500000000]]) },
+          totalDebt: { annual: annualSeries([[2025, 29250000000]]) }, // Net Debt = 26.25B / 7.5B FCF = 3.5x <= 4.0x
+        },
+      };
+      const hdRes = evaluateInversionFlags(hdPostAcquisition, { archetype: 'RETAIL_ECOMMERCE' });
+      expect(hdRes.guardrails.buybackCannibal.active).toBe(true);
+      expect(hdRes.tier1Red.find((f) => f.id === 'negative-equity-fail')).toBeUndefined();
+      expect(hdRes.tier3Context.some((c) => c.id === 'a1-buyback-cannibal')).toBe(true);
+
+      // Over 4.0x Net Debt / FCF (4.6x) or distressed negative retained earnings fails Red
+      const overLeveredBuyback = {
+        metrics: {
+          ...hdPostAcquisition.metrics,
+          totalDebt: { annual: annualSeries([[2025, 37500000000]]) }, // Net Debt = 34.5B / 7.5B = 4.6x > 4.0x
+        },
+      };
+      expect(
+        evaluateInversionFlags(overLeveredBuyback, { archetype: 'RETAIL_ECOMMERCE' })
+          .guardrails.buybackCannibal.active
+      ).toBe(false);
 
       // Negative control: negative retained earnings + weak coverage => RED fail
       const distressed = {
@@ -425,7 +469,10 @@ describe('inversionEngine & triageCalculator (#357 Slice 3)', () => {
     it('keeps quality serial compounder with 55% goodwill, high ROIC, low debt & 0% dilution at Tier 2 Yellow ONLY', () => {
       const res = calculateTriageMetrics({ metrics: baseAcquirer });
       expect(res.inversion.tier1Red).toHaveLength(0);
-      expect(res.inversion.tier2Yellow.some((f) => f.id === 'goodwill-elevated-warn')).toBe(true);
+      const warnFlag = res.inversion.tier2Yellow.find((f) => f.id === 'goodwill-elevated-warn');
+      expect(warnFlag).toBeDefined();
+      expect(warnFlag.explanationHe).toContain('הפרמיה ששולמה מעל שווי הנכסים המוחשיים');
+      expect(warnFlag.explanationHe).toContain('ROIC');
     });
 
     it('triggers Tier 1 Red Fail when >= 50% goodwill pairs with low ROIC (< 10%) OR high NetDebt/FCF (> 4x) OR > 2.5% dilution', () => {
@@ -883,6 +930,10 @@ describe('inversionEngine & triageCalculator (#357 Slice 3)', () => {
         expect(q.attributionEn.length).toBeGreaterThan(5);
         expect(q.attributionHe).toMatch(/המשקיע הנבון|באפט|Quality Compounders/);
       }
+
+      expect(WISDOM_QUOTES.cashConversionQuality.quoteEn).not.toBe(
+        WISDOM_QUOTES.cashBurnFinancing.quoteEn
+      );
     });
   });
 });

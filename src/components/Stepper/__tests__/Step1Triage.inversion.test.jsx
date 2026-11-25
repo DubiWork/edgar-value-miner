@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { Step1Triage } from '../Step1Triage'
 import { setCachedSummary } from '../../../services/aiSummaryService.js'
@@ -7,7 +7,7 @@ function annualSeries(valuesByYear) {
   return valuesByYear.map(([fiscalYear, value]) => ({ fiscalYear, value }))
 }
 
-describe('Step1Triage Option C Inversion & A1 Guardrails UI (#357 Slice 4)', () => {
+describe('Step1Triage Inversion Risk Breakdown & A1 Guardrails UI (#357 Slice 4 & UX Polish)', () => {
   beforeEach(async () => {
     await setCachedSummary('MSFT', {
       ticker: 'MSFT',
@@ -20,8 +20,7 @@ describe('Step1Triage Option C Inversion & A1 Guardrails UI (#357 Slice 4)', () 
     })
   })
 
-  it('renders flush single-line top inversion strip (h-10) and collapses MSFT healthy pass to 1 compact clean row', async () => {
-    const scrollIntoViewMock = vi.fn()
+  it('omits top inversion strip, adds dashed-avg legend, and collapses MSFT healthy compounder (even during AI CapEx wave) to 1 clean row', async () => {
     const msftCleanFacts = {
       metrics: {
         revenue: {
@@ -29,7 +28,7 @@ describe('Step1Triage Option C Inversion & A1 Guardrails UI (#357 Slice 4)', () 
             [2022, 198270000000],
             [2023, 211915000000],
             [2024, 245122000000],
-            [2025, 281724000000],
+            [2025, 281724000000], // +14.9% YoY
           ]),
         },
         grossProfit: { annual: annualSeries([[2025, 194000000000]]) },
@@ -38,7 +37,7 @@ describe('Step1Triage Option C Inversion & A1 Guardrails UI (#357 Slice 4)', () 
             [2022, 83472000000],
             [2023, 88580000000],
             [2024, 109324000000],
-            [2025, 128466000000],
+            [2025, 128466000000], // 45.6% Op Margin -> Rule of 40 = 60.5% >= 40%
           ]),
         },
         netIncome: {
@@ -53,6 +52,13 @@ describe('Step1Triage Option C Inversion & A1 Guardrails UI (#357 Slice 4)', () 
             [2023, 87582000000],
             [2024, 118548000000],
             [2025, 136162000000],
+          ]),
+        },
+        capitalExpenditures: {
+          annual: annualSeries([
+            [2023, 30000000000],
+            [2024, 48000000000],
+            [2025, 80000000000], // Heavy AI CapEx lowers latest FCF margin to ~19.9%
           ]),
         },
         weightedAverageSharesDiluted: {
@@ -73,24 +79,14 @@ describe('Step1Triage Option C Inversion & A1 Guardrails UI (#357 Slice 4)', () 
       />
     )
 
-    const strip = screen.getByTestId('step1-inversion-strip')
-    expect(strip.className).toContain('h-10')
-    expect(strip.className).toContain('whitespace-nowrap')
-    expect(strip.textContent).toContain('0 דגלים אדומים')
-
-    const breakdown = screen.getByTestId('step1-risk-breakdown')
-    breakdown.scrollIntoView = scrollIntoViewMock
-
+    expect(screen.queryByTestId('step1-inversion-strip')).toBeNull()
+    expect(screen.getByTestId('legend-dashed-avg').textContent).toContain('ממוצע רב-שנתי')
     expect(screen.getByTestId('risk-breakdown-clean-pass')).toBeTruthy()
     expect(screen.queryByTestId('risk-tier1-red')).toBeNull()
     expect(screen.queryByTestId('risk-tier2-yellow')).toBeNull()
-
-    fireEvent.click(strip)
-    expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' })
-    expect(breakdown.className).toContain('ring-2')
   })
 
-  it('renders Tier 1 Red flags on AER-like lessor profile with expandable Buffett/Graham quote drawer & EN toggle', async () => {
+  it('uses jargon-free headers on AER, deduplicates Buffett/Graham quotes across flags, and translates cleanly to EN', async () => {
     await setCachedSummary('AER', {
       ticker: 'AER',
       summary: 'אירקאפ מחכירה מטוסים לחברות תעופה ברחבי העולם באמצעות מימון חוב.',
@@ -141,31 +137,34 @@ describe('Step1Triage Option C Inversion & A1 Guardrails UI (#357 Slice 4)', () 
       />
     )
 
-    const strip = screen.getByTestId('step1-inversion-strip')
-    expect(strip.textContent).toContain('דגלים אדומים')
-    expect(strip.className).toContain('rose')
+    expect(screen.queryByTestId('step1-inversion-strip')).toBeNull()
+
+    const breakdown = screen.getByTestId('step1-risk-breakdown')
+    expect(breakdown.textContent).toContain('דגלים אדומים מהותיים')
+    expect(breakdown.textContent).not.toMatch(/Tier 1|Tier 2|אשמה עד שתוכח חפותה/)
 
     const redSection = screen.getByTestId('risk-tier1-red')
     expect(redSection).toBeTruthy()
     expect(screen.getByTestId('inversion-flag-high-leverage-fail')).toBeTruthy()
     expect(screen.getByTestId('inversion-flag-weak-interest-coverage-fail')).toBeTruthy()
 
+    // First flag using leverageZipWallet renders its quote toggle; second flag sharing the exact quote hides the duplicate toggle
     const quoteToggle = screen.getByTestId('quote-toggle-high-leverage-fail')
-    expect(screen.queryByTestId('quote-drawer-high-leverage-fail')).toBeNull()
-    fireEvent.click(quoteToggle)
+    expect(screen.queryByTestId('quote-toggle-weak-interest-coverage-fail')).toBeNull()
 
+    fireEvent.click(quoteToggle)
     const drawer = screen.getByTestId('quote-drawer-high-leverage-fail')
     expect(drawer.textContent).toContain('מכתבי וורן באפט')
     expect(drawer.textContent).toContain('zip up your wallet')
 
     fireEvent.click(screen.getByTestId('lang-btn-en'))
-    expect(screen.getByTestId('step1-inversion-strip').textContent).toContain('Red Flags')
+    expect(breakdown.textContent).toContain('Disqualifying Red Flags')
     expect(screen.getByTestId('quote-drawer-high-leverage-fail').textContent).toContain(
       'Warren Buffett Shareholder Letters'
     )
   })
 
-  it('renders HD Buyback Cannibal calm Slate/Sky guardrail & Green Health Pass without false Red fail', async () => {
+  it('renders HD Buyback Cannibal (Net Debt/FCF 3.5x <= 4.0x) with subtle inline info icon on balance-sheet card and full bottom context', async () => {
     await setCachedSummary('HD', {
       ticker: 'HD',
       summary: 'הום דיפו מפעילה רשת חנויות לשיפוץ הבית.',
@@ -207,14 +206,14 @@ describe('Step1Triage Option C Inversion & A1 Guardrails UI (#357 Slice 4)', () 
             [2025, 21000000000],
           ]),
         },
-        capitalExpenditures: { annual: annualSeries([[2025, 3200000000]]) },
+        capitalExpenditures: { annual: annualSeries([[2025, 3200000000]]) }, // FCF = 17.8B
         interestExpense: { annual: annualSeries([[2025, 1690000000]]) }, // 14.2x
-        totalAssets: { annual: annualSeries([[2025, 76000000000]]) },
+        totalAssets: { annual: annualSeries([[2025, 96000000000]]) },
         stockholdersEquity: { annual: annualSeries([[2025, -1500000000]]) },
         retainedEarnings: { annual: annualSeries([[2025, 78000000000]]) },
         treasuryStock: { annual: annualSeries([[2025, -82000000000]]) },
-        totalDebt: { annual: annualSeries([[2025, 42000000000]]) },
-        cash: { annual: annualSeries([[2025, 3500000000]]) },
+        totalDebt: { annual: annualSeries([[2025, 65800000000]]) },
+        cash: { annual: annualSeries([[2025, 3500000000]]) }, // Net Debt = 62.3B -> 3.50x FCF <= 4.0x
         currentAssets: { annual: annualSeries([[2025, 31000000000]]) },
         currentLiabilities: { annual: annualSeries([[2025, 19500000000]]) },
       },
@@ -229,21 +228,24 @@ describe('Step1Triage Option C Inversion & A1 Guardrails UI (#357 Slice 4)', () 
 
     expect(screen.queryByTestId('risk-tier1-red')).toBeNull()
     expect(screen.getByTestId('risk-breakdown-clean-pass')).toBeTruthy()
-    expect(screen.getByTestId('buyback-cannibal-sound-badge').textContent).toContain('מאזן יציב')
+    expect(screen.queryByTestId('guardrail-pill-buyback')).toBeNull()
 
-    const buybackPill = screen.getByTestId('guardrail-pill-buyback')
-    expect(buybackPill.textContent).toContain('ℹ️ הון שלילי מרכישה עצמית — תקין')
-    expect(buybackPill.className).toContain('sky-')
+    const sublabel = screen.getByTestId('balance-sheet-reported-sublabel')
+    expect(sublabel.textContent).toContain('מאזן יציב')
 
-    fireEvent.click(buybackPill)
+    const infoIconBtn = screen.getByTestId('guardrail-info-buyback')
+    expect(sublabel.contains(infoIconBtn)).toBe(true)
+
+    fireEvent.click(infoIconBtn)
     const sheet = await screen.findByTestId('tooltip-portal-sheet')
+    expect(sheet.textContent).toContain('ℹ️ הון שלילי מרכישה עצמית — תקין')
     expect(sheet.textContent).toContain('לקנות בחזרה מניות של עצמה')
 
     expect(screen.getByTestId('risk-tier3-context')).toBeTruthy()
     expect(screen.getByTestId('inversion-flag-a1-buyback-cannibal')).toBeTruthy()
   })
 
-  it('renders ADBE SaaS deferred revenue 1.7x (מתואם) + מדווח: 0.9x and calm Slate/Sky pill', async () => {
+  it('renders ADBE SaaS deferred revenue 1.7x (מתואם) + מדווח: 0.9x with inline info icon on same height line', async () => {
     await setCachedSummary('ADBE', {
       ticker: 'ADBE',
       summary: 'אדובי מספקת תוכנות ענן ליצירה ומסמכים.',
@@ -287,14 +289,17 @@ describe('Step1Triage Option C Inversion & A1 Guardrails UI (#357 Slice 4)', () 
     const balanceCard = screen.getByTestId('fundamental-card-balance-sheet')
     expect(balanceCard.getAttribute('data-status')).toBe('pass')
     expect(balanceCard.textContent).toContain('1.7x (מתואם)')
-    expect(screen.getByTestId('balance-sheet-reported-sublabel').textContent).toContain('מדווח: 0.9x')
+    expect(screen.queryByTestId('guardrail-pill-saas')).toBeNull()
 
-    const saasPill = screen.getByTestId('guardrail-pill-saas')
-    expect(saasPill.textContent).toContain('ℹ️ תשלומי מנויים מראש — לא חוב')
+    const sublabel = screen.getByTestId('balance-sheet-reported-sublabel')
+    expect(sublabel.textContent).toContain('מדווח: 0.9x')
+    const saasInfoBtn = screen.getByTestId('guardrail-info-saas')
+    expect(sublabel.contains(saasInfoBtn)).toBe(true)
+
     expect(screen.getByTestId('inversion-flag-a1-saas-deferred-revenue')).toBeTruthy()
   })
 
-  it('caps Tier 2 Yellow warnings at 3 visible items with interactive +N expand toggle', async () => {
+  it('caps watch warnings at 3 visible items with interactive +N expand toggle and clean heading', async () => {
     await setCachedSummary('MULTIWARN', {
       ticker: 'MULTIWARN',
       summary: 'חברה עתירת אזהרות למעקב.',
@@ -371,6 +376,8 @@ describe('Step1Triage Option C Inversion & A1 Guardrails UI (#357 Slice 4)', () 
     )
 
     const yellowContainer = await screen.findByTestId('risk-tier2-yellow')
+    expect(yellowContainer.textContent).toContain('נקודות למעקב')
+    expect(yellowContainer.textContent).not.toContain('Tier 2')
     expect(yellowContainer.querySelectorAll('[data-severity="yellow"]')).toHaveLength(3)
 
     const expandBtn = screen.getByTestId('risk-yellow-expand-btn')

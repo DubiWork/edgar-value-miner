@@ -170,12 +170,14 @@ describe('Step1Triage Component', () => {
     expect(balanceCard.textContent).toContain('יחס שוטף תקין ובטוח')
     expect(balanceCard.textContent).toContain('נכסים שוטפים מכסים בנוחות התחייבויות קרובות')
 
-    // Verify Dedicated Status Legend in Hebrew (#364)
+    // Verify Dedicated Status Legend in Hebrew including multi-year dashed avg (#364, #357)
     const legendHe = screen.getByTestId('fundamentals-status-legend')
     expect(legendHe.textContent).toContain('ירוק — תקין')
     expect(legendHe.textContent).toContain('צהוב — אזהרה / למעקב')
     expect(legendHe.textContent).toContain('אדום — דגל אדום')
     expect(legendHe.textContent).toContain('אפור — חסר מידע')
+    expect(legendHe.textContent).toContain('ממוצע רב-שנתי')
+    expect(screen.getByTestId('legend-dashed-avg')).toBeTruthy()
 
     const bdiNodes = revCard.querySelectorAll('bdi[dir="ltr"]')
     expect(bdiNodes.length).toBeGreaterThan(0)
@@ -190,6 +192,7 @@ describe('Step1Triage Component', () => {
     expect(legendEn.textContent).toContain('Yellow — Caution / Watch')
     expect(legendEn.textContent).toContain('Red — Red Flag')
     expect(legendEn.textContent).toContain('Gray — No SEC Data')
+    expect(legendEn.textContent).toContain('Multi-year avg')
     expect(screen.getByText('Revenue Growth', { selector: 'h4' })).toBeTruthy()
     expect(screen.getByText('Operating Margins', { selector: 'h4' })).toBeTruthy()
     expect(screen.getByText('Share Dilution', { selector: 'h4' })).toBeTruthy()
