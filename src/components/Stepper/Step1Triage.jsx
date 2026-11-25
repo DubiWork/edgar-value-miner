@@ -624,16 +624,24 @@ ResponsiveTooltip.propTypes = {
   wrapperClass: PropTypes.string,
 }
 
+const TOOLTIP_TONE_DOT_MAP = {
+  pass: 'bg-emerald-400',
+  warn: 'bg-amber-400',
+  fail: 'bg-rose-400',
+}
+
 /**
  * InfoTooltip Component
  * Subtle info ("i") icon with a viewport-safe dark tooltip bubble on hover, focus, or tap.
+ * Supports either plain `text` or structured `content` ({ title, description, thresholds }).
  */
-function InfoTooltip({ text, align = 'center', dir = 'rtl' }) {
+function InfoTooltip({ text = '', content = null, align = 'center', dir = 'rtl' }) {
+  const isRtl = dir === 'rtl'
   return (
     <ResponsiveTooltip
       placement="top"
       align={align}
-      widthClass="lg:w-72"
+      widthClass={content ? 'lg:w-80' : 'lg:w-72'}
       dir={dir}
       showArrow
       trigger={({ isOpen, onToggle }) => (
@@ -658,13 +666,58 @@ function InfoTooltip({ text, align = 'center', dir = 'rtl' }) {
         </button>
       )}
     >
-      <BidiText text={text} isRtl={dir === 'rtl'} />
+      {content ? (
+        <div className="space-y-2">
+          {content.title && (
+            <div className="font-bold text-sky-300 border-b border-slate-700/70 pb-1.5">
+              <BidiText text={content.title} isRtl={isRtl} />
+            </div>
+          )}
+          {content.description && (
+            <div className="leading-relaxed text-slate-200">
+              <BidiText text={content.description} isRtl={isRtl} />
+            </div>
+          )}
+          {Array.isArray(content.thresholds) && content.thresholds.length > 0 && (
+            <div className="pt-1.5 border-t border-slate-700/60 space-y-1">
+              {content.thresholds.map((row, idx) => (
+                <div
+                  key={`${row.tone}-${idx}`}
+                  className="flex items-start gap-2 text-[11px] leading-snug text-slate-200"
+                >
+                  <span
+                    className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
+                      TOOLTIP_TONE_DOT_MAP[row.tone] || 'bg-slate-400'
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span className="flex-1">
+                    <BidiText text={row.label} isRtl={isRtl} />
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <BidiText text={text} isRtl={isRtl} />
+      )}
     </ResponsiveTooltip>
   )
 }
 
 InfoTooltip.propTypes = {
-  text: PropTypes.string.isRequired,
+  text: PropTypes.string,
+  content: PropTypes.shape({
+    title: PropTypes.string,
+    description: PropTypes.string.isRequired,
+    thresholds: PropTypes.arrayOf(
+      PropTypes.shape({
+        tone: PropTypes.oneOf(['pass', 'warn', 'fail']).isRequired,
+        label: PropTypes.string.isRequired,
+      })
+    ),
+  }),
   align: PropTypes.oneOf(['left', 'right', 'start', 'end', 'center']),
   dir: PropTypes.oneOf(['rtl', 'ltr']),
 }
@@ -937,10 +990,26 @@ export function Step1Triage({
       sparkline: triageData.revenue.sparkline,
       sparklineUnit: triageData.revenue.sparklineUnit || '$M',
       historyMeta: triageData.revenue.historyMeta,
-      tooltip:
-        'צמיחה בהכנסות: עסק בריא מגדיל את המכירות שלו לאורך זמן. המספר המרכזי מציג את השינוי בשנה האחרונה (YoY — שנה מול שנה), והסיכום למטה מציג את קצב הצמיחה השנתי הממוצע (CAGR) ל-5 שנים ולטווח המלא (עד 15 שנה בגרף). ירוק = צמיחה עקבית וחיובית; צהוב = צמיחה איטית (מתחת ל-5%), מחזוריות או האטה חדה; אדום = התכווצות (3+ שנות ירידה רצופות או מגמת ירידה שלילית).',
-      tooltipEn:
-        'Revenue Growth: Healthy businesses expand sales over time. The headline shows the latest annual change (YoY), while the summary tracks multi-year compound growth (CAGR) across up to 15 years. Green = steady positive growth; Yellow = slow (<5%), cyclical dips, or sharp deceleration; Red = 3+ consecutive down years or declining trend.',
+      tooltipContent: {
+        title: 'צמיחה בהכנסות (Revenue Growth)',
+        description:
+          'עסק בריא מגדיל את המכירות שלו לאורך זמן. המספר המרכזי מציג את השינוי בשנה האחרונה (YoY — שנה מול שנה), והסיכום למטה מציג את קצב הצמיחה השנתי הממוצע (CAGR) ל-5 שנים ולטווח המלא (עד 15 שנה בגרף).',
+        thresholds: [
+          { tone: 'pass', label: 'ירוק: צמיחה עקבית וחיובית במכירות' },
+          { tone: 'warn', label: 'צהוב: צמיחה איטית (מתחת ל-5%), מחזוריות או האטה חדה' },
+          { tone: 'fail', label: 'אדום: התכווצות (3+ שנות ירידה רצופות או מגמת ירידה שלילית)' },
+        ],
+      },
+      tooltipContentEn: {
+        title: 'Revenue Growth',
+        description:
+          'Healthy businesses expand sales over time. The headline shows the latest annual change (YoY), while the summary tracks multi-year compound growth (CAGR) across up to 15 years.',
+        thresholds: [
+          { tone: 'pass', label: 'Green: Steady positive top-line growth' },
+          { tone: 'warn', label: 'Yellow: Slow (<5%), cyclical dips, or sharp deceleration' },
+          { tone: 'fail', label: 'Red: 3+ consecutive down years or declining trend' },
+        ],
+      },
       tooltipAlign: 'start',
       icon: TrendingUp,
     },
@@ -962,10 +1031,26 @@ export function Step1Triage({
       sparkline: triageData.margins.sparkline,
       sparklineUnit: triageData.margins.sparklineUnit || '%',
       historyMeta: triageData.margins.historyMeta,
-      tooltip:
-        'שולי רווח תפעולי: כמה אחוזים מכל שקל או דולר מכירות נשארים כרווח מפעילות העסק לפני מס וריבית — מדד ישיר ליעילות ולכוח תמחור. הקו המקווקו בגרף מסמן את הממוצע הרב-שנתי (לזיהוי מחזוריות לפי גישת "המשקיע הנבון" ובאפט). ירוק = שוליים יציבים מעל 10% (מעל 25% = גבוהים ויציבים); צהוב = מעל 10% אך תנודתיים (פער של מעל 20 נק׳ אחוז או ירידה חדה); אדום = הפסד בשנה האחרונה, מתחת ל-10%, או שנת הפסד בהיסטוריה.',
-      tooltipEn:
-        'Operating Margins: Percentage of revenue kept as operating profit before interest and taxes—a direct gauge of efficiency and pricing power. The dashed line marks the multi-year average. Green = stable >= 10% (>= 25% high & stable); Yellow = >= 10% but cyclical/volatile (>20pp spread or >=10pp drop); Red = negative latest margin, < 10%, or any historical loss year.',
+      tooltipContent: {
+        title: 'שולי רווח תפעולי (Operating Margins)',
+        description:
+          'כמה אחוזים מכל שקל או דולר מכירות נשארים כרווח מפעילות העסק לפני מס וריבית — מדד ישיר ליעילות ולכוח תמחור. הקו המקווקו בגרף מסמן את הממוצע הרב-שנתי לזיהוי מחזוריות לאורך זמן.',
+        thresholds: [
+          { tone: 'pass', label: 'ירוק: שוליים יציבים או מתרחבים מעל 10% (מעל 25% = גבוהים ויציבים)' },
+          { tone: 'warn', label: 'צהוב: מעל 10% אך תנודתיים או מחזוריים (נפילה חדה משיא לשפל)' },
+          { tone: 'fail', label: 'אדום: הפסד בשנה האחרונה, מתחת ל-10%, או שנת הפסד בהיסטוריה' },
+        ],
+      },
+      tooltipContentEn: {
+        title: 'Operating Margins',
+        description:
+          'Percentage of revenue kept as operating profit before interest and taxes—a direct gauge of efficiency and pricing power. The dashed line marks the multi-year average to spot cyclical swings.',
+        thresholds: [
+          { tone: 'pass', label: 'Green: Stable or expanding >= 10% (>= 25% = high & stable)' },
+          { tone: 'warn', label: 'Yellow: >= 10% but cyclical or sharp peak-to-trough drawdown' },
+          { tone: 'fail', label: 'Red: Negative latest margin, < 10%, or any historical loss year' },
+        ],
+      },
       tooltipAlign: 'start',
       icon: Percent,
     },
@@ -990,10 +1075,26 @@ export function Step1Triage({
       sparkline: triageData.shares.sparkline,
       sparklineUnit: triageData.shares.sparklineUnit || 'sharesM',
       historyMeta: triageData.shares.historyMeta,
-      tooltip:
-        'דילול מניות ורכישה עצמית (Buybacks): כשחברה מנפיקה מניות חדשות, חלקנו בעוגה קטן (דילול); כשהיא רוכשת מניות חזרה מהשוק (Buybacks) ומבטלת אותן, חלקו של כל משקיע גדל. הבדיקה מודדת את השינוי בכמות המניות בשנה האחרונה לצד המגמה הרב-שנתית. ירוק = ירידה בכמות המניות או יציבות (עד +0.2%); צהוב = דילול מתון (+0.2% עד +3.0% בשנה); אדום = דילול אגרסיבי (מעל +3.0% בשנה).',
-      tooltipEn:
-        'Share Dilution & Buybacks: Issuing new shares shrinks your ownership slice; buying back and retiring shares (Buybacks) increases it. Evaluates latest-year share change alongside multi-year trend. Green = shrinking or flat (<= +0.2%); Yellow = moderate dilution (+0.2% to +3.0%/yr); Red = aggressive dilution (> +3.0%/yr).',
+      tooltipContent: {
+        title: 'דילול מניות ורכישה עצמית (Buybacks)',
+        description:
+          'כשחברה מנפיקה מניות חדשות, חלקנו בעוגה קטן (דילול); כשהיא רוכשת מניות חזרה מהשוק (Buybacks) ומבטלת אותן, חלקו של כל משקיע גדל. הבדיקה מודדת את השינוי בכמות המניות בשנה האחרונה לצד המגמה הרב-שנתית.',
+        thresholds: [
+          { tone: 'pass', label: 'ירוק: ירידה בכמות המניות או יציבות (עד +0.2%)' },
+          { tone: 'warn', label: 'צהוב: דילול מתון (+0.3% עד +3.0% בשנה)' },
+          { tone: 'fail', label: 'אדום: דילול אגרסיבי (מעל +3.0% בשנה)' },
+        ],
+      },
+      tooltipContentEn: {
+        title: 'Share Dilution & Buybacks',
+        description:
+          'Issuing new shares shrinks your ownership slice; buying back and retiring shares (Buybacks) increases it. Evaluates latest-year share change alongside the multi-year trend.',
+        thresholds: [
+          { tone: 'pass', label: 'Green: Shrinking or flat share count (<= +0.2%)' },
+          { tone: 'warn', label: 'Yellow: Moderate dilution (+0.3% to +3.0% / yr)' },
+          { tone: 'fail', label: 'Red: Aggressive dilution (> +3.0% / yr)' },
+        ],
+      },
       tooltipAlign: 'end',
       icon: Coins,
     },
@@ -1015,10 +1116,26 @@ export function Step1Triage({
       sparkline: triageData.currentRatio.sparkline,
       sparklineUnit: triageData.currentRatio.sparklineUnit || 'x',
       historyMeta: triageData.currentRatio.historyMeta,
-      tooltip:
-        'יחס שוטף (Current Ratio): היחס בין הנכסים השוטפים (מזומן, לקוחות, מלאי) להתחייבויות השוטפות שיש לשלם ב-12 החודשים הקרובים — מרווח הביטחון של העסק לטווח קצר. ירוק = 1.5x ומעלה (מרווח ביטחון בריא); צהוב = גבולי (1.0x–1.5x); אדום = מתחת ל-1.0x (ההתחייבויות הקרובות עולות על הנכסים הנזילים).',
-      tooltipEn:
-        'Current Ratio: Short-term assets divided by liabilities due within 12 months—your near-term solvency cushion. Green = >= 1.5x (comfortable safety margin); Yellow = 1.0x–1.5x (borderline buffer); Red = < 1.0x (near-term liabilities exceed liquid assets).',
+      tooltipContent: {
+        title: 'יחס שוטף / נזילות (Current Ratio)',
+        description:
+          'היחס בין הנכסים השוטפים (מזומן, לקוחות, מלאי) להתחייבויות השוטפות שיש לשלם ב-12 החודשים הקרובים — מרווח הביטחון של העסק לטווח קצר.',
+        thresholds: [
+          { tone: 'pass', label: 'ירוק: 1.5x ומעלה (מרווח ביטחון בריא)' },
+          { tone: 'warn', label: 'צהוב: גבולי (1.0x–1.5x)' },
+          { tone: 'fail', label: 'אדום: מתחת ל-1.0x (ההתחייבויות הקרובות עולות על הנכסים הנזילים)' },
+        ],
+      },
+      tooltipContentEn: {
+        title: 'Current Ratio',
+        description:
+          'Short-term assets divided by liabilities due within 12 months—your near-term solvency cushion.',
+        thresholds: [
+          { tone: 'pass', label: 'Green: >= 1.5x (comfortable safety margin)' },
+          { tone: 'warn', label: 'Yellow: 1.0x–1.5x (borderline buffer)' },
+          { tone: 'fail', label: 'Red: < 1.0x (near-term liabilities exceed liquid assets)' },
+        ],
+      },
       tooltipAlign: 'end',
       icon: ShieldCheck,
     },
@@ -2082,7 +2199,7 @@ export function Step1Triage({
 
       {/* SECTION 2: Fast Fundamentals Indicators (4 Grid Cards with Sparklines) */}
       <div dir={lang === 'he' ? 'rtl' : 'ltr'}>
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white">
               {lang === 'he'
@@ -2102,6 +2219,32 @@ export function Step1Triage({
             <CheckCircle2 className="w-3.5 h-3.5" />
             {summaryBadgeLabel}
           </div>
+        </div>
+
+        {/* Status Legend */}
+        <div
+          data-testid="fundamentals-status-legend"
+          className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-4 px-3 py-2 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 text-xs text-slate-700 dark:text-slate-300"
+        >
+          {(lang === 'he'
+            ? [
+                { key: 'pass', dot: 'bg-emerald-500 dark:bg-emerald-400', label: 'ירוק — תקין' },
+                { key: 'warn', dot: 'bg-amber-500 dark:bg-amber-400', label: 'צהוב — אזהרה / למעקב' },
+                { key: 'fail', dot: 'bg-rose-500 dark:bg-rose-400', label: 'אדום — דגל אדום' },
+                { key: 'unavailable', dot: 'bg-slate-400 dark:bg-slate-500', label: 'אפור — חסר מידע' },
+              ]
+            : [
+                { key: 'pass', dot: 'bg-emerald-500 dark:bg-emerald-400', label: 'Green — Pass' },
+                { key: 'warn', dot: 'bg-amber-500 dark:bg-amber-400', label: 'Yellow — Caution / Watch' },
+                { key: 'fail', dot: 'bg-rose-500 dark:bg-rose-400', label: 'Red — Red Flag' },
+                { key: 'unavailable', dot: 'bg-slate-400 dark:bg-slate-500', label: 'Gray — No SEC Data' },
+              ]
+          ).map((item) => (
+            <span key={item.key} className="inline-flex items-center gap-1.5 font-medium">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${item.dot}`} aria-hidden="true" />
+              <span>{item.label}</span>
+            </span>
+          ))}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2142,6 +2285,11 @@ export function Step1Triage({
                       {lang === 'he' ? indicator.titleHe : indicator.title}
                     </h4>
                     <InfoTooltip
+                      content={
+                        lang === 'he'
+                          ? indicator.tooltipContent
+                          : indicator.tooltipContentEn || indicator.tooltipContent
+                      }
                       text={lang === 'he' ? indicator.tooltip : indicator.tooltipEn || indicator.tooltip}
                       align={indicator.tooltipAlign}
                       dir={lang === 'he' ? 'rtl' : 'ltr'}
