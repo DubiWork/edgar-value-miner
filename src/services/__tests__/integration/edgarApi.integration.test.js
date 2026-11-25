@@ -514,7 +514,7 @@ describe.skip('SEC EDGAR API Integration Tests', () => {
 
       // Metadata completeness
       expect(normalized.metadata.metricsFound).toBeGreaterThan(10);
-      expect(normalized.metadata.normalizationVersion).toBe(1);
+      expect(normalized.metadata.normalizationVersion).toBe(3);
       expect(normalized.metadata.currency).toBe('USD');
       expect(normalized.metadata.normalizedAt).toBeTruthy();
 

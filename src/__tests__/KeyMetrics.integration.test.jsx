@@ -564,7 +564,7 @@ describe('Key Metrics Integration Tests', () => {
             tag: 'GrossProfit',
           },
         },
-        metadata: { normalizationVersion: 1, metricsFound: 4, missingMetrics: [] },
+        metadata: { normalizationVersion: 3, metricsFound: 4, missingMetrics: [] },
       };
 
       setHookState({ data: singleYearData });

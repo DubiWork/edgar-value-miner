@@ -52,6 +52,7 @@ export interface CacheWriterResult {
   ticker: string;
   latestFiledDate: string | null;
   updated: boolean;
+  skippedReason?: 'too_large';
 }
 
 const DEFAULT_ADMIN_EMAILS = ['dubigreenfeld@gmail.com'];
@@ -127,14 +128,8 @@ async function resolveCikFromTicker(ticker: string): Promise<number> {
   return cik;
 }
 
-function assertBlobSize(companyFacts: Record<string, unknown>): void {
-  const blobBytes = Buffer.byteLength(JSON.stringify(companyFacts), 'utf8');
-  if (blobBytes > MAX_BLOB_BYTES) {
-    throw new HttpsError(
-      'resource-exhausted',
-      `companyFacts blob too large for Firestore (${blobBytes} bytes)`
-    );
-  }
+function isBlobTooLarge(companyFacts: Record<string, unknown>): boolean {
+  return Buffer.byteLength(JSON.stringify(companyFacts), 'utf8') > MAX_BLOB_BYTES;
 }
 
 function isStale(lastUpdated: Timestamp | null): boolean {
@@ -151,7 +146,6 @@ function buildDocPayload(
   latestFiledDate: string | null,
   accessCount = 0
 ) {
-  assertBlobSize(companyFacts);
   return {
     ticker,
     cik: paddedCik,
@@ -226,6 +220,7 @@ export async function cacheWriterHandler(
       ? (companyFacts as any).entityName.trim()
       : ticker;
 
+  let accessCount = 0;
   if (snap.exists) {
     const docData = snap.data() ?? {};
     const storedLatestFiledDate = typeof docData.latestFiledDate === 'string' ? docData.latestFiledDate : null;
@@ -242,18 +237,24 @@ export async function cacheWriterHandler(
       return { ticker, latestFiledDate: storedLatestFiledDate, updated: false };
     }
 
-    // Document exists and either new filing arrived or admin requested forceRefresh: overwrite full document
-    const accessCount = typeof docData.accessCount === 'number' ? docData.accessCount : 0;
-    await docRef.set(
-      buildDocPayload(ticker, paddedCik, companyName, companyFacts, newLatestFiledDate, accessCount)
-    );
-
-    return { ticker, latestFiledDate: newLatestFiledDate, updated: true };
+    if (typeof docData.accessCount === 'number') {
+      accessCount = docData.accessCount;
+    }
   }
 
-  // Document does not exist: fresh fetch
+  // Blobs exceeding Firestore's safe threshold skip caching cleanly instead of throwing 429
+  if (isBlobTooLarge(companyFacts)) {
+    return {
+      ticker,
+      latestFiledDate: newLatestFiledDate,
+      updated: false,
+      skippedReason: 'too_large',
+    };
+  }
+
+  // Write new document or overwrite existing document on new filing / admin forceRefresh
   await docRef.set(
-    buildDocPayload(ticker, paddedCik, companyName, companyFacts, newLatestFiledDate, 0)
+    buildDocPayload(ticker, paddedCik, companyName, companyFacts, newLatestFiledDate, accessCount)
   );
 
   return { ticker, latestFiledDate: newLatestFiledDate, updated: true };

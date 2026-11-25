@@ -403,42 +403,47 @@ async function _getCompanyDataInternal(normalizedTicker, options) {
       devLog('log', `Admin global refresh for ${normalizedTicker}: invoking cacheWriter(forceRefresh=true)`);
       const functions = getFunctions(app);
       const cacheWriter = httpsCallable(functions, 'cacheWriter');
-      await cacheWriter({ ticker: normalizedTicker, forceRefresh: true });
+      const cwRes = await cacheWriter({ ticker: normalizedTicker, forceRefresh: true });
+      const cwData = cwRes?.data ?? cwRes;
 
-      const freshDoc = await withTimeout(
-        firestoreCache.getCompanyFactsFromFirestore(normalizedTicker),
-        COORDINATOR_CONFIG.FIRESTORE_TIMEOUT_MS,
-        'Firestore re-read after admin cacheWriter'
-      );
+      if (cwData?.skippedReason === 'too_large') {
+        devLog('log', `Admin cacheWriter skipped Firestore write for ${normalizedTicker} (too_large), falling back to direct SEC fetch`);
+      } else {
+        const freshDoc = await withTimeout(
+          firestoreCache.getCompanyFactsFromFirestore(normalizedTicker),
+          COORDINATOR_CONFIG.FIRESTORE_TIMEOUT_MS,
+          'Firestore re-read after admin cacheWriter'
+        );
 
-      const freshBlob = freshDoc?.companyFacts || freshDoc?.data;
-      if (freshDoc && freshBlob) {
-        const normalized = normalizeCompanyFacts(freshBlob, { fullHistory: true });
-        const cik = freshDoc.cik || '';
+        const freshBlob = freshDoc?.companyFacts || freshDoc?.data;
+        if (freshDoc && freshBlob) {
+          const normalized = normalizeCompanyFacts(freshBlob, { fullHistory: true });
+          const cik = freshDoc.cik || '';
 
-        try {
-          await edgarCache.setCompanyFacts(normalizedTicker, normalized, cik);
-        } catch (err) {
-          devLog('warn', 'Failed to save to IndexedDB after admin cacheWriter', err.message);
+          try {
+            await edgarCache.setCompanyFacts(normalizedTicker, normalized, cik);
+          } catch (err) {
+            devLog('warn', 'Failed to save to IndexedDB after admin cacheWriter', err.message);
+          }
+
+          return {
+            success: true,
+            data: {
+              ticker: normalizedTicker,
+              cik,
+              companyName: normalized.companyName || normalized.entityName || freshDoc.companyName || '',
+              companyFacts: normalized,
+            },
+            metadata: includeMetadata ? {
+              source: CACHE_SOURCES.FIRESTORE,
+              cacheHit: false,
+              needsRefresh: false,
+              lastUpdated: freshDoc.lastUpdated || new Date(),
+              costSaved: 0,
+            } : null,
+            error: null,
+          };
         }
-
-        return {
-          success: true,
-          data: {
-            ticker: normalizedTicker,
-            cik,
-            companyName: normalized.companyName || normalized.entityName || freshDoc.companyName || '',
-            companyFacts: normalized,
-          },
-          metadata: includeMetadata ? {
-            source: CACHE_SOURCES.FIRESTORE,
-            cacheHit: false,
-            needsRefresh: false,
-            lastUpdated: freshDoc.lastUpdated || new Date(),
-            costSaved: 0,
-          } : null,
-          error: null,
-        };
       }
     } catch (adminRefreshErr) {
       devLog(
@@ -566,47 +571,52 @@ async function _getCompanyDataInternal(normalizedTicker, options) {
 
         const functions = getFunctions(app);
         const cacheWriter = httpsCallable(functions, 'cacheWriter');
-        await cacheWriter({ ticker: normalizedTicker });
+        const cwRes = await cacheWriter({ ticker: normalizedTicker });
+        const cwData = cwRes?.data ?? cwRes;
 
-        // Re-read newly written raw doc from Firestore
-        const freshDoc = await withTimeout(
-          firestoreCache.getCompanyFactsFromFirestore(normalizedTicker),
-          COORDINATOR_CONFIG.FIRESTORE_TIMEOUT_MS,
-          'Firestore re-read after cacheWriter'
-        );
+        if (cwData?.skippedReason === 'too_large') {
+          devLog('log', `cacheWriter skipped Firestore write for ${normalizedTicker} (too_large), falling back to direct SEC fetch`);
+        } else {
+          // Re-read newly written raw doc from Firestore
+          const freshDoc = await withTimeout(
+            firestoreCache.getCompanyFactsFromFirestore(normalizedTicker),
+            COORDINATOR_CONFIG.FIRESTORE_TIMEOUT_MS,
+            'Firestore re-read after cacheWriter'
+          );
 
-        const freshBlob = freshDoc?.companyFacts || freshDoc?.data;
-        if (freshDoc && freshBlob) {
-          const normalized = normalizeCompanyFacts(freshBlob, { fullHistory: true });
-          const cik = freshDoc.cik || '';
+          const freshBlob = freshDoc?.companyFacts || freshDoc?.data;
+          if (freshDoc && freshBlob) {
+            const normalized = normalizeCompanyFacts(freshBlob, { fullHistory: true });
+            const cik = freshDoc.cik || '';
 
-          try {
-            await edgarCache.setCompanyFacts(
-              normalizedTicker,
-              normalized,
-              cik
-            );
-          } catch (err) {
-            devLog('warn', 'Failed to save to IndexedDB after cacheWriter', err.message);
+            try {
+              await edgarCache.setCompanyFacts(
+                normalizedTicker,
+                normalized,
+                cik
+              );
+            } catch (err) {
+              devLog('warn', 'Failed to save to IndexedDB after cacheWriter', err.message);
+            }
+
+            return {
+              success: true,
+              data: {
+                ticker: normalizedTicker,
+                cik,
+                companyName: normalized.companyName || normalized.entityName || freshDoc.companyName || '',
+                companyFacts: normalized,
+              },
+              metadata: includeMetadata ? {
+                source: CACHE_SOURCES.FIRESTORE,
+                cacheHit: false,
+                needsRefresh: false,
+                lastUpdated: freshDoc.lastUpdated || new Date(),
+                costSaved: COORDINATOR_CONFIG.COST_PER_SEC_LOOKUP,
+              } : null,
+              error: null,
+            };
           }
-
-          return {
-            success: true,
-            data: {
-              ticker: normalizedTicker,
-              cik,
-              companyName: normalized.companyName || normalized.entityName || freshDoc.companyName || '',
-              companyFacts: normalized,
-            },
-            metadata: includeMetadata ? {
-              source: CACHE_SOURCES.FIRESTORE,
-              cacheHit: false,
-              needsRefresh: false,
-              lastUpdated: freshDoc.lastUpdated || new Date(),
-              costSaved: COORDINATOR_CONFIG.COST_PER_SEC_LOOKUP,
-            } : null,
-            error: null,
-          };
         }
       } catch (cwError) {
         devLog('warn', `cacheWriter or Firestore re-read failed for ${normalizedTicker}, falling back to direct SEC fetch`, cwError.message);

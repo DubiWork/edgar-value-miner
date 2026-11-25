@@ -38,6 +38,7 @@ Complete these updates **proactively in every PR** without asking or waiting to 
 5. **Work-Time Tracking (`⏱️ Time Log`):**
    - Fill out the `## ⏱️ Time Log` table in `.github/pull_request_template.md` with session start timestamp, PR ready/update timestamp, active dev duration (minutes/hours), and calendar lead time.
    - Update the parent **Epic issue** checklist and `⏱️ Time & Cycle Log` table whenever a child PR is opened, updated, or merged.
+   - Maintain **GitHub Project `#5`** status and date fields: set **`Start date`** (`YYYY-MM-DD`) when moving any issue or epic to `In Progress`, set **`Target date`** (`YYYY-MM-DD`) as the end date when marking it `Done` or closing it, and keep inactive/untouched epics and issues in `Backlog` so `In Progress` and `In Review` reflect active work only.
 
 ---
 

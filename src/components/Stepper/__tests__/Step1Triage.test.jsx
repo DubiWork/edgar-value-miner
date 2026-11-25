@@ -1,7 +1,66 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { Step1Triage } from '../Step1Triage'
+import { Step1Triage, tokenizeBidiText } from '../Step1Triage'
 import { setCachedSummary } from '../../../services/aiSummaryService.js'
+
+const mockMsftFacts = {
+  metrics: {
+    revenue: {
+      annual: [
+        { fiscalYear: 2015, value: 93580000000 },
+        { fiscalYear: 2016, value: 95000000000 },
+        { fiscalYear: 2017, value: 98000000000 },
+        { fiscalYear: 2018, value: 110360000000 },
+        { fiscalYear: 2019, value: 125843000000 },
+        { fiscalYear: 2020, value: 143015000000 },
+        { fiscalYear: 2021, value: 168088000000 },
+        { fiscalYear: 2022, value: 198270000000 },
+        { fiscalYear: 2023, value: 211915000000 },
+        { fiscalYear: 2024, value: 245120000000 },
+      ],
+    },
+    operatingIncome: {
+      annual: [
+        { fiscalYear: 2015, value: 32753000000 }, // 35.0%
+        { fiscalYear: 2016, value: 33250000000 }, // 35.0%
+        { fiscalYear: 2017, value: 34300000000 }, // 35.0%
+        { fiscalYear: 2018, value: 38626000000 }, // 35.0%
+        { fiscalYear: 2019, value: 44045000000 }, // 35.0%
+        { fiscalYear: 2020, value: 52959000000 }, // 37.0%
+        { fiscalYear: 2021, value: 69916000000 }, // 41.6%
+        { fiscalYear: 2022, value: 83383000000 }, // 42.1%
+        { fiscalYear: 2023, value: 88523000000 }, // 41.8%
+        { fiscalYear: 2024, value: 109433000000 }, // 44.6% (spread 9.6pp, steady pass)
+      ],
+    },
+    weightedAverageSharesDiluted: {
+      annual: [
+        { fiscalYear: 2015, value: 8027000000 },
+        { fiscalYear: 2016, value: 7808000000 },
+        { fiscalYear: 2017, value: 7708000000 },
+        { fiscalYear: 2018, value: 7677000000 },
+        { fiscalYear: 2019, value: 7643000000 },
+        { fiscalYear: 2020, value: 7571000000 },
+        { fiscalYear: 2021, value: 7547000000 },
+        { fiscalYear: 2022, value: 7464000000 },
+        { fiscalYear: 2023, value: 7440000000 },
+        { fiscalYear: 2024, value: 7430000000 },
+      ],
+    },
+    currentAssets: {
+      annual: [
+        { fiscalYear: 2023, value: 184257000000 },
+        { fiscalYear: 2024, value: 180000000000 },
+      ],
+    },
+    currentLiabilities: {
+      annual: [
+        { fiscalYear: 2023, value: 104149000000 },
+        { fiscalYear: 2024, value: 100000000000 }, // 1.80x >= 1.5x -> pass
+      ],
+    },
+  },
+}
 
 describe('Step1Triage Component', () => {
   const mockCompany = {
@@ -71,8 +130,8 @@ describe('Step1Triage Component', () => {
     expect(enMoatCats.textContent).toContain('Efficient Scale')
   })
 
-  it('renders the 4 Fast Fundamentals indicators in Hebrew by default with sparkline timelines and switches cleanly to English', () => {
-    render(<Step1Triage company={mockCompany} />)
+  it('renders the 4 Fast Fundamentals indicators from explicit MSFT facts in Hebrew by default with sparkline timelines and switches cleanly to English', () => {
+    render(<Step1Triage company={mockCompany} companyFacts={mockMsftFacts} />)
 
     // Hebrew default Section 2 titles & targets
     expect(screen.getByText(/בדיקת נתוני בסיס מהירה/)).toBeTruthy()
@@ -86,38 +145,84 @@ describe('Step1Triage Component', () => {
     const sharesCard = screen.getByTestId('fundamental-card-share-dilution')
     const balanceCard = screen.getByTestId('fundamental-card-balance-sheet')
 
-    expect(balanceCard.textContent).toContain('תנאי למעבר: מעל 1.0')
+    expect(balanceCard.textContent).toContain('תנאי למעבר: מעל 1.5x')
 
-    // Minimalist year timeline shown under sparkline + share buyback pace trend
+    // Minimalist year timeline shown under sparkline + share buyback pace trend (no duplicate arrows)
     const revTimeline = screen.getByTestId('sparkline-timeline-revenue-growth')
     expect(revTimeline.textContent).toContain('2015')
     expect(revTimeline.textContent).toContain('2024')
-    expect(screen.getByTestId('fundamental-trend-share-dilution').textContent).toContain('מגמת הבייבאקס:')
+    const shareTrendEl = screen.getByTestId('fundamental-trend-share-dilution')
+    expect(shareTrendEl.textContent).toContain('קצב רכישה עצמית:')
+    expect(shareTrendEl.textContent).not.toMatch(/[↓↑]/)
 
-    // Check all 4 Hebrew descriptions + BiDi <bdi dir="ltr"> isolation (#344)
-    expect(revCard.textContent).toContain('צמיחה עקבית של ~14% בשנה')
-    expect(revCard.textContent).toContain('צמיחה שנתית (CAGR)')
+    // Check all 4 Hebrew descriptions + BiDi <bdi dir="ltr"> isolation (#344, #356) & pipe separator (#364)
+    expect(revCard.textContent).toContain('(שנה אחרונה / YoY)')
+    expect(revCard.textContent).toContain('צמיחה עקבית של ~16% בשנה')
+    expect(revCard.textContent).toContain('צמיחה שנתית (CAGR) | ')
+    expect(revCard.textContent).not.toContain('·')
     expect(marginsCard.textContent).toContain('שוליים יציבים מעל 40%')
-    expect(sharesCard.textContent).toContain('החברה רוכשת מניות חזרה')
-    expect(balanceCard.textContent).toContain('יחס שוטף תקין (מעל 1.0)')
+    expect(marginsCard.textContent).toContain('ממוצע ')
+    expect(marginsCard.textContent).toContain('הקו המקווקו בגרף')
+    expect(marginsCard.textContent).not.toContain('·')
+    expect(sharesCard.textContent).toContain('בכמות המניות (שנה אחרונה)')
+    expect(sharesCard.textContent).toContain('פחות מניות מאז')
+    expect(sharesCard.textContent).not.toMatch(/[↓↑]/)
+    expect(balanceCard.textContent).toContain('יחס שוטף תקין ובטוח')
+    expect(balanceCard.textContent).toContain('נכסים שוטפים מכסים בנוחות התחייבויות קרובות')
+
+    // Verify Dedicated Status Legend in Hebrew (#364)
+    const legendHe = screen.getByTestId('fundamentals-status-legend')
+    expect(legendHe.textContent).toContain('ירוק — תקין')
+    expect(legendHe.textContent).toContain('צהוב — אזהרה / למעקב')
+    expect(legendHe.textContent).toContain('אדום — דגל אדום')
+    expect(legendHe.textContent).toContain('אפור — חסר מידע')
 
     const bdiNodes = revCard.querySelectorAll('bdi[dir="ltr"]')
     expect(bdiNodes.length).toBeGreaterThan(0)
     expect(Array.from(bdiNodes).some((el) => el.textContent === 'CAGR')).toBe(true)
+    expect(Array.from(bdiNodes).some((el) => el.textContent === 'YoY')).toBe(true)
 
-    // Switch to English -> Section 2 translates seamlessly too
+    // Switch to English -> Section 2 + Status Legend translate seamlessly too
     fireEvent.click(screen.getByTestId('lang-btn-en'))
     expect(screen.getByText('Instant Fundamentals Check')).toBeTruthy()
-    expect(screen.getByText('Revenue Growth')).toBeTruthy()
-    expect(screen.getByText('Operating Margins')).toBeTruthy()
-    expect(screen.getByText('Share Dilution')).toBeTruthy()
-    expect(screen.getByText('Current Ratio (Liquidity)')).toBeTruthy()
-    expect(screen.getByText('Target: > 1.0')).toBeTruthy()
-    expect(screen.getByTestId('fundamental-trend-share-dilution').textContent).toContain('Buyback trend:')
+    const legendEn = screen.getByTestId('fundamentals-status-legend')
+    expect(legendEn.textContent).toContain('Green — Pass')
+    expect(legendEn.textContent).toContain('Yellow — Caution / Watch')
+    expect(legendEn.textContent).toContain('Red — Red Flag')
+    expect(legendEn.textContent).toContain('Gray — No SEC Data')
+    expect(screen.getByText('Revenue Growth', { selector: 'h4' })).toBeTruthy()
+    expect(screen.getByText('Operating Margins', { selector: 'h4' })).toBeTruthy()
+    expect(screen.getByText('Share Dilution', { selector: 'h4' })).toBeTruthy()
+    expect(screen.getByText('Current Ratio (Liquidity)', { selector: 'h4' })).toBeTruthy()
+    expect(screen.getByText('Target: >= 1.5x')).toBeTruthy()
+    expect(screen.getByTestId('fundamental-trend-share-dilution').textContent).toContain('Buyback pace:')
   })
 
-  it('renders educational tooltips with the required rationales for beginners', async () => {
-    render(<Step1Triage company={mockCompany} />)
+  it('renders neutral unavailable state (no fake MSFT fallback) and chart placeholders when companyFacts is null', () => {
+    render(<Step1Triage company={mockCompany} companyFacts={null} />)
+
+    const summaryBadge = screen.getByTestId('fundamentals-passed-badge')
+    expect(summaryBadge.textContent).toContain('אין נתוני SEC זמינים')
+    expect(summaryBadge.className).toContain('slate')
+
+    for (const cardId of ['revenue-growth', 'operating-margins', 'share-dilution', 'balance-sheet']) {
+      const card = screen.getByTestId(`fundamental-card-${cardId}`)
+      expect(card.getAttribute('data-status')).toBe('unavailable')
+      expect(card.textContent).toContain('אין נתוני SEC')
+      expect(screen.getByTestId(`sparkline-unavailable-${cardId}`).textContent).toContain(
+        'אין היסטוריית SEC להצגת גרף'
+      )
+    }
+
+    fireEvent.click(screen.getByTestId('lang-btn-en'))
+    expect(screen.getByTestId('fundamentals-passed-badge').textContent).toContain('No SEC Data Available')
+    expect(screen.getByTestId('sparkline-unavailable-revenue-growth').textContent).toContain(
+      'No SEC history available'
+    )
+  })
+
+  it('renders educational tooltips with the required beginner-friendly Hebrew rationales and thresholds', async () => {
+    render(<Step1Triage company={mockCompany} companyFacts={mockMsftFacts} />)
 
     // 7 Educational Info buttons (Business Clarity, Business Model Traits, Core Revenue Streams, and 4 Fundamentals)
     const infoButtons = screen.getAllByRole('button', { name: /educational rationale/i })
@@ -141,34 +246,76 @@ describe('Step1Triage Component', () => {
     // Wait for async summary load to settle cleanly
     await screen.findByTestId('toggle-tear-sheet-btn')
 
-    // 4. Revenue Growth Tooltip
-    expect(
-      screen.getByText(/צמיחה בהכנסות: עסק בריא הוא עסק שצומח/i)
-    ).toBeTruthy()
+    // 4. Structured Revenue Growth Tooltip (bold title, explanation, colored threshold rows)
+    const revTooltip = screen
+      .getByTestId('fundamental-card-revenue-growth')
+      .querySelector('[role="tooltip"]')
+    expect(revTooltip).toBeTruthy()
+    expect(revTooltip.textContent).toContain('צמיחה בהכנסות (Revenue Growth)')
+    expect(revTooltip.textContent).toContain('YoY')
+    expect(revTooltip.textContent).toContain('CAGR')
+    expect(revTooltip.querySelector('.bg-emerald-400')).toBeTruthy()
+    expect(revTooltip.querySelector('.bg-amber-400')).toBeTruthy()
+    expect(revTooltip.querySelector('.bg-rose-400')).toBeTruthy()
+    expect(revTooltip.textContent).toContain('ירוק:')
+    expect(revTooltip.textContent).toContain('צהוב:')
+    expect(revTooltip.textContent).toContain('אדום:')
 
-    // 5. Operating Margins Tooltip
-    expect(
-      screen.getByText(/שולי רווח תפעולי: המדד ליעילות וכוח תמחור/i)
-    ).toBeTruthy()
+    // 5. Structured Operating Margins Tooltip (dashed-line historical average explanation)
+    const marginsTooltip = screen
+      .getByTestId('fundamental-card-operating-margins')
+      .querySelector('[role="tooltip"]')
+    expect(marginsTooltip).toBeTruthy()
+    expect(marginsTooltip.textContent).toContain('שולי רווח תפעולי (Operating Margins)')
+    expect(marginsTooltip.textContent).toContain('הקו המקווקו בגרף = הממוצע ההיסטורי לכל התקופה המוצגת')
+    expect(marginsTooltip.querySelector('.bg-emerald-400')).toBeTruthy()
+    expect(marginsTooltip.textContent).toContain('ירוק:')
+    expect(marginsTooltip.textContent).toContain('צהוב:')
+    expect(marginsTooltip.textContent).toContain('אדום:')
 
-    // 6. Share Dilution Tooltip
-    expect(
-      screen.getByText(/דילול מניות: כשהחברה מנפיקה עוד מניות/i)
-    ).toBeTruthy()
+    // 6. Structured Share Dilution Tooltip (explains annual vs cumulative & Buybacks)
+    const sharesTooltip = screen
+      .getByTestId('fundamental-card-share-dilution')
+      .querySelector('[role="tooltip"]')
+    expect(sharesTooltip).toBeTruthy()
+    expect(sharesTooltip.textContent).toContain('דילול מניות ורכישה עצמית (Buybacks)')
+    expect(sharesTooltip.textContent).toContain('Buybacks')
+    expect(sharesTooltip.textContent).toContain('השינוי השנתי')
+    expect(sharesTooltip.querySelector('.bg-amber-400')).toBeTruthy()
+    expect(sharesTooltip.textContent).toContain('ירוק:')
+    expect(sharesTooltip.textContent).toContain('צהוב:')
+    expect(sharesTooltip.textContent).toContain('אדום:')
 
-    // 7. Balance Sheet / Current Ratio Tooltip
-    expect(
-      screen.getByText(/יחס שוטף \(Current Ratio\): אנחנו רוצים לישון בשקט בלילה/i)
-    ).toBeTruthy()
+    // 7. Structured Balance Sheet / Current Ratio Tooltip
+    const crTooltip = screen
+      .getByTestId('fundamental-card-balance-sheet')
+      .querySelector('[role="tooltip"]')
+    expect(crTooltip).toBeTruthy()
+    expect(crTooltip.textContent).toContain('יחס שוטף / נזילות (Current Ratio)')
+    expect(crTooltip.textContent).toContain('1.5x')
+    expect(crTooltip.querySelector('.bg-rose-400')).toBeTruthy()
+    expect(crTooltip.textContent).toContain('ירוק:')
+    expect(crTooltip.textContent).toContain('צהוב:')
+    expect(crTooltip.textContent).toContain('אדום:')
+
+    // Switch to English -> structured KPI tooltips translate cleanly
+    fireEvent.click(screen.getByTestId('lang-btn-en'))
+    const revTooltipEn = screen
+      .getByTestId('fundamental-card-revenue-growth')
+      .querySelector('[role="tooltip"]')
+    expect(revTooltipEn.textContent).toContain('Revenue Growth')
+    expect(revTooltipEn.textContent).toContain('Green:')
+    expect(revTooltipEn.textContent).toContain('Yellow:')
+    expect(revTooltipEn.textContent).toContain('Red:')
   })
 
-  it('computes and updates metrics when real companyFacts are provided', () => {
+  it('computes and updates metrics when real companyFacts are provided (including 4-state styling)', () => {
     const customFacts = {
       metrics: {
         revenue: {
           annual: [
             { fiscalYear: 2024, value: 500000000 },
-            { fiscalYear: 2023, value: 400000000 },
+            { fiscalYear: 2023, value: 400000000 }, // +25% YoY -> pass
           ],
         },
         operatingIncome: {
@@ -179,46 +326,146 @@ describe('Step1Triage Component', () => {
         },
         weightedAverageSharesDiluted: {
           annual: [
-            { fiscalYear: 2024, value: 95000000 }, // decreasing -> buybacks (pass)
+            { fiscalYear: 2024, value: 101500000 }, // +1.5% dilution -> warn
             { fiscalYear: 2023, value: 100000000 },
           ],
         },
-        currentAssets: {
-          annual: [{ fiscalYear: 2024, value: 89000000 }],
-        },
-        currentLiabilities: {
-          annual: [{ fiscalYear: 2024, value: 100000000 }], // 0.89x -> fail (< 1.0)
-        },
+        // currentAssets / currentLiabilities omitted -> unavailable
       },
     }
 
     render(<Step1Triage company={mockCompany} companyFacts={customFacts} />)
 
-    // 2 of 4 passed in Hebrew default, and switch to English verifies English labels
-    expect(screen.getByText('2 מתוך 4 עברו')).toBeTruthy()
+    // 1 of 3 available passed (1 pass, 1 warn, 1 fail, 1 unavailable)
+    const passedBadge = screen.getByTestId('fundamentals-passed-badge')
+    expect(passedBadge.textContent).toContain('1 מתוך 3 עברו')
+    expect(passedBadge.className).toContain('rose')
+
     const revCard = screen.getByTestId('fundamental-card-revenue-growth')
     const marginsCard = screen.getByTestId('fundamental-card-operating-margins')
     const sharesCard = screen.getByTestId('fundamental-card-share-dilution')
     const balanceCard = screen.getByTestId('fundamental-card-balance-sheet')
 
-    expect(revCard.textContent).toContain('+25% בשנה')
-    expect(revCard.querySelector('bdi[dir="ltr"]')?.textContent).toBe('+25%')
+    expect(revCard.getAttribute('data-status')).toBe('pass')
+    expect(revCard.innerHTML).toContain('emerald')
+    expect(revCard.textContent).toContain('+25% (שנה אחרונה / YoY)')
+    const revBdiTexts = Array.from(revCard.querySelectorAll('bdi[dir="ltr"]')).map((el) => el.textContent)
+    expect(revBdiTexts).toContain('+25%')
+    expect(revBdiTexts).toContain('YoY')
+
+    expect(marginsCard.getAttribute('data-status')).toBe('fail')
+    expect(marginsCard.innerHTML).toContain('rose')
     expect(marginsCard.textContent).toContain('5.0%')
     expect(marginsCard.textContent).toContain('שוליים נמוכים')
-    expect(sharesCard.textContent).toContain('↓ -5.0% מניות (בייבאק)')
-    expect(screen.getByTestId('fundamental-trend-share-dilution').textContent).toContain('מגמת בייבאקס:')
-    expect(balanceCard.textContent).toContain('0.89x')
-    expect(balanceCard.textContent).toContain('סיכון (מתחת ל-1.0)')
-    expect(balanceCard.textContent).toContain('תנאי למעבר: מעל 1.0')
+
+    expect(sharesCard.getAttribute('data-status')).toBe('warn')
+    expect(sharesCard.innerHTML).toContain('amber')
+    expect(sharesCard.textContent).toContain('דילול מתון')
+    expect(sharesCard.textContent).toContain('+1.5% בכמות המניות (שנה אחרונה)')
+    expect(sharesCard.textContent).not.toMatch(/[↓↑]/)
+
+    expect(balanceCard.getAttribute('data-status')).toBe('unavailable')
+    expect(balanceCard.innerHTML).toContain('slate')
+    expect(balanceCard.textContent).toContain('אין נתוני SEC')
 
     fireEvent.click(screen.getByTestId('lang-btn-en'))
-    expect(screen.getByText('2 of 4 Passed')).toBeTruthy()
+    expect(screen.getByText('1 of 3 Passed')).toBeTruthy()
     expect(screen.getByText('+25% YoY')).toBeTruthy()
-    expect(screen.getByText('5%+')).toBeTruthy()
+    expect(screen.getByText('5.0%')).toBeTruthy()
     expect(screen.getByText('Low Margins')).toBeTruthy()
-    expect(screen.getByText('Share Buybacks')).toBeTruthy()
-    expect(screen.getByText('At Risk (< 1.0)')).toBeTruthy()
-    expect(screen.getByText('Target: > 1.0')).toBeTruthy()
+    expect(screen.getByText('Moderate Dilution')).toBeTruthy()
+    expect(screen.getByText('+1.5% shares (YoY)')).toBeTruthy()
+    expect(screen.getByText('Target: >= 1.5x')).toBeTruthy()
+  })
+
+  it('tokenizeBidiText keeps Hebrew prefix + hyphen RTL and isolates AER negative/positive percentages cleanly', () => {
+    // AER canonical failure fix: ל-48.0% must NEVER become ל-48.0%-
+    expect(tokenizeBidiText('בין -14.3% ל-48.0%')).toEqual([
+      { text: 'בין ', isLtr: false },
+      { text: '-14.3%', isLtr: true },
+      { text: ' ל-', isLtr: false },
+      { text: '48.0%', isLtr: true },
+    ])
+
+    expect(tokenizeBidiText('ל-48.0%')).toEqual([
+      { text: 'ל-', isLtr: false },
+      { text: '48.0%', isLtr: true },
+    ])
+    expect(tokenizeBidiText('מ-10%')).toEqual([
+      { text: 'מ-', isLtr: false },
+      { text: '10%', isLtr: true },
+    ])
+    expect(tokenizeBidiText('ב-9 ש׳')).toEqual([
+      { text: 'ב-', isLtr: false },
+      { text: '9', isLtr: true },
+      { text: ' ש׳', isLtr: false },
+    ])
+    expect(tokenizeBidiText('ל-1.0')).toEqual([
+      { text: 'ל-', isLtr: false },
+      { text: '1.0', isLtr: true },
+    ])
+    expect(tokenizeBidiText('(-14.3%)')).toEqual([
+      { text: '(', isLtr: false },
+      { text: '-14.3%', isLtr: true },
+      { text: ')', isLtr: false },
+    ])
+    expect(tokenizeBidiText('טווח 2015–2024 וגם -14.3%–48.0% וגם 1.0x–1.5x')).toEqual([
+      { text: 'טווח ', isLtr: false },
+      { text: '2015–2024', isLtr: true },
+      { text: ' וגם ', isLtr: false },
+      { text: '-14.3%–48.0%', isLtr: true },
+      { text: ' וגם ', isLtr: false },
+      { text: '1.0x–1.5x', isLtr: true },
+    ])
+    expect(tokenizeBidiText('תשואה +25% או -5.0% עם $50M ו-€10B בדוח 10-K (CAGR / YoY)')).toEqual([
+      { text: 'תשואה ', isLtr: false },
+      { text: '+25%', isLtr: true },
+      { text: ' או ', isLtr: false },
+      { text: '-5.0%', isLtr: true },
+      { text: ' עם ', isLtr: false },
+      { text: '$50M', isLtr: true },
+      { text: ' ו-', isLtr: false },
+      { text: '€10B', isLtr: true },
+      { text: ' בדוח ', isLtr: false },
+      { text: '10-K', isLtr: true },
+      { text: ' (', isLtr: false },
+      { text: 'CAGR', isLtr: true },
+      { text: ' / ', isLtr: false },
+      { text: 'YoY', isLtr: true },
+      { text: ')', isLtr: false },
+    ])
+    expect(tokenizeBidiText('ממוצע רב-שנתי')).toEqual([
+      { text: 'ממוצע רב-שנתי', isLtr: false },
+    ])
+
+    // Render AER-like operating margin data in DOM and verify <bdi dir="ltr"> isolation
+    const aerFacts = {
+      metrics: {
+        revenue: {
+          annual: [
+            { fiscalYear: 2020, value: 4500000000 },
+            { fiscalYear: 2024, value: 4100000000 },
+          ],
+        },
+        operatingIncome: {
+          annual: [
+            { fiscalYear: 2020, value: -643500000 }, // -14.3%
+            { fiscalYear: 2024, value: 1968000000 }, // 48.0%
+          ],
+        },
+      },
+    }
+
+    render(<Step1Triage company={{ ticker: 'AER', name: 'AerCap Holdings' }} companyFacts={aerFacts} />)
+    const marginsCard = screen.getByTestId('fundamental-card-operating-margins')
+    expect(marginsCard.getAttribute('data-status')).toBe('fail')
+    expect(marginsCard.textContent).toContain('תנודתיים (שנת הפסד)')
+    expect(marginsCard.textContent).toContain('בין -14.3% ל-48.0%')
+
+    const bdiTexts = Array.from(marginsCard.querySelectorAll('bdi[dir="ltr"]')).map((el) => el.textContent)
+    expect(bdiTexts).toContain('-14.3%')
+    expect(bdiTexts).toContain('48.0%')
+    expect(bdiTexts.some((txt) => txt.startsWith('-48.0'))).toBe(false)
   })
 
   it('renders The Gatekeeper button and calls onContinue when clicked', () => {
@@ -321,6 +568,21 @@ describe('Step1Triage Component', () => {
     expect(screen.getByTestId('tooltip-portal-sheet')).toBeTruthy()
     expect(screen.queryByTestId('tear-sheet-expanded-content')).toBeNull()
 
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByTestId('tooltip-portal-sheet')).toBeNull()
+
+    // Tapping a Section 2 Fundamental KPI info button renders structured title, description, and threshold rows inside Portal sheet (#364)
+    const revInfoBtn = screen
+      .getByTestId('fundamental-card-revenue-growth')
+      .querySelector('button[aria-label="Educational rationale"]')
+    expect(revInfoBtn).toBeTruthy()
+    fireEvent.click(revInfoBtn)
+    const kpiPortalSheet = await screen.findByTestId('tooltip-portal-sheet')
+    expect(kpiPortalSheet.textContent).toContain('צמיחה בהכנסות (Revenue Growth)')
+    expect(kpiPortalSheet.querySelector('.bg-emerald-400')).toBeTruthy()
+    expect(kpiPortalSheet.querySelector('.bg-amber-400')).toBeTruthy()
+    expect(kpiPortalSheet.querySelector('.bg-rose-400')).toBeTruthy()
+    expect(kpiPortalSheet.textContent).toContain('ירוק:')
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByTestId('tooltip-portal-sheet')).toBeNull()
   })

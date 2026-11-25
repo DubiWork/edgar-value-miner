@@ -221,20 +221,38 @@ describe('cacheWriter Adversarial Challenge Suite', () => {
       expect(mockSet).toHaveBeenCalledOnce();
     });
 
-    it('rejects a company facts blob of exactly 900,001 bytes with resource-exhausted HttpsError on write', async () => {
+    it('skips Firestore write with skippedReason: too_large for a 900,001-byte blob without throwing HttpsError', async () => {
       const over900k = generatePayloadOfSize(900_001);
       expect(Buffer.byteLength(JSON.stringify(over900k), 'utf8')).toBe(900_001);
 
       mockSecResponses(over900k);
       makeDocRef(false);
 
-      await expect(
-        cacheWriterHandler(makeReq({ ticker: 'AAPL' }))
-      ).rejects.toMatchObject({
-        code: 'resource-exhausted',
-        message: expect.stringContaining('(900001 bytes)'),
+      const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
+      expect(result).toEqual({
+        ticker: 'AAPL',
+        latestFiledDate: '2024-11-01',
+        updated: false,
+        skippedReason: 'too_large',
+      });
+      expect(mockSet).not.toHaveBeenCalled();
+    });
+
+    it('skips Firestore write with skippedReason: too_large when overwriting an existing doc on newer filing or forceRefresh', async () => {
+      const over900k = generatePayloadOfSize(900_001);
+      mockSecResponses(over900k);
+      makeDocRef(true, {
+        lastUpdated: timestampDaysAgo(95),
+        latestFiledDate: '2024-01-01', // older than '2024-11-01' in over900k
       });
 
+      const result = await cacheWriterHandler(makeReq({ ticker: 'MSFT' }));
+      expect(result).toEqual({
+        ticker: 'MSFT',
+        latestFiledDate: '2024-11-01',
+        updated: false,
+        skippedReason: 'too_large',
+      });
       expect(mockSet).not.toHaveBeenCalled();
     });
 

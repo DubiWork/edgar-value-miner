@@ -741,6 +741,34 @@ describe('cacheCoordinator', () => {
       expect(result.error.code).toBe(COORDINATOR_ERROR_CODES.SEC_API_ERROR);
     });
 
+    it('should skip redundant Firestore re-read and fall back directly to SEC API when cacheWriter returns skippedReason: too_large (#365)', async () => {
+      edgarCache.getCompanyFacts.mockResolvedValue(null);
+      firestoreCache.getCompanyFactsFromFirestore.mockResolvedValue(null);
+      mockCacheWriterCallable.mockResolvedValueOnce({
+        data: {
+          ticker: 'MSFT',
+          latestFiledDate: '2025-10-30',
+          updated: false,
+          skippedReason: 'too_large',
+        },
+      });
+      edgarApi.fetchCompanyFactsByTicker.mockResolvedValue({
+        facts: mockRawFirestoreData,
+        companyInfo: { ...mockCompanyInfo, ticker: 'MSFT' },
+      });
+      normalizeCompanyFacts.mockReturnValue(mockNormalizedData);
+      edgarCache.setCompanyFacts.mockResolvedValue(true);
+
+      const result = await getCompanyData('MSFT');
+
+      expect(result.success).toBe(true);
+      expect(result.metadata.source).toBe(CACHE_SOURCES.SEC_API);
+      expect(mockCacheWriterCallable).toHaveBeenCalledTimes(1);
+      // Initial L2 lookup only — NO redundant Firestore re-read after cacheWriter returned too_large
+      expect(firestoreCache.getCompanyFactsFromFirestore).toHaveBeenCalledTimes(1);
+      expect(edgarApi.fetchCompanyFactsByTicker).toHaveBeenCalledWith('MSFT');
+    });
+
     it('should handle L2 timeout and fall back to SEC API', async () => {
       edgarCache.getCompanyFacts.mockResolvedValue(null);
 
