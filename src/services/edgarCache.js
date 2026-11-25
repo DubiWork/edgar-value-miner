@@ -26,8 +26,8 @@ import { NORMALIZATION_VERSION } from '../utils/gaapNormalizer.js';
 const DB_CONFIG = {
   /** Database name */
   DB_NAME: 'edgar-value-miner',
-  /** Database version — v4: enforces normalizationVersion === NORMALIZATION_VERSION */
-  DB_VERSION: 4,
+  /** Database version — v5: invalidates pre-duration-filter entries on upgrade */
+  DB_VERSION: 5,
   /** Object store names */
   STORES: {
     COMPANY_FACTS: 'companyFacts',
@@ -193,8 +193,8 @@ function openDatabase() {
         const db = event.target.result;
         const oldVersion = event.oldVersion;
 
-        // v1-v3 -> v4: schema/normalizer changed — clear stale companyFacts entries on upgrade
-        if (oldVersion < 4 && db.objectStoreNames.contains(DB_CONFIG.STORES.COMPANY_FACTS)) {
+        // v1-v4 -> v5: schema/normalizer changed — clear stale companyFacts entries on upgrade
+        if (oldVersion < 5 && db.objectStoreNames.contains(DB_CONFIG.STORES.COMPANY_FACTS)) {
           db.deleteObjectStore(DB_CONFIG.STORES.COMPANY_FACTS);
         }
 

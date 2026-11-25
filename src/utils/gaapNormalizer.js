@@ -20,7 +20,7 @@
  * Increment when making breaking changes to metric mappings
  * @constant {number}
  */
-export const NORMALIZATION_VERSION = 2;
+export const NORMALIZATION_VERSION = 3;
 
 /**
  * Number of years of annual data to extract
@@ -903,6 +903,10 @@ function selectUnitArray(units, preferredCurrency) {
   return longest;
 }
 
+const ANNUAL_FRAME_REGEX = /^CY\d{4}(I4|Q4I)?$/;
+const QUARTERLY_FRAME_REGEX = /^CY\d{4}Q[1-4]$/;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
   const {
     fullHistory = false,
@@ -923,6 +927,7 @@ export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
 
   // Filter by form type
   const targetForms = periodType === 'annual' ? ANNUAL_FORMS : QUARTERLY_FORMS;
+  const expectedFrameRegex = periodType === 'annual' ? ANNUAL_FRAME_REGEX : QUARTERLY_FRAME_REGEX;
 
   const filteredData = unitData.filter(item => {
     // Must have a form that matches
@@ -930,19 +935,23 @@ export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
       return false;
     }
 
-    // For annual, prefer full-year periods (frames like CY2023, CY2023I4, or balance sheet instant CY2023Q4I)
-    if (periodType === 'annual') {
-      if (item.frame) {
-        const isFullYear = /^CY\d{4}(I4|Q4I)?$/.test(item.frame);
-        if (!isFullYear) return false;
-      }
+    // Prefer full-year frames (CY2023 / CY2023I4 / CY2023Q4I) for annual, Q1-Q4 frames for quarterly
+    if (item.frame && !expectedFrameRegex.test(item.frame)) {
+      return false;
     }
 
-    // For quarterly, we want Q1-Q4 periods (frames like CY2023Q1)
-    if (periodType === 'quarterly') {
-      if (item.frame) {
-        const isQuarter = /^CY\d{4}Q[1-4]$/.test(item.frame);
-        if (!isQuarter) return false;
+    // Filter duration/flow facts by period length (instant balance-sheet facts lack item.start)
+    if (item.start && item.end) {
+      const startDate = parseDate(item.start);
+      const endDate = parseDate(item.end);
+      if (startDate && endDate) {
+        const durationDays = (endDate.getTime() - startDate.getTime()) / MS_PER_DAY;
+        if (periodType === 'annual' && (durationDays < 300 || durationDays > 420)) {
+          return false;
+        }
+        if (periodType === 'quarterly' && (durationDays < 60 || durationDays > 120)) {
+          return false;
+        }
       }
     }
 
@@ -950,8 +959,7 @@ export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
     return isValidNumber(item.val);
   });
 
-  // Sort by end date (most recent first), then by filed date (most recent first)
-  // This ensures restated financials (later filings) take precedence
+  // Sort by end date (most recent first), then filed date, accn, and valid frame tiebreaker
   const sortedData = filteredData.sort((a, b) => {
     const dateA = parseDate(a.end) || parseDate(a.filed);
     const dateB = parseDate(b.end) || parseDate(b.filed);
@@ -968,11 +976,16 @@ export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
       if (filedCompare !== 0) return filedCompare;
     }
 
-    // Final tiebreaker: accession number (higher = more recent)
+    // Accession number tiebreaker (higher = more recent)
     if (a.accn && b.accn) {
-      return b.accn.localeCompare(a.accn);
+      const accnCompare = b.accn.localeCompare(a.accn);
+      if (accnCompare !== 0) return accnCompare;
     }
-    return 0;
+
+    // Final tiebreaker: prefer entries carrying a valid full-year / quarterly frame
+    const hasFrameA = typeof a.frame === 'string' && expectedFrameRegex.test(a.frame) ? 1 : 0;
+    const hasFrameB = typeof b.frame === 'string' && expectedFrameRegex.test(b.frame) ? 1 : 0;
+    return hasFrameB - hasFrameA;
   });
 
   // Deduplicate by period (keep most recent filing for each period)
@@ -982,6 +995,7 @@ export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
   // same filing (which share the same filing item.fy) are preserved.
   // For quarterly data: keep existing frame/end keying so Q1-Q4 are not collapsed.
   const seenPeriods = new Set();
+  const seenQuarterlyEnds = new Set();
   const deduplicatedData = sortedData.filter(item => {
     let period;
     if (periodType === 'annual') {
@@ -990,10 +1004,13 @@ export function extractTimeSeriesData(gaapTagData, periodType, options = {}) {
     } else {
       period = item.frame || item.end;
     }
-    if (seenPeriods.has(period)) {
+    if (seenPeriods.has(period) || (periodType === 'quarterly' && item.end && seenQuarterlyEnds.has(item.end))) {
       return false;
     }
     seenPeriods.add(period);
+    if (periodType === 'quarterly' && item.end) {
+      seenQuarterlyEnds.add(item.end);
+    }
     return true;
   });
 

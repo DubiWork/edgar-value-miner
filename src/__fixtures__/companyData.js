@@ -99,7 +99,7 @@ export const mockAppleData = {
     },
   },
   metadata: {
-    normalizationVersion: 2,
+    normalizationVersion: 3,
     metricsFound: 20,
     missingMetrics: [],
   },
@@ -154,7 +154,7 @@ export const mockPreRevenueCompany = {
     },
   },
   metadata: {
-    normalizationVersion: 2,
+    normalizationVersion: 3,
     metricsFound: 10,
     missingMetrics: ['capitalExpenditures'],
   },
@@ -178,7 +178,7 @@ export const mockNullDataCompany = {
     eps: { annual: [], quarterly: [], tag: 'EarningsPerShareBasic' },
   },
   metadata: {
-    normalizationVersion: 2,
+    normalizationVersion: 3,
     metricsFound: 0,
     missingMetrics: ['revenue', 'netIncome', 'grossProfit'],
   },
@@ -251,7 +251,7 @@ export const mockNegativeCompany = {
     },
   },
   metadata: {
-    normalizationVersion: 2,
+    normalizationVersion: 3,
     metricsFound: 12,
     missingMetrics: [],
   },
@@ -298,7 +298,7 @@ export const mockLongNameCompany = {
     eps: { annual: [], quarterly: [], tag: 'EarningsPerShareBasic' },
   },
   metadata: {
-    normalizationVersion: 2,
+    normalizationVersion: 3,
     metricsFound: 6,
     missingMetrics: ['operatingCashFlow', 'freeCashFlow'],
   },
@@ -349,7 +349,7 @@ export const mockTenYearCompany = {
     eps: { annual: [], quarterly: [], tag: 'EarningsPerShareBasic' },
   },
   metadata: {
-    normalizationVersion: 2,
+    normalizationVersion: 3,
     metricsFound: 30,
     missingMetrics: [],
   },
@@ -391,7 +391,7 @@ export const mockPartialDataCompany = {
     eps: { annual: [], quarterly: [], tag: 'EarningsPerShareBasic' },
   },
   metadata: {
-    normalizationVersion: 2,
+    normalizationVersion: 3,
     metricsFound: 4,
     missingMetrics: ['grossProfit', 'operatingIncome', 'operatingCashFlow'],
   },

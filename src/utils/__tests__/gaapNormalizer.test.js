@@ -57,8 +57,10 @@ function createCompanyFacts(overrides = {}) {
 /**
  * Creates a metric unit entry
  */
-function createUnitEntry({ end, val, form = '10-K', frame = null, filed = null, accn = null }) {
+function createUnitEntry({ start = null, end, val, form = '10-K', fp = null, frame = null, filed = null, accn = null }) {
   const entry = { end, val, form };
+  if (start) entry.start = start;
+  if (fp) entry.fp = fp;
   if (frame) entry.frame = frame;
   if (filed) entry.filed = filed;
   if (accn) entry.accn = accn;
@@ -1878,9 +1880,9 @@ describe('Issue #278: 40-F filing support and SHOP revenue history', () => {
 // Issue #356 (PR 1): 5 XBRL Fixes, Derived Fallbacks, Missing Tags & v2
 // =============================================================================
 
-describe('Issue #356: PR 1 gaapNormalizer fixes & NORMALIZATION_VERSION = 2', () => {
-  it('bumps NORMALIZATION_VERSION to 2', () => {
-    expect(NORMALIZATION_VERSION).toBe(2);
+describe('Issue #356: PR 1 gaapNormalizer fixes & NORMALIZATION_VERSION = 3', () => {
+  it('bumps NORMALIZATION_VERSION to 3', () => {
+    expect(NORMALIZATION_VERSION).toBe(3);
   });
 
   describe('1. totalLiabilities tag cleanup & derived fallback', () => {
@@ -2108,6 +2110,221 @@ describe('Issue #356: PR 1 gaapNormalizer fixes & NORMALIZATION_VERSION = 2', ()
       expect(BANK_REVENUE_TAGS).toContain('InterestRevenueExpense');
       expect(ifrsRes.metrics.revenue.tag).toBe('InterestRevenueExpense');
       expect(ifrsRes.metadata.warnings.some((w) => w.includes('Bank/fintech revenue tag'))).toBe(true);
+    });
+  });
+
+  describe('Issue #362 — Duration filtering & frame tie-breaker', () => {
+    it('filters 90/180/270-day 10-K footnote entries without frame in annual mode and preserves full-year revenue', () => {
+      const facts = {
+        cik: '0000320193',
+        entityName: 'Duration Test Corp',
+        facts: {
+          'us-gaap': {
+            Revenues: {
+              units: {
+                USD: [
+                  createUnitEntry({
+                    start: '2018-01-01',
+                    end: '2018-12-31',
+                    val: 265595000000,
+                    form: '10-K',
+                    fp: 'FY',
+                    filed: '2019-02-01',
+                    accn: '0000320193-19-000001',
+                  }),
+                  // 90-day Q4 footnote fact reported inside 10-K with newer filed date and no frame
+                  createUnitEntry({
+                    start: '2018-10-01',
+                    end: '2018-12-31',
+                    val: 84310000000,
+                    form: '10-K',
+                    fp: 'FY',
+                    filed: '2020-02-01',
+                    accn: '0000320193-20-000002',
+                  }),
+                  // 180-day half-year footnote fact inside 10-K without frame
+                  createUnitEntry({
+                    start: '2019-07-01',
+                    end: '2019-12-31',
+                    val: 140000000000,
+                    form: '10-K',
+                    fp: 'FY',
+                    filed: '2020-02-01',
+                    accn: '0000320193-20-000003',
+                  }),
+                  // 270-day 9M footnote fact inside 10-K without frame
+                  createUnitEntry({
+                    start: '2019-04-01',
+                    end: '2019-12-31',
+                    val: 200000000000,
+                    form: '10-K',
+                    fp: 'FY',
+                    filed: '2020-02-01',
+                    accn: '0000320193-20-000004',
+                  }),
+                  createUnitEntry({
+                    start: '2019-01-01',
+                    end: '2019-12-31',
+                    val: 274515000000,
+                    form: '10-K',
+                    fp: 'FY',
+                    filed: '2020-02-01',
+                    accn: '0000320193-20-000001',
+                  }),
+                ],
+              },
+            },
+            Assets: {
+              units: {
+                USD: [
+                  // Instant balance sheet facts lack `start` and must pass through unaffected
+                  createUnitEntry({
+                    end: '2019-12-31',
+                    val: 338516000000,
+                    form: '10-K',
+                    fp: 'FY',
+                    filed: '2020-02-01',
+                    accn: '0000320193-20-000001',
+                  }),
+                ],
+              },
+            },
+          },
+        },
+      };
+
+      const res = normalizeCompanyFacts(facts);
+      expect(res.metrics.revenue.annual).toHaveLength(2);
+      expect(res.metrics.revenue.annual.map((p) => [p.fiscalYear, p.value])).toEqual([
+        [2019, 274515000000],
+        [2018, 265595000000],
+      ]);
+      expect(res.metrics.totalAssets.annual).toHaveLength(1);
+      expect(res.metrics.totalAssets.annual[0].value).toBe(338516000000);
+    });
+
+    it('filters 180/270-day YTD cumulative 10-Q entries without frame in quarterly mode', () => {
+      const facts = {
+        cik: '0000789019',
+        entityName: 'Quarterly Duration Corp',
+        facts: {
+          'us-gaap': {
+            Revenues: {
+              units: {
+                USD: [
+                  // 90-day standalone Q3 entry without frame -> keep
+                  createUnitEntry({
+                    start: '2024-07-01',
+                    end: '2024-09-30',
+                    val: 65000000000,
+                    form: '10-Q',
+                    fp: 'Q3',
+                    filed: '2024-11-01',
+                    accn: '0000789019-24-000001',
+                  }),
+                  // 270-day 9M YTD entry without frame & newer accn -> reject
+                  createUnitEntry({
+                    start: '2024-01-01',
+                    end: '2024-09-30',
+                    val: 190000000000,
+                    form: '10-Q',
+                    fp: 'Q3',
+                    filed: '2024-11-01',
+                    accn: '0000789019-24-000002',
+                  }),
+                  // 180-day 6M YTD entry without frame -> reject
+                  createUnitEntry({
+                    start: '2024-01-01',
+                    end: '2024-06-30',
+                    val: 125000000000,
+                    form: '10-Q',
+                    fp: 'Q2',
+                    filed: '2024-08-01',
+                    accn: '0000789019-24-000003',
+                  }),
+                  // 90-day standalone Q2 entry -> keep
+                  createUnitEntry({
+                    start: '2024-04-01',
+                    end: '2024-06-30',
+                    val: 64000000000,
+                    form: '10-Q',
+                    fp: 'Q2',
+                    filed: '2024-08-01',
+                    accn: '0000789019-24-000001',
+                  }),
+                ],
+              },
+            },
+          },
+        },
+      };
+
+      const res = normalizeCompanyFacts(facts);
+      expect(res.metrics.revenue.quarterly.map((p) => [p.period, p.value])).toEqual([
+        ['2024-09-30', 65000000000],
+        ['2024-06-30', 64000000000],
+      ]);
+    });
+
+    it('prefers framed entry over unframed entry when end, filed, and accn tie', () => {
+      const facts = {
+        cik: '0000789019',
+        entityName: 'Frame TieBreak Corp',
+        facts: {
+          'us-gaap': {
+            Revenues: {
+              units: {
+                USD: [
+                  createUnitEntry({
+                    start: '2024-01-01',
+                    end: '2024-12-31',
+                    val: 111000000000,
+                    form: '10-K',
+                    fp: 'FY',
+                    filed: '2025-02-01',
+                    accn: '0000789019-25-000010',
+                  }),
+                  createUnitEntry({
+                    start: '2024-01-01',
+                    end: '2024-12-31',
+                    val: 245122000000,
+                    form: '10-K',
+                    fp: 'FY',
+                    frame: 'CY2024',
+                    filed: '2025-02-01',
+                    accn: '0000789019-25-000010',
+                  }),
+                  createUnitEntry({
+                    start: '2024-01-01',
+                    end: '2024-03-31',
+                    val: 50000000000,
+                    form: '10-Q',
+                    fp: 'Q1',
+                    filed: '2024-05-01',
+                    accn: '0000789019-24-000010',
+                  }),
+                  createUnitEntry({
+                    start: '2024-01-01',
+                    end: '2024-03-31',
+                    val: 61858000000,
+                    form: '10-Q',
+                    fp: 'Q1',
+                    frame: 'CY2024Q1',
+                    filed: '2024-05-01',
+                    accn: '0000789019-24-000010',
+                  }),
+                ],
+              },
+            },
+          },
+        },
+      };
+
+      const res = normalizeCompanyFacts(facts);
+      expect(res.metrics.revenue.annual).toHaveLength(1);
+      expect(res.metrics.revenue.annual[0].value).toBe(245122000000);
+      expect(res.metrics.revenue.quarterly).toHaveLength(1);
+      expect(res.metrics.revenue.quarterly[0].value).toBe(61858000000);
     });
   });
 });

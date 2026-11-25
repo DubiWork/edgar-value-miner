@@ -562,6 +562,7 @@ describe('edgarCache', () => {
         { ticker: 'NO_VER', metadata: { normalized: true } },
         { ticker: 'STR_VER', metadata: { normalized: true, normalizationVersion: '1.0.0' } },
         { ticker: 'V1_VER', metadata: { normalized: true, normalizationVersion: 1 } },
+        { ticker: 'V2_VER', metadata: { normalized: true, normalizationVersion: 2 } },
         { ticker: 'MISMATCH_VER', metadata: { normalized: true, normalizationVersion: NORMALIZATION_VERSION + 10 } },
       ];
 
@@ -582,13 +583,13 @@ describe('edgarCache', () => {
       expect(stats.companyFacts.count).toBe(0);
     });
 
-    it('should clear v3 companyFacts store on upgrade to DB_VERSION 4 while preserving tickerMappings', async () => {
+    it('should clear v4 companyFacts store on upgrade to DB_VERSION 5 while preserving tickerMappings', async () => {
       const freshFactory = new IDBFactory();
       globalThis.indexedDB = freshFactory;
 
-      // Seed a v3 database directly
+      // Seed a v4 database directly
       await new Promise((resolve, reject) => {
-        const openReq = freshFactory.open('edgar-value-miner', 3);
+        const openReq = freshFactory.open('edgar-value-miner', 4);
         openReq.onupgradeneeded = (event) => {
           const db = event.target.result;
           const cf = db.createObjectStore('companyFacts', { keyPath: 'ticker' });

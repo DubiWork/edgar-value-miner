@@ -280,7 +280,7 @@ function createMockCompanyData(overrides = {}) {
       },
     },
     metadata: {
-      normalizationVersion: 2,
+      normalizationVersion: 3,
       metricsFound: 20,
       missingMetrics: [],
     },
