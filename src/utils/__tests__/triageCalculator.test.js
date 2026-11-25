@@ -89,8 +89,11 @@ describe('triageCalculator', () => {
 
     // Shares: Decreasing = Buybacks = PASS
     expect(result.shares.status).toBe('pass');
-    expect(result.shares.value).toBe('Share Buybacks');
+    expect(result.shares.value).toBe('-3.1% shares (YoY)');
+    expect(result.shares.valueHe).toBe('-3.1% בכמות המניות (שנה אחרונה)');
     expect(result.shares.badge).toBe('Buybacks');
+    expect(result.shares.detail).toContain('6.9% פחות מניות מאז 2021');
+    expect(result.shares.detail).not.toMatch(/[↓↑]/);
 
     // Current Ratio (1.5 >= 1.5 = PASS)
     expect(result.currentRatio.status).toBe('pass');
@@ -173,16 +176,16 @@ describe('triageCalculator', () => {
           ],
         },
         operatingIncome: {
-          // Narrow margins swinging 2% -> 7% across multiple compression cycles (cyclical even though latest is 7%)
+          // Narrow margins swinging 2% -> 7% across 4 compression cycles (cyclical even though latest is 7%)
           annual: [
             { fiscalYear: 2016, value: 60000000 }, // 6.0%
             { fiscalYear: 2017, value: 27500000 }, // 2.5% (-3.5pp drop #1)
             { fiscalYear: 2018, value: 72000000 }, // 6.0%
-            { fiscalYear: 2019, value: 84500000 }, // 6.5%
-            { fiscalYear: 2020, value: 20000000 }, // 2.0% cyclical trough (-4.5pp drop #2)
-            { fiscalYear: 2021, value: 54000000 }, // 6.0%
+            { fiscalYear: 2019, value: 39000000 }, // 3.0% (-3.0pp drop #2)
+            { fiscalYear: 2020, value: 60000000 }, // 6.0%
+            { fiscalYear: 2021, value: 18000000 }, // 2.0% cyclical trough (-4.0pp drop #3)
             { fiscalYear: 2022, value: 69000000 }, // 6.0%
-            { fiscalYear: 2023, value: 40500000 }, // 3.0% (-3.0pp drop #3)
+            { fiscalYear: 2023, value: 40500000 }, // 3.0% (-3.0pp drop #4)
             { fiscalYear: 2024, value: 105000000 }, // 7.0%
             { fiscalYear: 2025, value: 112735700 }, // 7.0%
           ],
@@ -213,16 +216,15 @@ describe('triageCalculator', () => {
     expect(result.revenue.valueHe).toContain('(שנה אחרונה / YoY)');
     expect(result.revenue.metricSummary).toContain('5Y CAGR ~10% | 9Y ~5%');
     expect(result.revenue.metricSummaryHe).toBe('צמיחה שנתית (CAGR) | 5 ש׳: ~10% | 9 ש׳: ~5%');
-    expect(result.margins.metricSummary).toContain(' | ');
-    expect(result.margins.metricSummaryHe).toContain(' | ');
-    expect(result.shares.metricSummary).toContain(' | Latest spend: $50M');
-    expect(result.shares.metricSummaryHe).toContain(' | רכישות אשתקד: $50M');
+    expect(result.margins.metricSummaryHe).toContain('ממוצע 2016–2025:');
+    expect(result.margins.metricSummaryHe).toContain('הקו המקווקו בגרף');
     expect(result.revenue.metricSummaryHe).not.toContain('·');
     expect(result.margins.metricSummaryHe).not.toContain('·');
     expect(result.shares.metricSummaryHe).not.toContain('·');
     expect(result.currentRatio.status).toBe('pass');
     expect(result.currentRatio.badgeHe).toBe('בטוח (מעל 1.5x)');
     expect(result.currentRatio.detail).toContain('מעל 1.5x');
+    expect(result.currentRatio.metricSummaryHe).toBe('נכסים שוטפים מכסים בנוחות התחייבויות קרובות');
     expect(result.revenue.historyMeta.startYear).toBe(2016);
     expect(result.revenue.historyMeta.endYear).toBe(2025);
 
@@ -232,9 +234,12 @@ describe('triageCalculator', () => {
     expect(result.margins.historyMeta.cycleBadgeHe).toContain('מחזורי');
     expect(result.margins.historyMeta.cycleBadgeHe).toContain('2.0%–7.0%');
 
-    // Buybacks % and USD spend surfaced cleanly
-    expect(result.shares.valueHe).toBe('↓ -5.0% מניות (בייבאק)');
-    expect(result.shares.metricSummaryHe).toContain('$50M');
+    // Buybacks % and USD spend surfaced cleanly without duplicate arrows or buyback-spend CAGR
+    expect(result.shares.valueHe).toBe('-5.0% בכמות המניות (שנה אחרונה)');
+    expect(result.shares.value).toBe('-5.0% shares (YoY)');
+    expect(result.shares.metricSummaryHe).toBe('השקעה ברכישה עצמית אשתקד: $50M');
+    expect(result.shares.metricSummary).toBe('Buyback spend last year: $50M');
+    expect(result.shares.metricSummaryHe).not.toContain('קצב שנתי');
   });
 
   it('detects share dilution and buyback pace trends (accelerating, slowing, steady)', () => {
@@ -259,10 +264,10 @@ describe('triageCalculator', () => {
     expect(slowingDilution.shares.status).toBe('warn');
     expect(slowingDilution.shares.badge).toBe('Moderate Dilution');
     expect(slowingDilution.shares.badgeHe).toBe('דילול מתון');
-    expect(slowingDilution.shares.valueHe).toBe('↑ +0.4% מניות (דילול)');
+    expect(slowingDilution.shares.valueHe).toBe('+0.4% בכמות המניות (שנה אחרונה)');
     expect(slowingDilution.shares.trendDirection).toBe('slowing');
     expect(slowingDilution.shares.trendTone).toBe('improving');
-    expect(slowingDilution.shares.trendLabelHe).toBe('מגמת הדילול: בירידה ↓ (משתפר)');
+    expect(slowingDilution.shares.trendLabelHe).toBe('קצב דילול: בירידה (משתפר)');
 
     // 2. Accelerating dilution (worsening)
     const acceleratingDilution = calculateTriageMetrics(
@@ -274,10 +279,10 @@ describe('triageCalculator', () => {
         [2024, 115], // +7.48%
       ])
     );
-    expect(acceleratingDilution.shares.valueHe).toBe('↑ +7.5% מניות (דילול)');
+    expect(acceleratingDilution.shares.valueHe).toBe('+7.5% בכמות המניות (שנה אחרונה)');
     expect(acceleratingDilution.shares.trendDirection).toBe('accelerating');
     expect(acceleratingDilution.shares.trendTone).toBe('worsening');
-    expect(acceleratingDilution.shares.trendLabelHe).toBe('מגמת הדילול: בעלייה ↑ (מחמיר)');
+    expect(acceleratingDilution.shares.trendLabelHe).toBe('קצב דילול: מואץ (מחמיר)');
 
     // 3. Steady dilution
     const steadyDilution = calculateTriageMetrics(
@@ -291,7 +296,7 @@ describe('triageCalculator', () => {
     );
     expect(steadyDilution.shares.trendDirection).toBe('steady');
     expect(steadyDilution.shares.trendTone).toBe('steady');
-    expect(steadyDilution.shares.trendLabelHe).toBe('מגמת הדילול: קצב יציב →');
+    expect(steadyDilution.shares.trendLabelHe).toBe('קצב דילול: יציב');
 
     // 4. Accelerating buybacks (improving)
     const acceleratingBuybacks = calculateTriageMetrics(
@@ -303,10 +308,10 @@ describe('triageCalculator', () => {
         [2024, 89], // -5.32%
       ])
     );
-    expect(acceleratingBuybacks.shares.valueHe).toBe('↓ -5.3% מניות (בייבאק)');
+    expect(acceleratingBuybacks.shares.valueHe).toBe('-5.3% בכמות המניות (שנה אחרונה)');
     expect(acceleratingBuybacks.shares.trendDirection).toBe('accelerating');
     expect(acceleratingBuybacks.shares.trendTone).toBe('improving');
-    expect(acceleratingBuybacks.shares.trendLabelHe).toBe('מגמת הבייבאקס: בעלייה ↑ (משתפר)');
+    expect(acceleratingBuybacks.shares.trendLabelHe).toBe('קצב רכישה עצמית: מואץ');
 
     // 5. Slowing buybacks
     const slowingBuybacks = calculateTriageMetrics(
@@ -318,10 +323,10 @@ describe('triageCalculator', () => {
         [2024, 89.0], // -0.56%
       ])
     );
-    expect(slowingBuybacks.shares.valueHe).toBe('↓ -0.6% מניות (בייבאק)');
+    expect(slowingBuybacks.shares.valueHe).toBe('-0.6% בכמות המניות (שנה אחרונה)');
     expect(slowingBuybacks.shares.trendDirection).toBe('slowing');
     expect(slowingBuybacks.shares.trendTone).toBe('slowing');
-    expect(slowingBuybacks.shares.trendLabelHe).toBe('מגמת הבייבאקס: בירידה ↓ (האטה)');
+    expect(slowingBuybacks.shares.trendLabelHe).toBe('קצב רכישה עצמית: האטה');
 
     // 6. Steady buybacks
     const steadyBuybacks = calculateTriageMetrics(
@@ -335,7 +340,7 @@ describe('triageCalculator', () => {
     );
     expect(steadyBuybacks.shares.trendDirection).toBe('steady');
     expect(steadyBuybacks.shares.trendTone).toBe('steady');
-    expect(steadyBuybacks.shares.trendLabelHe).toBe('מגמת הבייבאקס: קצב יציב →');
+    expect(steadyBuybacks.shares.trendLabelHe).toBe('קצב רכישה עצמית: יציב');
   });
 
   it('uses filing currency unit (€M) and falls through empty share arrays (#348)', () => {
@@ -754,19 +759,16 @@ describe('triageCalculator', () => {
 
       expect(hdLike.shares.status).toBe('pass');
       expect(hdLike.shares.changePct).toBe(0.2);
-      expect(hdLike.shares.value).toBe('Flat Share Count');
+      expect(hdLike.shares.value).toBe('~0% shares (YoY)');
+      expect(hdLike.shares.valueHe).toBe('~0% בכמות המניות (שנה אחרונה)');
       expect(hdLike.shares.badge).toBe('No Dilution');
       expect(hdLike.shares.badgeHe).toBe('ללא דילול');
       expect(hdLike.shares.trendDirection).toBe('slowing');
       expect(hdLike.shares.trendTone).toBe('slowing');
-      expect(hdLike.shares.trendLabelHe).toBe('מגמת הבייבאקס: האטה / הפסקה זמנית ↓');
-      expect(hdLike.shares.trendLabelEn).toBe('Buyback trend: Slowed / Paused ↓');
-      expect(hdLike.shares.detail).toBe(
-        'כמות מניות יציבה השנה (האטה בקצב הרכישה העצמית לאחר צמצום רב-שנתי)'
-      );
-      expect(hdLike.shares.detailEn).toBe(
-        'Flat share count this year (buyback pace paused after multi-year net reduction)'
-      );
+      expect(hdLike.shares.trendLabelHe).toBe('קצב רכישה עצמית: הפסקה זמנית');
+      expect(hdLike.shares.trendLabelEn).toBe('Buyback pace: Temporarily paused');
+      expect(hdLike.shares.detail).toBe('יציב השנה לאחר צמצום של 40.0% במניות מאז 2011');
+      expect(hdLike.shares.detailEn).toBe('Flat this year after retiring 40.0% of shares since 2011');
     });
 
     it('treats slight +0.4% YoY tick after multi-year buyback reduction as buyback pause rather than worsening dilution', () => {
@@ -781,11 +783,12 @@ describe('triageCalculator', () => {
       );
 
       expect(slightTick.shares.status).toBe('warn');
-      expect(slightTick.shares.value).toBe('+0.4% / yr');
+      expect(slightTick.shares.value).toBe('+0.4% shares (YoY)');
+      expect(slightTick.shares.valueHe).toBe('+0.4% בכמות המניות (שנה אחרונה)');
       expect(slightTick.shares.badge).toBe('Moderate Dilution');
       expect(slightTick.shares.trendDirection).toBe('slowing');
       expect(slightTick.shares.trendTone).toBe('slowing');
-      expect(slightTick.shares.trendLabelHe).toBe('מגמת הבייבאקס: האטה / הפסקה זמנית ↓');
+      expect(slightTick.shares.trendLabelHe).toBe('קצב רכישה עצמית: הפסקה זמנית');
     });
 
     it('keeps moderate (+1.5%), aggressive (+5.0%), and regular non-buyback flat dilution behavior intact', () => {
@@ -796,7 +799,7 @@ describe('triageCalculator', () => {
         ])
       );
       expect(moderate.shares.status).toBe('warn');
-      expect(moderate.shares.value).toBe('+1.5% / yr');
+      expect(moderate.shares.value).toBe('+1.5% shares (YoY)');
       expect(moderate.shares.badge).toBe('Moderate Dilution');
       expect(moderate.shares.badgeHe).toBe('דילול מתון');
 
@@ -807,7 +810,7 @@ describe('triageCalculator', () => {
         ])
       );
       expect(aggressive.shares.status).toBe('fail');
-      expect(aggressive.shares.value).toBe('+5.0% / yr');
+      expect(aggressive.shares.value).toBe('+5.0% shares (YoY)');
       expect(aggressive.shares.badge).toBe('Diluting');
       expect(aggressive.shares.badgeHe).toBe('דילול מניות');
 
@@ -821,6 +824,128 @@ describe('triageCalculator', () => {
       );
       expect(regularFlat.shares.status).toBe('pass');
       expect(regularFlat.shares.detail).toBe('ללא דילול מניות משמעותי');
+    });
+  });
+
+  describe('Final Polish (#24) — Recency-aware MSFT margins, HD erosion, 4.7% CAGR, and copy clarity', () => {
+    it('passes 15Y MSFT fixture despite FY2015 19.4% drop (11+ years ago) followed by 10Y expansion to 46.8%', () => {
+      const msft15Y = calculateTriageMetrics({
+        metrics: {
+          revenue: {
+            annual: [
+              { fiscalYear: 2012, value: 73723000000 },
+              { fiscalYear: 2013, value: 77849000000 },
+              { fiscalYear: 2014, value: 86833000000 },
+              { fiscalYear: 2015, value: 93580000000 },
+              { fiscalYear: 2016, value: 91154000000 }, // Isolated decade-old dip
+              { fiscalYear: 2017, value: 96571000000 },
+              { fiscalYear: 2018, value: 110360000000 },
+              { fiscalYear: 2019, value: 125843000000 },
+              { fiscalYear: 2020, value: 143015000000 },
+              { fiscalYear: 2021, value: 168088000000 },
+              { fiscalYear: 2022, value: 198270000000 },
+              { fiscalYear: 2023, value: 211915000000 },
+              { fiscalYear: 2024, value: 245122000000 },
+              { fiscalYear: 2025, value: 281724000000 },
+              { fiscalYear: 2026, value: 315000000000 },
+            ],
+          },
+          operatingIncome: {
+            annual: [
+              { fiscalYear: 2012, value: 21763000000 }, // 29.5%
+              { fiscalYear: 2013, value: 26764000000 }, // 34.4%
+              { fiscalYear: 2014, value: 27759000000 }, // 32.0%
+              { fiscalYear: 2015, value: 18161000000 }, // 19.4% (-12.6pp 11 years ago — outside last 10 points)
+              { fiscalYear: 2016, value: 20182000000 }, // 22.1%
+              { fiscalYear: 2017, value: 28006000000 }, // 29.0%
+              { fiscalYear: 2018, value: 35094000000 }, // 31.8%
+              { fiscalYear: 2019, value: 42912000000 }, // 34.1%
+              { fiscalYear: 2020, value: 52916000000 }, // 37.0%
+              { fiscalYear: 2021, value: 69925000000 }, // 41.6%
+              { fiscalYear: 2022, value: 83472000000 }, // 42.1%
+              { fiscalYear: 2023, value: 88580000000 }, // 41.8%
+              { fiscalYear: 2024, value: 109324000000 }, // 44.6%
+              { fiscalYear: 2025, value: 128466000000 }, // 45.6%
+              { fiscalYear: 2026, value: 147420000000 }, // 46.8%
+            ],
+          },
+          weightedAverageSharesDiluted: {
+            annual: [
+              { fiscalYear: 2012, value: 8506000000 },
+              { fiscalYear: 2019, value: 7753000000 },
+              { fiscalYear: 2024, value: 7469000000 },
+              { fiscalYear: 2025, value: 7433000000 },
+              { fiscalYear: 2026, value: 7396000000 }, // -0.5% YoY
+            ],
+          },
+          stockRepurchases: {
+            annual: [
+              { fiscalYear: 2025, value: 18000000000 },
+              { fiscalYear: 2026, value: 16500000000 },
+            ],
+          },
+          currentAssets: { annual: [{ fiscalYear: 2026, value: 160000000000 }] },
+          currentLiabilities: { annual: [{ fiscalYear: 2026, value: 120000000000 }] }, // 1.33x warn
+        },
+      });
+
+      expect(msft15Y.revenue.status).toBe('pass');
+      expect(msft15Y.margins.status).toBe('pass');
+      expect(msft15Y.margins.badgeHe).toBe('גבוהים ויציבים');
+      expect(msft15Y.margins.historyMeta.recentMarginDrawdown).toBe(0.3);
+      expect(msft15Y.margins.metricSummaryHe).toBe(
+        `ממוצע 2012–2026: ${msft15Y.margins.historyMeta.avg.toFixed(1)}% (הקו המקווקו בגרף)`
+      );
+      expect(msft15Y.shares.status).toBe('pass');
+      expect(msft15Y.shares.valueHe).toBe('-0.5% בכמות המניות (שנה אחרונה)');
+      expect(msft15Y.shares.valueHe).not.toMatch(/[↓↑]/);
+      expect(msft15Y.shares.metricSummaryHe).toBe('השקעה ברכישה עצמית אשתקד: $16.5B');
+      expect(msft15Y.shares.metricSummaryHe).not.toContain('קצב שנתי');
+      expect(msft15Y.currentRatio.status).toBe('warn');
+      expect(msft15Y.currentRatio.metricSummaryHe).toBe('כרית נזילות צרה לטווח הקצר');
+    });
+
+    it('flags HD trailing 3-year margin erosion (15.3% -> 12.7%), shows 4.7% CAGR detail, and uses singular down-year Hebrew grammar', () => {
+      const hdFixture = calculateTriageMetrics({
+        metrics: {
+          revenue: {
+            annual: [
+              { fiscalYear: 2019, value: 108203000000 },
+              { fiscalYear: 2020, value: 110225000000 },
+              { fiscalYear: 2021, value: 132110000000 },
+              { fiscalYear: 2022, value: 151157000000 },
+              { fiscalYear: 2023, value: 157403000000 },
+              { fiscalYear: 2024, value: 152669000000 }, // -3.0% single down year
+              { fiscalYear: 2025, value: 159514000000 },
+              { fiscalYear: 2026, value: 166220000000 }, // 5Y CAGR 2021->2026 = 4.7%
+            ],
+          },
+          operatingIncome: {
+            annual: [
+              { fiscalYear: 2019, value: 15798000000 }, // 14.6%
+              { fiscalYear: 2020, value: 15872000000 }, // 14.4%
+              { fiscalYear: 2021, value: 18231000000 }, // 13.8%
+              { fiscalYear: 2022, value: 22976000000 }, // 15.2%
+              { fiscalYear: 2023, value: 24083000000 }, // 15.3% peak
+              { fiscalYear: 2024, value: 21679000000 }, // 14.2% (down 1)
+              { fiscalYear: 2025, value: 21534000000 }, // 13.5% (down 2)
+              { fiscalYear: 2026, value: 21110000000 }, // 12.7% (down 3, total -2.6pp)
+            ],
+          },
+        },
+      });
+
+      expect(hdFixture.margins.status).toBe('warn');
+      expect(hdFixture.margins.badgeHe).toBe('שחיקה בשוליים');
+      expect(hdFixture.margins.badge).toBe('Margin Erosion');
+      expect(hdFixture.margins.historyMeta.recentConsecutiveDownYears).toBe(3);
+      expect(hdFixture.margins.historyMeta.recentErosionPp).toBe(2.6);
+      expect(hdFixture.margins.detail).toBe('שולי הרווח בירידה 3 שנים רצופות (מ-15.3% ל-12.7%)');
+
+      expect(hdFixture.revenue.status).toBe('warn');
+      expect(hdFixture.revenue.detail).toBe('צמיחה איטית בהכנסות (קצב ממוצע 4.7%, מתחת ל-5%)');
+      expect(hdFixture.revenue.detail).not.toContain('~5% מתחת ל-5%');
+      expect(hdFixture.revenue.historyMeta.cycleBadgeHe).toBe('שנת ירידה אחת');
     });
   });
 });
