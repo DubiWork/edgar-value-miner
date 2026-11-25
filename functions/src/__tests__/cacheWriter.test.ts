@@ -270,16 +270,17 @@ describe('cacheWriterHandler', () => {
     expect(writeData.companyName).toBe('AAPL');
   });
 
-  it('throws resource-exhausted HttpsError when companyFacts blob exceeds Firestore size limit (>900KB)', async () => {
+  it('skips Firestore write with skippedReason: too_large when companyFacts blob exceeds Firestore size limit (>900KB)', async () => {
     const largeFacts = { facts: { 'us-gaap': { x: 'a'.repeat(950_000) } } };
     mockSecResponses(largeFacts);
     makeDocRef(false);
 
-    await expect(
-      cacheWriterHandler(makeReq({ ticker: 'AAPL' }))
-    ).rejects.toMatchObject({
-      code: 'resource-exhausted',
-      message: expect.stringContaining('too large for Firestore'),
+    const result = await cacheWriterHandler(makeReq({ ticker: 'AAPL' }));
+    expect(result).toEqual({
+      ticker: 'AAPL',
+      latestFiledDate: null,
+      updated: false,
+      skippedReason: 'too_large',
     });
     expect(mockSet).not.toHaveBeenCalled();
   });
@@ -386,6 +387,39 @@ describe('cacheWriterHandler', () => {
       // Because doc is fresh (<90 days), SEC is not contacted at all
       expect(mockFetchFromSec).not.toHaveBeenCalled();
       expect(result).toEqual({ ticker: 'AAPL', latestFiledDate: '2024-11-01', updated: false });
+    });
+
+    it('rejects forceRefresh when caller is not an authorized admin', async () => {
+      makeDocRef(true, { lastUpdated: daysAgo(1), latestFiledDate: '2024-11-01' });
+
+      await expect(
+        cacheWriterHandler({
+          data: { ticker: 'AAPL', forceRefresh: true },
+          auth: { token: { email: 'randomuser@example.com' } },
+        } as any)
+      ).rejects.toMatchObject({
+        code: 'permission-denied',
+      });
+      expect(mockFetchFromSec).not.toHaveBeenCalled();
+    });
+
+    it('bypasses freshness check and overwrites Firestore doc when admin passes forceRefresh: true', async () => {
+      const facts = makeCompanyFacts('2024-11-01', 'Apple Inc.');
+      mockSecResponses(facts);
+      makeDocRef(true, {
+        lastUpdated: daysAgo(1),
+        latestFiledDate: '2024-11-01',
+        accessCount: 7,
+      });
+
+      const result = await cacheWriterHandler({
+        data: { ticker: 'AAPL', forceRefresh: true },
+        auth: { token: { email: 'dubigreenfeld@gmail.com' } },
+      } as any);
+
+      expect(mockFetchFromSec).toHaveBeenCalledWith('companyFacts', 320193);
+      expect(mockSet).toHaveBeenCalledOnce();
+      expect(result).toEqual({ ticker: 'AAPL', latestFiledDate: '2024-11-01', updated: true });
     });
   });
 });

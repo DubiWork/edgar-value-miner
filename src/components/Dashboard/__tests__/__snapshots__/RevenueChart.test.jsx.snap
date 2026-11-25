@@ -8,15 +8,15 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
 >
   <div
     class="recharts-responsive-container"
-    style="width: 100%; height: 300px; min-width: 0px;"
+    style="width: 100%; height: 400px; min-width: 0px;"
   >
     <div
       style="width: 0px; overflow-x: visible;"
     >
       <div
         class="recharts-wrapper"
-        height="300"
-        style="position: relative; cursor: default; width: 600px; height: 300px;"
+        height="400"
+        style="position: relative; cursor: default; width: 600px; height: 400px;"
         width="600"
       >
         <div
@@ -27,11 +27,11 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
         />
         <svg
           class="recharts-surface"
-          height="300"
+          height="400"
           role="application"
           style="width: 100%; height: 100%; display: block;"
           tabindex="0"
-          viewBox="0 0 600 300"
+          viewBox="0 0 600 400"
           width="600"
         >
           <title />
@@ -47,7 +47,7 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
               >
                 <line
                   fill="none"
-                  height="242"
+                  height="342"
                   stroke="#e2e8f0"
                   stroke-dasharray="3 3"
                   width="516"
@@ -55,12 +55,12 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   x1="68"
                   x2="584"
                   y="24"
-                  y1="266"
-                  y2="266"
+                  y1="366"
+                  y2="366"
                 />
                 <line
                   fill="none"
-                  height="242"
+                  height="342"
                   stroke="#e2e8f0"
                   stroke-dasharray="3 3"
                   width="516"
@@ -68,12 +68,12 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   x1="68"
                   x2="584"
                   y="24"
-                  y1="205.5"
-                  y2="205.5"
+                  y1="280.5"
+                  y2="280.5"
                 />
                 <line
                   fill="none"
-                  height="242"
+                  height="342"
                   stroke="#e2e8f0"
                   stroke-dasharray="3 3"
                   width="516"
@@ -81,12 +81,12 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   x1="68"
                   x2="584"
                   y="24"
-                  y1="145"
-                  y2="145"
+                  y1="195"
+                  y2="195"
                 />
                 <line
                   fill="none"
-                  height="242"
+                  height="342"
                   stroke="#e2e8f0"
                   stroke-dasharray="3 3"
                   width="516"
@@ -94,12 +94,12 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   x1="68"
                   x2="584"
                   y="24"
-                  y1="84.5"
-                  y2="84.5"
+                  y1="109.5"
+                  y2="109.5"
                 />
                 <line
                   fill="none"
-                  height="242"
+                  height="342"
                   stroke="#e2e8f0"
                   stroke-dasharray="3 3"
                   width="516"
@@ -118,10 +118,10 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
           />
           <defs>
             <clippath
-              id="recharts573-clip"
+              id="recharts577-clip"
             >
               <rect
-                height="242"
+                height="342"
                 width="516"
                 x="68"
                 y="24"
@@ -152,14 +152,14 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   >
                     <path
                       class="recharts-rectangle"
-                      d="M78.32,112.5947A 4,4,0,0,1,82.32,108.5947L 156.32,108.5947A 4,4,0,0,1,
-        160.32,112.5947L 160.32,266L 78.32,266Z"
+                      d="M78.32,147.5512A 4,4,0,0,1,82.32,143.5512L 156.32,143.5512A 4,4,0,0,1,
+        160.32,147.5512L 160.32,366L 78.32,366Z"
                       fill="#0284c7"
-                      height="157.4053"
+                      height="222.4488"
                       name="undefined"
                       width="82"
                       x="78.32"
-                      y="108.5947"
+                      y="143.5512"
                     />
                   </g>
                   <g
@@ -167,14 +167,14 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   >
                     <path
                       class="recharts-rectangle"
-                      d="M181.52,103.9184A 4,4,0,0,1,185.52,99.9184L 259.52,99.9184A 4,4,0,0,1,
-        263.52,103.9184L 263.52,266L 181.52,266Z"
+                      d="M181.52,135.2897A 4,4,0,0,1,185.52,131.2897L 259.52,131.2897A 4,4,0,0,1,
+        263.52,135.2897L 263.52,366L 181.52,366Z"
                       fill="#0284c7"
-                      height="166.0816"
+                      height="234.7103"
                       name="undefined"
                       width="82"
                       x="181.52"
-                      y="99.9184"
+                      y="131.2897"
                     />
                   </g>
                   <g
@@ -182,14 +182,14 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   >
                     <path
                       class="recharts-rectangle"
-                      d="M284.72,48.6807A 4,4,0,0,1,288.72,44.6807L 362.72,44.6807A 4,4,0,0,1,
-        366.72,48.6807L 366.72,266L 284.72,266Z"
+                      d="M284.72,57.2265A 4,4,0,0,1,288.72,53.2265L 362.72,53.2265A 4,4,0,0,1,
+        366.72,57.2265L 366.72,366L 284.72,366Z"
                       fill="#0284c7"
-                      height="221.3193"
+                      height="312.7735"
                       name="undefined"
                       width="82"
                       x="284.72"
-                      y="44.6807"
+                      y="53.2265"
                     />
                   </g>
                   <g
@@ -197,14 +197,14 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   >
                     <path
                       class="recharts-rectangle"
-                      d="M387.92,31.4316A 4,4,0,0,1,391.92,27.4316L 465.92,27.4316A 4,4,0,0,1,
-        469.92,31.4316L 469.92,266L 387.92,266Z"
+                      d="M387.92,32.8496A 4,4,0,0,1,391.92,28.8496L 465.92,28.8496A 4,4,0,0,1,
+        469.92,32.8496L 469.92,366L 387.92,366Z"
                       fill="#0284c7"
-                      height="238.5684"
+                      height="337.1504"
                       name="undefined"
                       width="82"
                       x="387.92"
-                      y="27.4316"
+                      y="28.8496"
                     />
                   </g>
                   <g
@@ -212,14 +212,14 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   >
                     <path
                       class="recharts-rectangle"
-                      d="M491.12,38.1126A 4,4,0,0,1,495.12,34.1126L 569.12,34.1126A 4,4,0,0,1,
-        573.12,38.1126L 573.12,266L 491.12,266Z"
+                      d="M491.12,42.2913A 4,4,0,0,1,495.12,38.2913L 569.12,38.2913A 4,4,0,0,1,
+        573.12,42.2913L 573.12,366L 491.12,366Z"
                       fill="#0284c7"
-                      height="231.8874"
+                      height="327.7087"
                       name="undefined"
                       width="82"
                       x="491.12"
-                      y="34.1126"
+                      y="38.2913"
                     />
                   </g>
                 </g>
@@ -246,9 +246,9 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                 x="68"
                 x1="68"
                 x2="584"
-                y="266"
-                y1="266"
-                y2="266"
+                y="366"
+                y1="366"
+                y2="366"
               />
               <g
                 class="recharts-cartesian-axis-ticks recharts-xAxis-ticks"
@@ -333,7 +333,7 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   text-anchor="middle"
                   width="516"
                   x="119.6"
-                  y="274"
+                  y="374"
                 >
                   <tspan
                     dy="0.71em"
@@ -356,7 +356,7 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   text-anchor="middle"
                   width="516"
                   x="222.79999999999998"
-                  y="274"
+                  y="374"
                 >
                   <tspan
                     dy="0.71em"
@@ -379,7 +379,7 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   text-anchor="middle"
                   width="516"
                   x="326"
-                  y="274"
+                  y="374"
                 >
                   <tspan
                     dy="0.71em"
@@ -402,7 +402,7 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   text-anchor="middle"
                   width="516"
                   x="429.20000000000005"
-                  y="274"
+                  y="374"
                 >
                   <tspan
                     dy="0.71em"
@@ -425,7 +425,7 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   text-anchor="middle"
                   width="516"
                   x="532.4"
-                  y="274"
+                  y="374"
                 >
                   <tspan
                     dy="0.71em"
@@ -446,13 +446,13 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   class="recharts-text recharts-cartesian-axis-tick-value"
                   fill="#94a3b8"
                   font-size="12"
-                  height="242"
+                  height="342"
                   orientation="left"
                   stroke="none"
                   text-anchor="end"
                   width="60"
                   x="60"
-                  y="266"
+                  y="366"
                 >
                   <tspan
                     dy="0.355em"
@@ -469,13 +469,13 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   class="recharts-text recharts-cartesian-axis-tick-value"
                   fill="#94a3b8"
                   font-size="12"
-                  height="242"
+                  height="342"
                   orientation="left"
                   stroke="none"
                   text-anchor="end"
                   width="60"
                   x="60"
-                  y="205.5"
+                  y="280.5"
                 >
                   <tspan
                     dy="0.355em"
@@ -492,13 +492,13 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   class="recharts-text recharts-cartesian-axis-tick-value"
                   fill="#94a3b8"
                   font-size="12"
-                  height="242"
+                  height="342"
                   orientation="left"
                   stroke="none"
                   text-anchor="end"
                   width="60"
                   x="60"
-                  y="145"
+                  y="195"
                 >
                   <tspan
                     dy="0.355em"
@@ -515,13 +515,13 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   class="recharts-text recharts-cartesian-axis-tick-value"
                   fill="#94a3b8"
                   font-size="12"
-                  height="242"
+                  height="342"
                   orientation="left"
                   stroke="none"
                   text-anchor="end"
                   width="60"
                   x="60"
-                  y="84.5"
+                  y="109.5"
                 >
                   <tspan
                     dy="0.355em"
@@ -538,7 +538,7 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                   class="recharts-text recharts-cartesian-axis-tick-value"
                   fill="#94a3b8"
                   font-size="12"
-                  height="242"
+                  height="342"
                   orientation="left"
                   stroke="none"
                   text-anchor="end"
@@ -563,7 +563,7 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                 data-testid="yoy-label"
                 text-anchor="middle"
                 x="222.51999999999998"
-                y="91.91842499999998"
+                y="123.28967499999999"
               >
                 +5.5%
               </text>
@@ -572,7 +572,7 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                 data-testid="yoy-label"
                 text-anchor="middle"
                 x="325.71999999999997"
-                y="36.68071499999999"
+                y="45.22646499999999"
               >
                 +33.3%
               </text>
@@ -581,7 +581,7 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                 data-testid="yoy-label"
                 text-anchor="middle"
                 x="428.92"
-                y="19.431559999999994"
+                y="20.84955999999999"
               >
                 +7.8%
               </text>
@@ -590,7 +590,7 @@ exports[`RevenueChart > Snapshot tests > matches snapshot for 5-year data 1`] = 
                 data-testid="yoy-label"
                 text-anchor="middle"
                 x="532.12"
-                y="26.112574999999993"
+                y="30.291324999999993"
               >
                 -2.8%
               </text>

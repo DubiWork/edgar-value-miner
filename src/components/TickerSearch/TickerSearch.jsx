@@ -11,10 +11,12 @@
 
 import { useState, useRef, useEffect, useCallback, useId } from 'react';
 import PropTypes from 'prop-types';
-import { Search, X, Clock, Loader2 } from 'lucide-react';
+import { Search, X, Clock, Loader2, RefreshCw } from 'lucide-react';
 import { useTickerAutocomplete } from '../../hooks/useTickerAutocomplete';
 import { useRecentSearches } from '../../hooks/useRecentSearches';
-import { sanitizeTickerInput } from '../../utils/inputSanitization';
+import * as sanitization from '../../utils/inputSanitization';
+
+const TICKER_SHAPE_REGEX = /^[A-Z]{1,5}(?:[.-][A-Z0-9]{1,2})?$/;
 
 // =============================================================================
 // Sub-components
@@ -83,7 +85,8 @@ SuggestionItem.propTypes = {
  * @param {'hero'|'compact'} props.variant - Layout variant
  * @param {Function} props.onSearch - Callback when a search is triggered
  * @param {boolean} props.isSearching - Whether a search is currently in progress
- * @param {boolean} props.autoFocus - Whether to auto-focus on mount (desktop only)
+ * @param {boolean} props.autoFocus - Whether to auto-focus on mount (desktop only unless autoFocusOnMobile)
+ * @param {boolean} props.autoFocusOnMobile - Allow auto-focus even on mobile viewports (e.g. inside modal)
  * @param {string} props.className - Additional CSS classes
  */
 export function TickerSearch({
@@ -91,6 +94,7 @@ export function TickerSearch({
   onSearch,
   isSearching = false,
   autoFocus = false,
+  autoFocusOnMobile = false,
   className = '',
 }) {
   // State
@@ -98,6 +102,7 @@ export function TickerSearch({
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [showRecent, setShowRecent] = useState(false);
+  const [inlineFeedback, setInlineFeedback] = useState(null);
 
   // Instance-unique IDs for ARIA (supports multiple TickerSearch instances)
   const instanceId = useId();
@@ -112,9 +117,13 @@ export function TickerSearch({
   const {
     suggestions,
     isLoading: isTickersLoading,
+    isReady: isTickersReady,
+    loadError: tickersLoadError,
     setQuery,
     loadTickers,
     clearSuggestions,
+    resolveQuery,
+    resolveQuerySync,
   } = useTickerAutocomplete();
 
   const {
@@ -130,6 +139,7 @@ export function TickerSearch({
 
   const isDropdownOpen = isOpen && (
     displayItems.length > 0 ||
+    Boolean(inlineFeedback) ||
     (isTickersLoading && inputValue.length > 0) ||
     (!isTickersLoading && inputValue.length > 0 && suggestions.length === 0 && !showRecent)
   );
@@ -139,10 +149,10 @@ export function TickerSearch({
   // -------------------------------------------------------------------------
 
   useEffect(() => {
-    if (autoFocus && variant === 'hero' && inputRef.current) {
-      // Check if device likely has a physical keyboard (not mobile)
-      const isDesktop = window.matchMedia('(min-width: 768px)').matches;
-      if (isDesktop) {
+    if (autoFocus && inputRef.current) {
+      const isDesktopHero =
+        variant === 'hero' && window.matchMedia('(min-width: 768px)').matches;
+      if (autoFocusOnMobile || isDesktopHero) {
         // Small delay to ensure the component is rendered
         const timer = setTimeout(() => {
           inputRef.current?.focus();
@@ -150,7 +160,7 @@ export function TickerSearch({
         return () => clearTimeout(timer);
       }
     }
-  }, [autoFocus, variant]);
+  }, [autoFocus, autoFocusOnMobile, variant]);
 
   // -------------------------------------------------------------------------
   // Click outside handler
@@ -183,7 +193,8 @@ export function TickerSearch({
 
   const handleInputChange = useCallback((e) => {
     const raw = e.target.value;
-    const { sanitized } = sanitizeTickerInput(raw);
+    const sanitizeFn = sanitization.sanitizeSearchQuery || sanitization.sanitizeTickerInput;
+    const { sanitized } = sanitizeFn(raw);
     const upper = sanitized.toUpperCase();
 
     setInputValue(upper);
@@ -191,6 +202,7 @@ export function TickerSearch({
     setIsOpen(true);
     setShowRecent(false);
     setHighlightedIndex(-1);
+    setInlineFeedback(null);
   }, [setQuery]);
 
   const handleSelect = useCallback((item) => {
@@ -201,6 +213,7 @@ export function TickerSearch({
     setIsOpen(false);
     setShowRecent(false);
     setHighlightedIndex(-1);
+    setInlineFeedback(null);
     clearSuggestions();
 
     addRecentSearch(ticker, companyName);
@@ -210,29 +223,101 @@ export function TickerSearch({
     }
   }, [onSearch, addRecentSearch, clearSuggestions]);
 
-  const handleSubmit = useCallback((e) => {
+  const submitResolvedTicker = useCallback((ticker, companyName = '') => {
+    setIsOpen(false);
+    setShowRecent(false);
+    setHighlightedIndex(-1);
+    setInlineFeedback(null);
+    clearSuggestions();
+
+    addRecentSearch(ticker, companyName);
+
+    if (onSearch) {
+      onSearch(ticker);
+    }
+  }, [onSearch, addRecentSearch, clearSuggestions]);
+
+  const handleSubmit = useCallback(async (e) => {
     if (e) e.preventDefault();
 
-    // If a suggestion is highlighted, select it
+    // 1. If a suggestion is highlighted, select it immediately
     if (highlightedIndex >= 0 && highlightedIndex < displayItems.length) {
       handleSelect(displayItems[highlightedIndex]);
       return;
     }
 
-    // Otherwise submit the raw input
-    const trimmed = inputValue.trim();
+    const trimmed = inputValue.trim().toUpperCase();
     if (!trimmed) return;
 
-    setIsOpen(false);
-    setShowRecent(false);
-    clearSuggestions();
+    const isTickerShape = TICKER_SHAPE_REGEX.test(trimmed);
+    const alias = trimmed.includes('.') ? trimmed.replace(/\./g, '-') : trimmed.replace(/-/g, '.');
 
-    addRecentSearch(trimmed, '');
-
-    if (onSearch) {
-      onSearch(trimmed);
+    // 2. Check current live suggestions first
+    if (suggestions.length > 0) {
+      const exactInSuggestions = suggestions.find((item) => {
+        const t = String(item.ticker || '').toUpperCase();
+        return t === trimmed || t === alias;
+      });
+      if (exactInSuggestions) {
+        handleSelect(exactInSuggestions);
+        return;
+      }
+      if (!isTickerShape || suggestions.length > 0) {
+        handleSelect(suggestions[0]);
+        return;
+      }
     }
-  }, [highlightedIndex, displayItems, inputValue, onSearch, addRecentSearch, clearSuggestions, handleSelect]);
+
+    // 3. If directory is already loaded synchronously, check exact/company-name matches before debounce
+    if (isTickersReady && typeof resolveQuerySync === 'function') {
+      const syncResult = resolveQuerySync(trimmed);
+      if (syncResult.exactTickerMatch) {
+        handleSelect(syncResult.exactTickerMatch);
+        return;
+      }
+      if (syncResult.bestMatch) {
+        handleSelect(syncResult.bestMatch);
+        return;
+      }
+    }
+
+    // 4. For company-name / multi-word / long queries (not a valid ticker shape), resolve via directory
+    // and show helpful inline guidance instead of navigating to a full-page Error screen.
+    if (!isTickerShape) {
+      if (typeof resolveQuery === 'function') {
+        const resolved = await resolveQuery(trimmed);
+        if (resolved.exactTickerMatch) {
+          handleSelect(resolved.exactTickerMatch);
+          return;
+        }
+        if (resolved.bestMatch) {
+          handleSelect(resolved.bestMatch);
+          return;
+        }
+        setIsOpen(true);
+        setShowRecent(false);
+        setInlineFeedback(
+          resolved.loadFailed
+            ? 'לא הצלחנו לטעון הצעות כרגע — נסה להזין סימול מניה קצר באנגלית (כמו AAPL, MSFT, SAP) או ללחוץ לניסיון חוזר.'
+            : `לא נמצאה חברה תואמת עבור "${trimmed}" — נסה שם חברה באנגלית או סימול מניה (כמו AAPL, MSFT, SAP).`
+        );
+        return;
+      }
+    }
+
+    // 5. Direct short ticker symbol submission
+    submitResolvedTicker(trimmed, '');
+  }, [
+    highlightedIndex,
+    displayItems,
+    inputValue,
+    suggestions,
+    isTickersReady,
+    resolveQuerySync,
+    resolveQuery,
+    handleSelect,
+    submitResolvedTicker,
+  ]);
 
   const handleClear = useCallback(() => {
     setInputValue('');
@@ -241,6 +326,7 @@ export function TickerSearch({
     setHighlightedIndex(-1);
     setIsOpen(false);
     setShowRecent(false);
+    setInlineFeedback(null);
     inputRef.current?.focus();
   }, [setQuery, clearSuggestions]);
 
@@ -281,6 +367,7 @@ export function TickerSearch({
       case 'Escape': {
         e.preventDefault();
         if (isDropdownOpen) {
+          e.stopPropagation();
           setIsOpen(false);
           setShowRecent(false);
           setHighlightedIndex(-1);
@@ -442,14 +529,51 @@ export function TickerSearch({
             />
           ))}
 
+          {/* Inline feedback on unmatched company-name Enter */}
+          {inlineFeedback && (
+            <li
+              className="px-4 py-3 text-sm text-amber-800 dark:text-amber-300 bg-amber-50/90 dark:bg-amber-950/30 border-t border-amber-200/70 dark:border-amber-800/40 text-center"
+              role="status"
+              dir="auto"
+              data-testid="search-inline-feedback"
+            >
+              {inlineFeedback}
+            </li>
+          )}
+
+          {/* Directory load error with retry action */}
+          {!isTickersLoading && tickersLoadError && !inlineFeedback && inputValue.trim().length > 0 && suggestions.length === 0 && (
+            <li
+              className="px-4 py-3 text-sm text-amber-800 dark:text-amber-300 bg-amber-50/80 dark:bg-amber-950/30 flex flex-col items-center gap-2 text-center"
+              role="presentation"
+              data-testid="tickers-load-error-message"
+            >
+              <span dir="auto">
+                לא ניתן לטעון הצעות כרגע — הקלד סימול מניה קצר (למשל MSFT, AAPL, SAP) ולחץ Enter
+              </span>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  loadTickers();
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold bg-amber-200/70 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900 cursor-pointer transition-colors"
+                data-testid="retry-load-tickers-btn"
+              >
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>נסה לטעון הצעות שוב</span>
+              </button>
+            </li>
+          )}
+
           {/* No results message */}
-          {!isTickersLoading && inputValue.length > 0 && suggestions.length === 0 && (
+          {!isTickersLoading && !tickersLoadError && !inlineFeedback && inputValue.trim().length > 0 && suggestions.length === 0 && (
             <li
               className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center"
               role="presentation"
               data-testid="no-results-message"
             >
-              No matching tickers found
+              No matching tickers found — try an English company name or ticker symbol (e.g. AAPL, MSFT, SAP)
             </li>
           )}
 
@@ -483,6 +607,7 @@ TickerSearch.propTypes = {
   onSearch: PropTypes.func,
   isSearching: PropTypes.bool,
   autoFocus: PropTypes.bool,
+  autoFocusOnMobile: PropTypes.bool,
   className: PropTypes.string,
 };
 

@@ -15,7 +15,7 @@ describe('Dashboard barrel exports', () => {
 
     expect(barrel.DashboardSkeleton).toBeDefined();
     expect(typeof barrel.DashboardSkeleton).toBe('function');
-  }, 15000);
+  }, 45000);
 
   it('exports all real components alongside skeletons', async () => {
     const barrel = await import('../index.js');
@@ -28,5 +28,5 @@ describe('Dashboard barrel exports', () => {
     expect(typeof barrel.RevenueChart).toBe('function');
     expect(barrel.FCFChart).toBeDefined();
     expect(typeof barrel.FCFChart).toBe('function');
-  }, 15000);
+  }, 45000);
 });

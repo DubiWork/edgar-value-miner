@@ -71,6 +71,13 @@ test.describe('Core Flows', () => {
     await input.fill('AAPL');
     await input.press('Enter');
 
+    // Pass Step 1 Triage Gatekeeper
+    const continueBtn = page.getByRole('button', {
+      name: /I understand how this company makes money - Continue/i,
+    });
+    await expect(continueBtn).toBeVisible({ timeout: 15_000 });
+    await continueBtn.click();
+
     // Dashboard should render (allow extra time for cache-layer fallthrough)
     await expect(
       page.locator(`[data-testid="${SELECTORS.dashboard.layout}"]`),

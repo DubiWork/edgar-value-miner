@@ -13,6 +13,8 @@
  * @module edgarCache
  */
 
+import { NORMALIZATION_VERSION } from '../utils/gaapNormalizer.js';
+
 // =============================================================================
 // Configuration
 // =============================================================================
@@ -24,8 +26,8 @@
 const DB_CONFIG = {
   /** Database name */
   DB_NAME: 'edgar-value-miner',
-  /** Database version — v2: stores normalized output instead of raw SEC JSON */
-  DB_VERSION: 2,
+  /** Database version — v5: invalidates pre-duration-filter entries on upgrade */
+  DB_VERSION: 5,
   /** Object store names */
   STORES: {
     COMPANY_FACTS: 'companyFacts',
@@ -174,12 +176,25 @@ function openDatabase() {
         );
       };
 
+      request.onblocked = () => {
+        dbInitPromise = null;
+        if (import.meta.env.DEV) {
+          console.warn('EdgarCache: Database upgrade blocked by another open tab');
+        }
+        reject(
+          new EdgarCacheError(
+            'IndexedDB upgrade blocked by another open tab',
+            CACHE_ERROR_CODES.DATABASE_ERROR
+          )
+        );
+      };
+
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
         const oldVersion = event.oldVersion;
 
-        // v1→v2: schema changed from raw SEC JSON to normalized output — clear stale entries
-        if (oldVersion < 2 && db.objectStoreNames.contains(DB_CONFIG.STORES.COMPANY_FACTS)) {
+        // v1-v4 -> v5: schema/normalizer changed — clear stale companyFacts entries on upgrade
+        if (oldVersion < 5 && db.objectStoreNames.contains(DB_CONFIG.STORES.COMPANY_FACTS)) {
           db.deleteObjectStore(DB_CONFIG.STORES.COMPANY_FACTS);
         }
 
@@ -322,7 +337,11 @@ function isValidCacheEntry(entry) {
     return false;
   }
 
-  if (!entry.data.metadata || entry.data.metadata.normalized !== true) {
+  if (
+    !entry.data.metadata ||
+    entry.data.metadata.normalized !== true ||
+    entry.data.metadata.normalizationVersion !== NORMALIZATION_VERSION
+  ) {
     return false;
   }
 

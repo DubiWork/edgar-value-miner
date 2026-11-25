@@ -310,6 +310,13 @@ test.describe('Theme Flow', () => {
     await input.fill('AAPL');
     await input.press('Enter');
 
+    // Pass Step 1 Triage Gatekeeper
+    const continueBtn = page.getByRole('button', {
+      name: /I understand how this company makes money - Continue/i,
+    });
+    await expect(continueBtn).toBeVisible({ timeout: 35_000 });
+    await continueBtn.click();
+
     // Wait for dashboard with live Cloud Function data
     await expect(
       page.locator(`[data-testid="${SELECTORS.companyBanner.root}"]`)

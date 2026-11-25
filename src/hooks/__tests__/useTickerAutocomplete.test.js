@@ -34,14 +34,14 @@ vi.mock('../../services/edgarApi', () => ({
   fetchCompanyTickers: vi.fn(),
 }));
 
-vi.mock('../../utils/inputSanitization', () => ({
-  sanitizeTickerInput: vi.fn((input) => {
-    const str = String(input || '');
-    // Simple mock: strip non-alphanumeric except hyphen and period
-    const sanitized = str.replace(/[^A-Za-z0-9.-]/g, '').slice(0, 10);
-    return { sanitized, isValid: sanitized.length > 0, original: str, warnings: [] };
-  }),
-}));
+vi.mock('../../utils/inputSanitization', async () => {
+  const actual = await vi.importActual('../../utils/inputSanitization');
+  return {
+    ...actual,
+    sanitizeTickerInput: vi.fn(actual.sanitizeTickerInput),
+    sanitizeSearchQuery: vi.fn(actual.sanitizeSearchQuery),
+  };
+});
 
 import { fetchCompanyTickers } from '../../services/edgarApi';
 
@@ -109,6 +109,7 @@ describe('useTickerAutocomplete', () => {
     });
 
     expect(result.current.isReady).toBe(false);
+    expect(result.current.loadError).toBe(true);
     expect(result.current.isLoading).toBe(false);
     expect(result.current.suggestions).toEqual([]);
   });
@@ -333,15 +334,36 @@ describe('useTickerAutocomplete', () => {
     expect(result.current.suggestions).toEqual([]);
   });
 
-  it('should sanitize input via sanitizeTickerInput', async () => {
-    const { sanitizeTickerInput } = await import('../../utils/inputSanitization');
+  it('should sanitize input via sanitizeSearchQuery', async () => {
+    const { sanitizeSearchQuery } = await import('../../utils/inputSanitization');
     const { result } = renderHook(() => useTickerAutocomplete());
 
     act(() => {
       result.current.setQuery('<script>AAPL</script>');
     });
 
-    expect(sanitizeTickerInput).toHaveBeenCalledWith('<script>AAPL</script>');
+    expect(sanitizeSearchQuery).toHaveBeenCalledWith('<script>AAPL</script>');
+  });
+
+  it('supports multi-word company-name queries and resolveQuery', async () => {
+    fetchCompanyTickers.mockResolvedValue({
+      ...mockTickerMap,
+      BAC: { cik: 70858, name: 'BANK OF AMERICA CORP /DE/', ticker: 'BAC' },
+      SAP: { cik: 1000184, name: 'SAP SE', ticker: 'SAP' },
+    });
+
+    const { result } = renderHook(() => useTickerAutocomplete());
+
+    act(() => {
+      result.current.setQuery('bank america');
+    });
+
+    const resolved = await act(async () => result.current.resolveQuery('bank america'));
+    expect(resolved.loadFailed).toBe(false);
+    expect(resolved.bestMatch?.ticker).toBe('BAC');
+
+    const sapResolved = await act(async () => result.current.resolveQuery('SAP'));
+    expect(sapResolved.exactTickerMatch?.ticker).toBe('SAP');
   });
 
   it('should return empty suggestions when tickers not loaded and query is set', async () => {
@@ -387,5 +409,33 @@ describe('useTickerAutocomplete', () => {
     expect(result.current.suggestions.length).toBeLessThanOrEqual(8);
     // But should have found results
     expect(result.current.suggestions.length).toBeGreaterThan(0);
+  });
+
+  it('finds exact ticker BA even when 20+ earlier A-prefix companies contain "ba" in their name (Boeing bug)', async () => {
+    const baMap = {};
+    for (let i = 0; i < 20; i++) {
+      const t = `A${String(i).padStart(2, '0')}`;
+      baMap[t] = { cik: 200000 + i, name: `ALIBABA PARTNER ${i} CORP`, ticker: t };
+    }
+    baMap.BA = { cik: 12927, name: 'BOEING CO', ticker: 'BA' };
+
+    fetchCompanyTickers.mockResolvedValue(baMap);
+    const { result } = renderHook(() => useTickerAutocomplete());
+
+    await act(async () => {
+      result.current.loadTickers();
+    });
+
+    act(() => {
+      result.current.setQuery('BA');
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+
+    expect(result.current.suggestions.length).toBeGreaterThan(0);
+    expect(result.current.suggestions[0].ticker).toBe('BA');
+    expect(result.current.suggestions[0].name).toBe('BOEING CO');
   });
 });

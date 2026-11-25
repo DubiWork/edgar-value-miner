@@ -10,8 +10,19 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react';
 import App from '../App';
+
+function render(ui, options) {
+  const result = rtlRender(ui, options);
+  const continueBtn = screen.queryByRole('button', {
+    name: /I understand how this company makes money - Continue/i,
+  });
+  if (continueBtn) {
+    fireEvent.click(continueBtn);
+  }
+  return result;
+}
 
 // =============================================================================
 // Mock Setup

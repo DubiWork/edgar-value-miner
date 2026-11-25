@@ -1,7 +1,10 @@
-import { TrendingUp, DollarSign, BarChart3, Gem } from 'lucide-react'
+import { useState } from 'react'
+import { TrendingUp, DollarSign, BarChart3, Gem, LogIn, LogOut, ShieldCheck, Search, Loader2 } from 'lucide-react'
 import { TickerSearch } from './components/TickerSearch'
+import { MobileSearchModal } from './components/TickerSearch/MobileSearchModal'
 import { ThemeToggle } from './components/ThemeToggle'
 import { ErrorFallback } from './components/ErrorBoundary'
+import { Step1Triage } from './components/Stepper'
 import {
   DashboardLayout,
   CompanyBanner,
@@ -19,11 +22,19 @@ import { useStockQuote } from './hooks/useStockQuote'
 import { useKeyMetrics } from './hooks/useKeyMetrics'
 import { useWatchlist } from './hooks/useWatchlist'
 import { useReducedMotion } from './hooks/useReducedMotion'
+import { useAdminAuth } from './hooks/useAdminAuth'
 import gaapNormalizer from './utils/gaapNormalizer'
 import { calculateMargins } from './utils/calculateMargins'
 
 function App() {
-  const { data, loading, error, metadata, searchCompany, clearError } = useCompanySearch()
+  const [currentStep, setCurrentStep] = useState(1)
+  const [dismissedAuthError, setDismissedAuthError] = useState(null)
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+  const [pendingTicker, setPendingTicker] = useState(null)
+  const { data, loading, error, metadata, searchCompany, clearError, reset } = useCompanySearch()
+  const { user, isAdmin, authError, signInWithGoogle, signOutUser, isFirebaseAvailable } = useAdminAuth()
+
+  const activeAuthError = authError && authError !== dismissedAuthError ? authError : null
 
   // Fetch live stock quote from FMP API when company data is available
   const { data: stockQuote, loading: priceLoading } = useStockQuote(data?.ticker)
@@ -35,7 +46,21 @@ function App() {
   const prefersReducedMotion = useReducedMotion()
 
   const handleSearch = (ticker) => {
+    setPendingTicker(String(ticker || '').trim().toUpperCase() || null)
+    setCurrentStep(1)
     searchCompany(ticker)
+  }
+
+  const handleGoHome = () => {
+    setPendingTicker(null)
+    setMobileSearchOpen(false)
+    reset()
+    setCurrentStep(1)
+  }
+
+  const handleModalSearch = (ticker) => {
+    setMobileSearchOpen(false)
+    handleSearch(ticker)
   }
 
   const handleToggleWatchlist = () => {
@@ -73,33 +98,152 @@ function App() {
         }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <div className="flex items-center space-x-2">
-              <Gem className="h-8 w-8 text-brand-500" aria-hidden="true" />
+          <div className="flex justify-between items-center h-16 gap-2">
+            {/* Clickable Logo (icon-only on phones, icon + title on sm:+) */}
+            <button
+              type="button"
+              data-testid="header-logo-btn"
+              onClick={handleGoHome}
+              aria-label="EDGAR Value Miner — Return to home"
+              className="flex items-center justify-center sm:justify-start gap-2 min-w-[44px] min-h-[44px] sm:min-w-0 px-1.5 -ms-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-colors cursor-pointer shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            >
+              <Gem className="h-7 w-7 sm:h-8 sm:w-8 text-brand-500 shrink-0" aria-hidden="true" />
               <span
-                className="text-xl font-bold"
+                className="hidden sm:inline text-xl font-bold whitespace-nowrap"
                 style={{ color: 'var(--color-text-primary)' }}
               >
                 EDGAR Value Miner
               </span>
-            </div>
+            </button>
 
-            {/* Compact Search Bar (shown when data is loaded or loading) */}
+            {/* Compact Search Bar on tablet/desktop (hidden on <640px; mobile uses Search Modal) */}
             {showCompactSearch && (
-              <TickerSearch
-                variant="compact"
-                onSearch={handleSearch}
-                isSearching={loading}
-                className="flex-1 mx-8"
-              />
+              <div className="hidden sm:flex flex-1 min-w-0 max-w-lg mx-4 md:mx-6">
+                <TickerSearch
+                  variant="compact"
+                  onSearch={handleSearch}
+                  isSearching={loading}
+                  className="w-full"
+                />
+              </div>
             )}
 
-            {/* Theme Toggle */}
-            <ThemeToggle />
+            {/* Mobile Search Icon + Auth & Theme Controls */}
+            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+              {showCompactSearch && (
+                <button
+                  type="button"
+                  data-testid="mobile-search-trigger"
+                  onClick={() => setMobileSearchOpen(true)}
+                  aria-label="Open ticker search"
+                  title="חיפוש חברה / Search ticker"
+                  className="sm:hidden inline-flex items-center justify-center w-11 h-11 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors shrink-0"
+                >
+                  <Search className="w-5 h-5" aria-hidden="true" />
+                </button>
+              )}
+              {isFirebaseAvailable && (
+                user ? (
+                  <div className="flex items-center gap-1.5 sm:gap-2" data-testid="header-user-info">
+                    {isAdmin && (
+                      <span
+                        data-testid="header-admin-badge"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 shrink-0"
+                        title={`Admin: ${user.email}`}
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>Admin</span>
+                      </span>
+                    )}
+                    <span
+                      className="hidden sm:inline text-xs font-medium truncate max-w-[140px]"
+                      style={{ color: 'var(--color-text-secondary)' }}
+                      title={user.email || user.displayName || ''}
+                    >
+                      {user.displayName || user.email}
+                    </span>
+                    <button
+                      type="button"
+                      data-testid="header-signout-btn"
+                      onClick={signOutUser}
+                      aria-label="התנתק / Sign out"
+                      className="inline-flex items-center justify-center gap-1 w-11 h-11 sm:w-auto sm:h-auto sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors shrink-0"
+                      title="התנתק"
+                    >
+                      <LogOut className="w-5 h-5 sm:w-3.5 sm:h-3.5 shrink-0" aria-hidden="true" />
+                      <span className="hidden sm:inline whitespace-nowrap">התנתק</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="header-signin-btn"
+                    onClick={signInWithGoogle}
+                    aria-label="התחברות עם Google / Sign in"
+                    title="התחברות עם Google"
+                    className="inline-flex items-center justify-center gap-1.5 w-11 h-11 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                  >
+                    <LogIn className="w-5 h-5 sm:w-3.5 sm:h-3.5 shrink-0" aria-hidden="true" />
+                    <span className="hidden sm:inline">התחברות</span>
+                  </button>
+                )
+              )}
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </header>
+
+      <MobileSearchModal
+        isOpen={mobileSearchOpen}
+        onClose={() => setMobileSearchOpen(false)}
+      >
+        <TickerSearch
+          variant="hero"
+          onSearch={handleModalSearch}
+          isSearching={loading}
+          autoFocus
+          autoFocusOnMobile
+        />
+      </MobileSearchModal>
+
+      {/* Auth error banner (e.g. Firebase unauthorized-domain on PR preview or popup blocked) */}
+      {activeAuthError && (
+        <div
+          dir="rtl"
+          role="alert"
+          data-testid="auth-error-banner"
+          className="border-b border-rose-500/30 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 text-xs sm:text-sm"
+        >
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-3">
+            <span>
+              {/unauthorized-domain/i.test(activeAuthError) ? (
+                <>
+                  התחברות Google נחסמה בדומיין זה ב-Firebase (יש להוסיף את הדומיין לרשימת ה-Authorized Domains). בינתיים ניתן להתחבר דרך סביבת{' '}
+                  <a
+                    href="https://edgar-value-miner-staging.web.app"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline font-semibold"
+                  >
+                    Staging (edgar-value-miner-staging.web.app)
+                  </a>
+                  .
+                </>
+              ) : (
+                <>שגיאת התחברות: {activeAuthError}</>
+              )}
+            </span>
+            <button
+              type="button"
+              onClick={() => setDismissedAuthError(activeAuthError)}
+              className="px-2 py-0.5 rounded hover:bg-rose-500/15 font-semibold shrink-0 cursor-pointer"
+            >
+              סגור
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -127,8 +271,21 @@ function App() {
               onSearch={handleSearch}
               isSearching={loading}
               autoFocus
-              className="mb-12"
+              className="mb-6"
             />
+
+            {/* Quick Demo Pill for MSFT Triage testing */}
+            <div className="flex items-center justify-center gap-2 mb-12">
+              <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">Quick Demo:</span>
+              <button
+                type="button"
+                onClick={() => handleSearch('MSFT')}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 border border-sky-500/30 hover:bg-sky-100 dark:hover:bg-sky-900/40 cursor-pointer transition-colors"
+              >
+                <span>MSFT (Microsoft)</span>
+                <span className="text-[10px] text-sky-400 font-normal">&rarr; 10s Triage</span>
+              </button>
+            </div>
 
             {/* Watchlist Panel (shown when user has watchlist items) */}
             {watchlist.length > 0 && (
@@ -228,9 +385,24 @@ function App() {
           </div>
         )}
 
-        {/* Loading State */}
-        {loading && !data && (
-          <DashboardSkeleton data-testid="loading-state" />
+        {/* Loading State (both initial load and switching between tickers) */}
+        {loading && (
+          <div data-testid="loading-state" className="space-y-6">
+            <div
+              role="status"
+              aria-live="polite"
+              data-testid="search-loading-banner"
+              className="max-w-4xl mx-auto rounded-2xl border border-sky-500/25 bg-sky-50/80 dark:bg-sky-950/30 px-4 py-3 flex items-center justify-center gap-3 text-sm font-medium text-sky-800 dark:text-sky-200 shadow-xs"
+            >
+              <Loader2 className="w-4 h-4 animate-spin text-sky-600 dark:text-sky-400 shrink-0" aria-hidden="true" />
+              <span dir="auto">
+                {pendingTicker
+                  ? `טוען נתוני ${pendingTicker} מ-SEC EDGAR...`
+                  : 'טוען נתוני חברה מ-SEC EDGAR...'}
+              </span>
+            </div>
+            <DashboardSkeleton heroChartHeight={400} secondaryChartHeight={400} />
+          </div>
         )}
 
         {/* Error State */}
@@ -239,15 +411,38 @@ function App() {
             <ErrorFallback
               error={error.originalError || error}
               errorType={error.type}
+              userMessage={error.userMessage}
               resetError={() => {
                 clearError()
               }}
+              onGoHome={handleGoHome}
             />
           </div>
         )}
 
-        {/* Dashboard State (data loaded) */}
-        {data && !loading && (
+        {/* Step 1 Triage (Stock Simplifier 10-Second UX Gatekeeper) */}
+        {data && !loading && currentStep === 1 && (
+          <Step1Triage
+            company={{
+              ticker: data.ticker || 'MSFT',
+              name: data.companyName || 'Microsoft Corporation',
+              cik: data.cik,
+            }}
+            companyFacts={data}
+            isAdmin={isAdmin}
+            cacheMetadata={metadata}
+            isRefreshingCompany={loading}
+            onForceRefreshCompany={(ticker) =>
+              searchCompany(ticker || data.ticker, { refreshGlobalCache: true })
+            }
+            onContinue={() => {
+              setCurrentStep(2)
+            }}
+          />
+        )}
+
+        {/* Step 2+ Dashboard State (data loaded & Gatekeeper passed) */}
+        {data && !loading && currentStep >= 2 && (
           <DashboardLayout
             banner={
               <CompanyBanner
@@ -269,7 +464,7 @@ function App() {
               />
             ))}
             heroChart={
-              <ChartContainer title="Revenue" loading={false}>
+              <ChartContainer title="Revenue (YoY Growth)" loading={false} height={400}>
                 <RevenueChart
                   data={data?.metrics?.revenue?.annual}
                   animationDisabled={prefersReducedMotion}
@@ -277,20 +472,20 @@ function App() {
               </ChartContainer>
             }
             secondaryCharts={[
-              <ChartContainer key="fcf-chart" title="Free Cash Flow" loading={false}>
+              <ChartContainer key="fcf-chart" title="Free Cash Flow (YoY Growth)" loading={false} height={400}>
                 <FCFChart
                   data={data?.metrics?.freeCashFlow?.annual}
                   animationDisabled={prefersReducedMotion}
                 />
               </ChartContainer>,
-              <ChartContainer key="margins-chart" title="Margins" loading={false}>
+              <ChartContainer key="margins-chart" title="Margins" loading={false} height={400}>
                 <MarginsChart
                   data={calculateMargins({
                     revenue: data?.metrics?.revenue?.annual,
                     grossProfit: data?.metrics?.grossProfit?.annual,
                     operatingIncome: data?.metrics?.operatingIncome?.annual,
                     netIncome: data?.metrics?.netIncome?.annual,
-                  })}
+                  }, { fullHistory: true })}
                   animationDisabled={prefersReducedMotion}
                 />
               </ChartContainer>,

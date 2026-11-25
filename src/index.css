@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 @source "../index.html";
 @source "../src/**/*.{js,jsx,ts,tsx,css}";
 @source not "../*.md";
@@ -130,6 +131,13 @@
     color: var(--color-text-primary);
     transition-property: color, background-color;
     transition-duration: 200ms;
+  }
+
+  /* Hide browser-native clear 'X' on type="search" so only TickerSearch's clear button appears */
+  input[type="search"]::-webkit-search-cancel-button,
+  input[type="search"]::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
   }
 
   /* Reduced motion: disable transitions */

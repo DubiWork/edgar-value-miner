@@ -771,22 +771,22 @@ describe('FCFChart', () => {
   // Data Slicing (max 5 years)
   // =========================================================================
 
-  describe('Data slicing', () => {
-    it('slices data to most recent 5 years when more than 5 provided', () => {
+  describe('Full history retention', () => {
+    it('displays all years without 5-year capping when more than 5 provided', () => {
       renderChart({ data: MOCK_FCF_7Y });
       const container = screen.getByTestId('fcf-chart');
       const rows = getTableRows(container);
-      expect(rows.length).toBe(5);
+      expect(rows.length).toBe(7);
     });
 
-    it('includes the most recent 5 years, not oldest 5', () => {
+    it('renders all years in chronological order from oldest to newest', () => {
       renderChart({ data: MOCK_FCF_7Y });
       const container = screen.getByTestId('fcf-chart');
       const rows = getTableRows(container);
-      // Most recent 5 from [2025,2024,2023,2022,2021,2020,2019] = [2025,2024,2023,2022,2021]
-      // Reversed to chronological: 2021,2022,2023,2024,2025
-      expect(getYearFromRow(rows, 0)).toBe('FY2021');
-      expect(getYearFromRow(rows, 4)).toBe('FY2025');
+      // All 7 from [2025,2024,2023,2022,2021,2020,2019]
+      // Reversed to chronological: 2019, 2020, 2021, 2022, 2023, 2024, 2025
+      expect(getYearFromRow(rows, 0)).toBe('FY2019');
+      expect(getYearFromRow(rows, 6)).toBe('FY2025');
     });
 
     it('displays all years when exactly 5 provided', () => {
@@ -1271,6 +1271,38 @@ describe('FCFChart', () => {
       const result = calculateYoY(-50000000000, -20000000000);
       expect(result.percentage).toBe(-150);
       expect(result.formatted).toBe('-150.0%');
+    });
+  });
+
+  // =========================================================================
+  // YoY Label Thinning (crowding prevention)
+  // =========================================================================
+
+  describe('YoY label thinning (crowding prevention)', () => {
+    it('renders YoY labels when data length is <= 15', () => {
+      const data = Array.from({ length: 15 }, (_, i) => ({
+        value: (i + 1) * 10000000000,
+        fiscalYear: 2010 + i,
+        period: `CY${2010 + i}`,
+        calculated: true,
+        components: { operatingCashFlow: 15000000000, capitalExpenditures: 5000000000 },
+      }));
+      const { container } = renderChart({ data });
+      const labels = container.querySelectorAll('[data-testid="yoy-label"]');
+      expect(labels.length).toBeGreaterThan(0);
+    });
+
+    it('does not render YoY labels when data length is > 15 to prevent text collision', () => {
+      const data = Array.from({ length: 16 }, (_, i) => ({
+        value: (i + 1) * 10000000000,
+        fiscalYear: 2005 + i,
+        period: `CY${2005 + i}`,
+        calculated: true,
+        components: { operatingCashFlow: 15000000000, capitalExpenditures: 5000000000 },
+      }));
+      const { container } = renderChart({ data });
+      const labels = container.querySelectorAll('[data-testid="yoy-label"]');
+      expect(labels.length).toBe(0);
     });
   });
 

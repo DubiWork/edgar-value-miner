@@ -151,6 +151,16 @@ test.describe('Dashboard smoke tests', () => {
     await input.fill('AAPL');
     await input.press('Enter');
 
+    // Step 1 Triage renders first as Gatekeeper
+    await expect(page.getByText('Step 1 of 5')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="tear-sheet-blade"]')).toBeVisible();
+    await expect(page.getByText('בהירות עסקית (מעגל הכשירות)')).toBeVisible();
+    const continueBtn = page.getByRole('button', {
+      name: /I understand how this company makes money - Continue/i,
+    });
+    await expect(continueBtn).toBeVisible();
+    await continueBtn.click();
+
     // Wait for dashboard with real data (company-banner only renders after
     // data loads, unlike dashboard-layout which also exists in the skeleton)
     await expect(page.locator('[data-testid="company-banner"]')).toBeVisible({ timeout: 15000 });
@@ -195,6 +205,13 @@ test.describe('Dashboard smoke tests', () => {
     // Click the first suggestion
     const firstItem = page.locator('[data-testid="suggestion-item-0"]');
     await firstItem.click();
+
+    // Pass Step 1 Triage Gatekeeper
+    const continueBtn = page.getByRole('button', {
+      name: /I understand how this company makes money - Continue/i,
+    });
+    await expect(continueBtn).toBeVisible({ timeout: 15000 });
+    await continueBtn.click();
 
     // Wait for dashboard with real data (company-banner only renders after
     // data loads, unlike dashboard-layout which also exists in the skeleton)

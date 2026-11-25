@@ -124,7 +124,7 @@ function validateTicker(ticker) {
 
   const normalized = normalizeTicker(ticker);
 
-  if (!/^[A-Z]{1,5}$/.test(normalized)) {
+  if (!/^[A-Z]{1,5}(?:[.-][A-Z0-9]{1,2})?$/.test(normalized)) {
     return {
       valid: false,
       error: createError(
@@ -323,6 +323,7 @@ function startBackgroundRefresh(ticker) {
 export async function getCompanyData(ticker, options = {}) {
   const {
     forceRefresh = false,
+    refreshGlobalCache = false,
     backgroundRefresh = true,
     includeMetadata = true,
   } = options;
@@ -348,7 +349,7 @@ export async function getCompanyData(ticker, options = {}) {
 
   // Concurrent request deduplication:
   // If the same ticker is already being fetched (non-forceRefresh), return the same promise
-  if (!forceRefresh) {
+  if (!forceRefresh && !refreshGlobalCache) {
     const existingRequest = inFlightRequests.get(normalizedTicker);
     if (existingRequest) {
       devLog('log', `Deduplicating concurrent request for ${normalizedTicker}`);
@@ -359,12 +360,13 @@ export async function getCompanyData(ticker, options = {}) {
   // Create the actual fetch promise
   const fetchPromise = _getCompanyDataInternal(normalizedTicker, {
     forceRefresh,
+    refreshGlobalCache,
     backgroundRefresh,
     includeMetadata,
   });
 
   // Track in-flight request for deduplication (only non-forceRefresh)
-  if (!forceRefresh) {
+  if (!forceRefresh && !refreshGlobalCache) {
     inFlightRequests.set(normalizedTicker, fetchPromise);
 
     // Clean up when done (whether success or failure)
@@ -383,12 +385,78 @@ export async function getCompanyData(ticker, options = {}) {
 async function _getCompanyDataInternal(normalizedTicker, options) {
   const {
     forceRefresh,
+    refreshGlobalCache,
     backgroundRefresh,
     includeMetadata,
   } = options;
 
+  // Admin Force Refresh: Clear local IndexedDB cache, invoke cacheWriter with forceRefresh=true
+  // to overwrite Firestore global cache from SEC, then re-read and populate IndexedDB.
+  if (refreshGlobalCache) {
+    try {
+      await edgarCache.invalidateCache(normalizedTicker);
+    } catch (err) {
+      devLog('warn', `Failed to invalidate local IndexedDB for ${normalizedTicker}`, err.message);
+    }
+
+    try {
+      devLog('log', `Admin global refresh for ${normalizedTicker}: invoking cacheWriter(forceRefresh=true)`);
+      const functions = getFunctions(app);
+      const cacheWriter = httpsCallable(functions, 'cacheWriter');
+      const cwRes = await cacheWriter({ ticker: normalizedTicker, forceRefresh: true });
+      const cwData = cwRes?.data ?? cwRes;
+
+      if (cwData?.skippedReason === 'too_large') {
+        devLog('log', `Admin cacheWriter skipped Firestore write for ${normalizedTicker} (too_large), falling back to direct SEC fetch`);
+      } else {
+        const freshDoc = await withTimeout(
+          firestoreCache.getCompanyFactsFromFirestore(normalizedTicker),
+          COORDINATOR_CONFIG.FIRESTORE_TIMEOUT_MS,
+          'Firestore re-read after admin cacheWriter'
+        );
+
+        const freshBlob = freshDoc?.companyFacts || freshDoc?.data;
+        if (freshDoc && freshBlob) {
+          const normalized = normalizeCompanyFacts(freshBlob, { fullHistory: true });
+          const cik = freshDoc.cik || '';
+
+          try {
+            await edgarCache.setCompanyFacts(normalizedTicker, normalized, cik);
+          } catch (err) {
+            devLog('warn', 'Failed to save to IndexedDB after admin cacheWriter', err.message);
+          }
+
+          return {
+            success: true,
+            data: {
+              ticker: normalizedTicker,
+              cik,
+              companyName: normalized.companyName || normalized.entityName || freshDoc.companyName || '',
+              companyFacts: normalized,
+            },
+            metadata: includeMetadata ? {
+              source: CACHE_SOURCES.FIRESTORE,
+              cacheHit: false,
+              needsRefresh: false,
+              lastUpdated: freshDoc.lastUpdated || new Date(),
+              costSaved: 0,
+            } : null,
+            error: null,
+          };
+        }
+      }
+    } catch (adminRefreshErr) {
+      devLog(
+        'warn',
+        `Admin cacheWriter(forceRefresh=true) failed for ${normalizedTicker}, falling back to direct SEC fetch`,
+        adminRefreshErr.message
+      );
+      // Fall through to direct SEC fetch below
+    }
+  }
+
   // Skip cache if force refresh requested
-  if (!forceRefresh) {
+  if (!forceRefresh && !refreshGlobalCache) {
     // ==========================================================================
     // LAYER 1: IndexedDB (Local Cache)
     // ==========================================================================
@@ -503,47 +571,52 @@ async function _getCompanyDataInternal(normalizedTicker, options) {
 
         const functions = getFunctions(app);
         const cacheWriter = httpsCallable(functions, 'cacheWriter');
-        await cacheWriter({ ticker: normalizedTicker });
+        const cwRes = await cacheWriter({ ticker: normalizedTicker });
+        const cwData = cwRes?.data ?? cwRes;
 
-        // Re-read newly written raw doc from Firestore
-        const freshDoc = await withTimeout(
-          firestoreCache.getCompanyFactsFromFirestore(normalizedTicker),
-          COORDINATOR_CONFIG.FIRESTORE_TIMEOUT_MS,
-          'Firestore re-read after cacheWriter'
-        );
+        if (cwData?.skippedReason === 'too_large') {
+          devLog('log', `cacheWriter skipped Firestore write for ${normalizedTicker} (too_large), falling back to direct SEC fetch`);
+        } else {
+          // Re-read newly written raw doc from Firestore
+          const freshDoc = await withTimeout(
+            firestoreCache.getCompanyFactsFromFirestore(normalizedTicker),
+            COORDINATOR_CONFIG.FIRESTORE_TIMEOUT_MS,
+            'Firestore re-read after cacheWriter'
+          );
 
-        const freshBlob = freshDoc?.companyFacts || freshDoc?.data;
-        if (freshDoc && freshBlob) {
-          const normalized = normalizeCompanyFacts(freshBlob, { fullHistory: true });
-          const cik = freshDoc.cik || '';
+          const freshBlob = freshDoc?.companyFacts || freshDoc?.data;
+          if (freshDoc && freshBlob) {
+            const normalized = normalizeCompanyFacts(freshBlob, { fullHistory: true });
+            const cik = freshDoc.cik || '';
 
-          try {
-            await edgarCache.setCompanyFacts(
-              normalizedTicker,
-              normalized,
-              cik
-            );
-          } catch (err) {
-            devLog('warn', 'Failed to save to IndexedDB after cacheWriter', err.message);
+            try {
+              await edgarCache.setCompanyFacts(
+                normalizedTicker,
+                normalized,
+                cik
+              );
+            } catch (err) {
+              devLog('warn', 'Failed to save to IndexedDB after cacheWriter', err.message);
+            }
+
+            return {
+              success: true,
+              data: {
+                ticker: normalizedTicker,
+                cik,
+                companyName: normalized.companyName || normalized.entityName || freshDoc.companyName || '',
+                companyFacts: normalized,
+              },
+              metadata: includeMetadata ? {
+                source: CACHE_SOURCES.FIRESTORE,
+                cacheHit: false,
+                needsRefresh: false,
+                lastUpdated: freshDoc.lastUpdated || new Date(),
+                costSaved: COORDINATOR_CONFIG.COST_PER_SEC_LOOKUP,
+              } : null,
+              error: null,
+            };
           }
-
-          return {
-            success: true,
-            data: {
-              ticker: normalizedTicker,
-              cik,
-              companyName: normalized.companyName || normalized.entityName || freshDoc.companyName || '',
-              companyFacts: normalized,
-            },
-            metadata: includeMetadata ? {
-              source: CACHE_SOURCES.FIRESTORE,
-              cacheHit: false,
-              needsRefresh: false,
-              lastUpdated: freshDoc.lastUpdated || new Date(),
-              costSaved: COORDINATOR_CONFIG.COST_PER_SEC_LOOKUP,
-            } : null,
-            error: null,
-          };
         }
       } catch (cwError) {
         devLog('warn', `cacheWriter or Firestore re-read failed for ${normalizedTicker}, falling back to direct SEC fetch`, cwError.message);

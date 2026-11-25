@@ -30,18 +30,25 @@ export function categorizeError(error) {
   const statusCode = error.statusCode || null;
 
   // Rate limit errors (SEC 429)
-  if (errorCode === 'RATE_LIMITED' || statusCode === 429) {
+  if (errorCode === 'RATE_LIMITED' || statusCode === 429 || errorMessage.includes('429')) {
     return ERROR_TYPES.RATE_LIMIT;
   }
 
-  // Network errors (offline, timeout, fetch failures)
+  // Network & upstream SEC proxy errors (offline, timeout, 502/503/network failures)
   if (
     errorCode === 'NETWORK_ERROR' ||
+    errorCode === 'SERVER_ERROR' ||
+    errorCode === 'SEC_API_ERROR' ||
+    errorCode === 'ALL_LAYERS_FAILED' ||
+    errorCode === 'TIMEOUT' ||
     error.name === 'TypeError' ||
     errorMessage.includes('network') ||
     errorMessage.includes('offline') ||
     errorMessage.includes('timeout') ||
-    errorMessage.includes('failed to fetch')
+    errorMessage.includes('failed to fetch') ||
+    errorMessage.includes('sec server error') ||
+    errorMessage.includes('502') ||
+    errorMessage.includes('503')
   ) {
     return ERROR_TYPES.NETWORK;
   }
@@ -53,7 +60,9 @@ export function categorizeError(error) {
     errorCode === 'INVALID_CIK' ||
     errorCode === 'PARSE_ERROR' ||
     errorCode === 'NOT_FOUND' ||
-    statusCode === 404
+    statusCode === 404 ||
+    errorMessage.includes('not found in sec database') ||
+    errorMessage.includes('invalid ticker')
   ) {
     return ERROR_TYPES.DATA;
   }

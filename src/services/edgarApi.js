@@ -330,8 +330,8 @@ function validateTicker(ticker) {
 
   const cleanTicker = ticker.trim().toUpperCase();
 
-  // Ticker should be 1-5 alphanumeric characters
-  if (!/^[A-Z]{1,5}$/.test(cleanTicker)) {
+  // Ticker should be 1-5 letters with optional share-class suffix (e.g., BRK.B, BRK-B)
+  if (!/^[A-Z]{1,5}(?:[.-][A-Z0-9]{1,2})?$/.test(cleanTicker)) {
     throw new EdgarApiError(
       `Invalid ticker "${ticker}": Ticker must be 1-5 letters`,
       EDGAR_ERROR_CODES.INVALID_TICKER
@@ -397,14 +397,18 @@ function validateConceptTag(tag) {
 // Company Tickers Cache
 // =============================================================================
 
+const TICKERS_STORAGE_KEY = 'edgar-sec-tickers-v1';
+
 /**
- * In-memory cache for company tickers
+ * In-memory cache and in-flight deduplication promise for company tickers
  * @type {{data: Object|null, timestamp: number}}
  */
 let tickersCache = {
   data: null,
   timestamp: 0,
 };
+
+let inFlightTickersPromise = null;
 
 /**
  * Checks if the tickers cache is still valid
@@ -416,6 +420,69 @@ function isTickersCacheValid() {
   }
   const age = Date.now() - tickersCache.timestamp;
   return age < SEC_CONFIG.TICKERS_CACHE_DURATION;
+}
+
+function getStorageSafe() {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : null;
+  } catch {
+    return null;
+  }
+}
+
+function readTickersFromLocalStorage() {
+  const storage = getStorageSafe();
+  if (!storage || typeof storage.getItem !== 'function') return null;
+
+  try {
+    const raw = storage.getItem(TICKERS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.items) || parsed.items.length === 0) {
+      return null;
+    }
+
+    const tickerMap = {};
+    for (const tuple of parsed.items) {
+      if (!Array.isArray(tuple) || tuple.length < 3) continue;
+      const [cik, ticker, name] = tuple;
+      if (!ticker) continue;
+      const upperTicker = String(ticker).toUpperCase();
+      tickerMap[upperTicker] = {
+        cik: Number(cik),
+        name: String(name || ''),
+        ticker: upperTicker,
+      };
+    }
+
+    if (Object.keys(tickerMap).length === 0) return null;
+
+    const ts = typeof parsed.ts === 'number' ? parsed.ts : 0;
+    const isFresh = ts > 0 && Date.now() - ts < SEC_CONFIG.TICKERS_CACHE_DURATION;
+    return { data: tickerMap, ts, isFresh };
+  } catch {
+    return null;
+  }
+}
+
+function writeTickersToLocalStorage(tickerMap) {
+  const storage = getStorageSafe();
+  if (!storage || typeof storage.setItem !== 'function') return;
+
+  try {
+    const items = Object.values(tickerMap).map((entry) => [
+      entry.cik,
+      entry.ticker,
+      entry.name,
+    ]);
+    if (items.length === 0) return;
+    storage.setItem(
+      TICKERS_STORAGE_KEY,
+      JSON.stringify({ ts: Date.now(), items })
+    );
+  } catch {
+    // Ignore storage quota or private-browsing write failures
+  }
 }
 
 // =============================================================================
@@ -562,34 +629,78 @@ export async function fetchCompanyTickers(forceRefresh = false) {
     return tickersCache.data;
   }
 
-  const rawData = await fetchWithRateLimitAndRetry(
-    SEC_CONFIG.COMPANY_TICKERS_URL,
-    'fetching company tickers'
-  );
-
-  // Transform the raw data into a ticker-keyed map
-  // SEC returns: { "0": { cik_str: "...", ticker: "...", title: "..." }, ... }
-  const tickerMap = {};
-
-  for (const key in rawData) {
-    const company = rawData[key];
-    if (company && company.ticker) {
-      const ticker = company.ticker.toUpperCase();
-      tickerMap[ticker] = {
-        cik: company.cik_str ? parseInt(company.cik_str, 10) : company.cik,
-        name: company.title || '',
-        ticker: ticker,
+  let storedFallback = null;
+  if (!forceRefresh) {
+    const stored = readTickersFromLocalStorage();
+    if (stored?.isFresh) {
+      tickersCache = {
+        data: stored.data,
+        timestamp: stored.ts,
       };
+      return stored.data;
+    }
+    if (stored?.data) {
+      storedFallback = stored.data;
     }
   }
 
-  // Update cache
-  tickersCache = {
-    data: tickerMap,
-    timestamp: Date.now(),
+  if (!forceRefresh && inFlightTickersPromise) {
+    return inFlightTickersPromise;
+  }
+
+  const runFetch = async () => {
+    try {
+      const rawData = await fetchWithRateLimitAndRetry(
+        SEC_CONFIG.COMPANY_TICKERS_URL,
+        'fetching company tickers'
+      );
+
+      // Transform the raw data into a ticker-keyed map
+      // SEC returns: { "0": { cik_str: "...", ticker: "...", title: "..." }, ... }
+      const tickerMap = {};
+
+      for (const key in rawData) {
+        const company = rawData[key];
+        if (company && company.ticker) {
+          const ticker = company.ticker.toUpperCase();
+          tickerMap[ticker] = {
+            cik: company.cik_str ? parseInt(company.cik_str, 10) : company.cik,
+            name: company.title || '',
+            ticker: ticker,
+          };
+        }
+      }
+
+      // Update memory & localStorage caches
+      tickersCache = {
+        data: tickerMap,
+        timestamp: Date.now(),
+      };
+      writeTickersToLocalStorage(tickerMap);
+
+      return tickerMap;
+    } catch (error) {
+      if (!forceRefresh && storedFallback) {
+        tickersCache = {
+          data: storedFallback,
+          // Keep stale fallback cached briefly in memory (15 min) before re-probing SEC
+          timestamp: Date.now() - SEC_CONFIG.TICKERS_CACHE_DURATION + 15 * 60 * 1000,
+        };
+        return storedFallback;
+      }
+      throw error;
+    }
   };
 
-  return tickerMap;
+  if (forceRefresh) {
+    return runFetch();
+  }
+
+  const promise = runFetch().finally(() => {
+    inFlightTickersPromise = null;
+  });
+  inFlightTickersPromise = promise;
+  return promise;
 }
 
 /**
@@ -608,7 +719,10 @@ export async function mapTickerToCik(ticker) {
   const validatedTicker = validateTicker(ticker);
   const tickerMap = await fetchCompanyTickers();
 
-  const companyInfo = tickerMap[validatedTicker];
+  const companyInfo =
+    tickerMap[validatedTicker] ||
+    tickerMap[validatedTicker.replace(/\./g, '-')] ||
+    tickerMap[validatedTicker.replace(/-/g, '.')];
 
   if (!companyInfo) {
     throw new EdgarApiError(
@@ -781,6 +895,15 @@ export function clearTickersCache() {
     data: null,
     timestamp: 0,
   };
+  inFlightTickersPromise = null;
+  const storage = getStorageSafe();
+  if (storage && typeof storage.removeItem === 'function') {
+    try {
+      storage.removeItem(TICKERS_STORAGE_KEY);
+    } catch {
+      // Ignore storage removal errors
+    }
+  }
 }
 
 // =============================================================================

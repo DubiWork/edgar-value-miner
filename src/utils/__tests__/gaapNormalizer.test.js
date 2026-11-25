@@ -15,10 +15,18 @@ import {
   extractTimeSeriesData,
   stitchTimeSeriesData,
   calculateFreeCashFlow,
+  calculateDerivedTotalLiabilities,
+  calculateDerivedTotalDebt,
   findGaapTag,
   detectFilingCurrency,
+  getMetricsByCategory,
   NORMALIZATION_VERSION,
   ANNUAL_FORMS,
+  GAAP_TAG_MAP,
+  IFRS_TAG_MAP,
+  METRIC_CATEGORIES,
+  INTEREST_EXPENSE_CASH_FALLBACK_TAGS,
+  BANK_REVENUE_TAGS,
 } from '../../utils/gaapNormalizer.js';
 import { calculateMargins } from '../../utils/calculateMargins.js';
 import { calculateYoY } from '../../utils/calculateYoY.js';
@@ -49,8 +57,10 @@ function createCompanyFacts(overrides = {}) {
 /**
  * Creates a metric unit entry
  */
-function createUnitEntry({ end, val, form = '10-K', frame = null, filed = null, accn = null }) {
+function createUnitEntry({ start = null, end, val, form = '10-K', fp = null, frame = null, filed = null, accn = null }) {
   const entry = { end, val, form };
+  if (start) entry.start = start;
+  if (fp) entry.fp = fp;
   if (frame) entry.frame = frame;
   if (filed) entry.filed = filed;
   if (accn) entry.accn = accn;
@@ -417,18 +427,6 @@ describe('P1 #15: Missing shares outstanding', () => {
   });
 
   it('should NOT flag when shares outstanding are present', () => {
-    const facts = createCompanyFactsWithMetrics({
-      CommonStockSharesOutstanding: [
-        {
-          end: '2023-12-31',
-          val: 15000000000,
-          form: '10-K',
-          frame: 'CY2023',
-          filed: '2024-02-15',
-        },
-      ],
-    });
-
     // Note: shares use 'shares' unit, not USD
     const factsWithShares = createCompanyFacts({
       facts: {
@@ -1259,24 +1257,115 @@ describe('#252 detectFilingCurrency', () => {
   });
 });
 
-describe('#252 normalizeCompanyFacts — IFRS detection', () => {
-  it('throws for IFRS-only filer', () => {
-    const ifrsOnly = createCompanyFacts({
-      facts: { 'ifrs-full': { Revenue: { units: { EUR: [] } } } },
+describe('#348 normalizeCompanyFacts — full IFRS (ifrs-full / 20-F) support', () => {
+  it('normalizes IFRS-only filer (SAP SE style, Form 20-F, CY2025Q4I balance sheet, EUR primary currency)', () => {
+    const sapLike = createCompanyFacts({
+      cik: 1000184,
+      entityName: 'SAP SE',
+      facts: {
+        'ifrs-full': {
+          Revenue: {
+            units: {
+              USD: [
+                createUnitEntry({ end: '2017-12-31', val: 28000000000, form: '20-F', frame: 'CY2017', filed: '2018-02-28' }),
+              ],
+              EUR: [
+                createUnitEntry({ end: '2024-12-31', val: 34176000000, form: '20-F', frame: 'CY2024', filed: '2026-02-26' }),
+                createUnitEntry({ end: '2025-12-31', val: 36800000000, form: '20-F', frame: 'CY2025', filed: '2026-02-26' }),
+              ],
+            },
+          },
+          ProfitLossFromOperatingActivities: {
+            units: {
+              EUR: [
+                createUnitEntry({ end: '2024-12-31', val: 4665000000, form: '20-F', frame: 'CY2024', filed: '2026-02-26' }),
+                createUnitEntry({ end: '2025-12-31', val: 9617000000, form: '20-F', frame: 'CY2025', filed: '2026-02-26' }),
+              ],
+            },
+          },
+          CashFlowsFromUsedInOperatingActivities: {
+            units: {
+              EUR: [
+                createUnitEntry({ end: '2025-12-31', val: 9156000000, form: '20-F', frame: 'CY2025', filed: '2026-02-26' }),
+              ],
+            },
+          },
+          PurchaseOfPropertyPlantAndEquipmentIntangibleAssetsOtherThanGoodwillInvestmentPropertyAndOtherNoncurrentAssets: {
+            units: {
+              EUR: [
+                createUnitEntry({ end: '2025-12-31', val: 900000000, form: '20-F', frame: 'CY2025', filed: '2026-02-26' }),
+              ],
+            },
+          },
+          CurrentAssets: {
+            units: {
+              EUR: [
+                createUnitEntry({ end: '2025-12-31', val: 20256000000, form: '20-F', frame: 'CY2025Q4I', filed: '2026-02-26' }),
+              ],
+            },
+          },
+          CurrentLiabilities: {
+            units: {
+              EUR: [
+                createUnitEntry({ end: '2025-12-31', val: 16200000000, form: '20-F', frame: 'CY2025Q4I', filed: '2026-02-26' }),
+              ],
+            },
+          },
+          AdjustedWeightedAverageShares: {
+            units: {
+              shares: [
+                createUnitEntry({ end: '2024-12-31', val: 1170000000, form: '20-F', frame: 'CY2024', filed: '2026-02-26' }),
+                createUnitEntry({ end: '2025-12-31', val: 1165000000, form: '20-F', frame: 'CY2025', filed: '2026-02-26' }),
+              ],
+            },
+          },
+        },
+      },
     });
-    expect(() => normalizeCompanyFacts(ifrsOnly)).toThrow(
-      'IFRS filer detected: IFRS namespace not supported. Only US-GAAP filers are supported in this version.'
-    );
+
+    const result = normalizeCompanyFacts(sapLike, { fullHistory: true });
+    expect(result.metadata.accountingStandard).toBe('IFRS');
+    expect(result.metadata.currency).toBe('EUR');
+    expect(result.metadata.warnings.some((w) => w.includes('IFRS'))).toBe(true);
+
+    expect(result.metrics.revenue.annual).toHaveLength(2);
+    expect(result.metrics.revenue.annual[0]).toMatchObject({ fiscalYear: 2025, value: 36800000000 });
+    expect(result.metrics.operatingIncome.annual[0].value).toBe(9617000000);
+    expect(result.metrics.currentAssets.annual[0]).toMatchObject({ fiscalYear: 2025, value: 20256000000 });
+    expect(result.metrics.currentLiabilities.annual[0]).toMatchObject({ fiscalYear: 2025, value: 16200000000 });
+    expect(result.metrics.freeCashFlow.annual[0].value).toBe(9156000000 - 900000000);
+    expect(result.metrics.weightedAverageSharesDiluted.annual).toHaveLength(2);
   });
 
-  it('does NOT throw when both us-gaap and ifrs-full are present', () => {
+  it('prefers US-GAAP when both us-gaap and ifrs-full are present', () => {
     const dual = createCompanyFacts({
       facts: {
         'us-gaap': { Revenues: { units: { USD: [] } } },
-        'ifrs-full': { Revenue: { units: { USD: [] } } },
+        'ifrs-full': { Revenue: { units: { EUR: [] } } },
       },
     });
-    expect(() => normalizeCompanyFacts(dual)).not.toThrow();
+    const res = normalizeCompanyFacts(dual);
+    expect(res.metadata.accountingStandard).toBe('US-GAAP');
+    expect(res.metadata.currency).toBe('USD');
+  });
+
+  it('normalizes IFRS even when us-gaap is an empty object', () => {
+    const ifrsEmptyUsGaap = createCompanyFacts({
+      facts: {
+        'us-gaap': {},
+        'ifrs-full': {
+          Revenue: {
+            units: {
+              EUR: [createUnitEntry({ end: '2025-12-31', val: 1000000, form: '20-F', frame: 'CY2025' })],
+            },
+          },
+        },
+      },
+    });
+    const res = normalizeCompanyFacts(ifrsEmptyUsGaap);
+    expect(res.metadata.accountingStandard).toBe('IFRS');
+    expect(res.metadata.currency).toBe('EUR');
+    expect(res.metrics.revenue.annual).toHaveLength(1);
   });
 });
 
@@ -1294,15 +1383,6 @@ describe('#252 normalizeCompanyFacts — metadata.currency from filing', () => {
     });
     const result = normalizeCompanyFacts(eurFacts);
     expect(result.metadata.currency).toBe('EUR');
-  });
-});
-
-describe('#252 normalizeCompanyFacts — IFRS guard with empty us-gaap', () => {
-  it('throws when us-gaap is empty object and ifrs-full has data', () => {
-    const ifrsEmptyUsGaap = createCompanyFacts({
-      facts: { 'us-gaap': {}, 'ifrs-full': { Revenue: { units: { EUR: [] } } } },
-    });
-    expect(() => normalizeCompanyFacts(ifrsEmptyUsGaap)).toThrow('IFRS filer detected');
   });
 });
 
@@ -1334,6 +1414,12 @@ describe('normalizeCompanyFacts — fullHistory flag (#253)', () => {
     const a = normalizeCompanyFacts(aaplFacts);
     const b = normalizeCompanyFacts(aaplFacts, {});
     expect(a.metrics.revenue.annual.length).toBe(b.metrics.revenue.annual.length);
+  });
+
+  it('returns already normalized object as-is without re-normalizing (idempotency guard)', () => {
+    const normalized = normalizeCompanyFacts(aaplFacts);
+    const result = normalizeCompanyFacts(normalized);
+    expect(result).toBe(normalized);
   });
 });
 
@@ -1787,6 +1873,459 @@ describe('Issue #278: 40-F filing support and SHOP revenue history', () => {
     const sofi = normalizeCompanyFacts(sofiFacts);
     expect(sofi.metrics.revenue.annual.length).toBeGreaterThan(0);
     expect(sofi.metrics.revenue.annual.every((r) => r.form.startsWith('10-K'))).toBe(true);
+  });
+});
+
+// =============================================================================
+// Issue #356 (PR 1): 5 XBRL Fixes, Derived Fallbacks, Missing Tags & v2
+// =============================================================================
+
+describe('Issue #356: PR 1 gaapNormalizer fixes & NORMALIZATION_VERSION = 3', () => {
+  it('bumps NORMALIZATION_VERSION to 3', () => {
+    expect(NORMALIZATION_VERSION).toBe(3);
+  });
+
+  describe('1. totalLiabilities tag cleanup & derived fallback', () => {
+    it('excludes LiabilitiesAndStockholdersEquity (US-GAAP) and NoncurrentLiabilities (IFRS)', () => {
+      expect(GAAP_TAG_MAP.totalLiabilities).toEqual(['Liabilities']);
+      expect(GAAP_TAG_MAP.totalLiabilities).not.toContain('LiabilitiesAndStockholdersEquity');
+      expect(IFRS_TAG_MAP.totalLiabilities).toEqual(['Liabilities']);
+      expect(IFRS_TAG_MAP.totalLiabilities).not.toContain('NoncurrentLiabilities');
+    });
+
+    it('derives totalLiabilities = totalAssets - stockholdersEquity for annual and quarterly series', () => {
+      const annualAssets = [
+        { fiscalYear: 2024, period: 'CY2024Q4I', frame: 'CY2024Q4I', form: '10-K', fiscalQuarter: null, value: 1000 },
+        { fiscalYear: 2023, period: 'CY2023Q4I', frame: 'CY2023Q4I', form: '10-K', fiscalQuarter: null, value: 900 },
+      ];
+      const annualEquity = [
+        { fiscalYear: 2024, period: 'CY2024Q4I', frame: 'CY2024Q4I', form: '10-K', fiscalQuarter: null, value: 350 },
+        { fiscalYear: 2023, period: 'CY2023Q4I', frame: 'CY2023Q4I', form: '10-K', fiscalQuarter: null, value: -50 },
+      ];
+
+      const annualDerived = calculateDerivedTotalLiabilities(annualAssets, annualEquity);
+      expect(annualDerived).toHaveLength(2);
+      expect(annualDerived[0]).toMatchObject({ fiscalYear: 2024, value: 650, calculated: true });
+      expect(annualDerived[1]).toMatchObject({ fiscalYear: 2023, value: 950, calculated: true });
+
+      const quarterlyAssets = [
+        { fiscalYear: 2024, fiscalQuarter: 2, period: 'CY2024Q2', frame: 'CY2024Q2', form: '10-Q', value: 1100 },
+        { fiscalYear: 2024, fiscalQuarter: 1, period: '2024-03-31', frame: null, form: '10-Q', value: 1050 },
+      ];
+      const quarterlyEquity = [
+        { fiscalYear: 2024, fiscalQuarter: 2, period: 'CY2024Q2', frame: 'CY2024Q2', form: '10-Q', value: 400 },
+        { fiscalYear: 2024, fiscalQuarter: 1, period: '2024-03-31', frame: null, form: '10-Q', value: 350 },
+      ];
+
+      const quarterlyDerived = calculateDerivedTotalLiabilities(quarterlyAssets, quarterlyEquity);
+      expect(quarterlyDerived).toHaveLength(2);
+      expect(quarterlyDerived[0]).toMatchObject({ period: 'CY2024Q2', value: 700, calculated: true });
+      expect(quarterlyDerived[1]).toMatchObject({ period: '2024-03-31', value: 700, calculated: true });
+    });
+
+    it('uses derived totalLiabilities inside normalizeCompanyFacts when direct Liabilities tag is missing (even if LiabilitiesAndStockholdersEquity exists)', () => {
+      const facts = createCompanyFactsWithMetrics({
+        Assets: [
+          createUnitEntry({ end: '2024-12-31', val: 500000000, form: '10-K', frame: 'CY2024Q4I', filed: '2025-02-15' }),
+          createUnitEntry({ end: '2024-03-31', val: 480000000, form: '10-Q', frame: 'CY2024Q1', filed: '2024-05-01' }),
+        ],
+        StockholdersEquity: [
+          createUnitEntry({ end: '2024-12-31', val: 200000000, form: '10-K', frame: 'CY2024Q4I', filed: '2025-02-15' }),
+          createUnitEntry({ end: '2024-03-31', val: 190000000, form: '10-Q', frame: 'CY2024Q1', filed: '2024-05-01' }),
+        ],
+        LiabilitiesAndStockholdersEquity: [
+          createUnitEntry({ end: '2024-12-31', val: 500000000, form: '10-K', frame: 'CY2024Q4I', filed: '2025-02-15' }),
+        ],
+      });
+
+      const result = normalizeCompanyFacts(facts);
+      expect(result.metrics.totalLiabilities.tag).toBeNull();
+      expect(result.metrics.totalLiabilities.calculated).toBe(true);
+      expect(result.metrics.totalLiabilities.annual[0].value).toBe(300000000);
+      expect(result.metrics.totalLiabilities.quarterly[0].value).toBe(290000000);
+      expect(result.metadata.missingMetrics).not.toContain('totalLiabilities');
+      // Only Assets, StockholdersEquity, and derived totalLiabilities have data => metricsFound === 3
+      expect(result.metadata.metricsFound).toBe(3);
+    });
+  });
+
+  describe('2. totalDebt tag cleanup & derived fallback', () => {
+    it('excludes LongTermDebtAndCapitalLeaseObligationsCurrent from GAAP_TAG_MAP.totalDebt', () => {
+      expect(GAAP_TAG_MAP.totalDebt).toEqual(['DebtLongtermAndShorttermCombinedAmount']);
+      expect(GAAP_TAG_MAP.totalDebt).not.toContain('LongTermDebtAndCapitalLeaseObligationsCurrent');
+    });
+
+    it('derives totalDebt = (shortTermDebt ?? 0) + (longTermDebt ?? 0) across annual and quarterly union of periods', () => {
+      const shortAnnual = [
+        { fiscalYear: 2024, period: 'CY2024Q4I', frame: 'CY2024Q4I', form: '10-K', fiscalQuarter: null, value: 100 },
+      ];
+      const longAnnual = [
+        { fiscalYear: 2024, period: 'CY2024Q4I', frame: 'CY2024Q4I', form: '10-K', fiscalQuarter: null, value: 500 },
+        { fiscalYear: 2023, period: 'CY2023Q4I', frame: 'CY2023Q4I', form: '10-K', fiscalQuarter: null, value: 450 },
+      ];
+
+      const annualDebt = calculateDerivedTotalDebt(shortAnnual, longAnnual);
+      expect(annualDebt).toHaveLength(2);
+      expect(annualDebt[0]).toMatchObject({ fiscalYear: 2024, value: 600, calculated: true });
+      expect(annualDebt[1]).toMatchObject({ fiscalYear: 2023, value: 450, calculated: true });
+
+      const shortQ = [{ fiscalYear: 2024, fiscalQuarter: 2, period: 'CY2024Q2', frame: 'CY2024Q2', form: '10-Q', value: 80 }];
+      const longQ = [{ fiscalYear: 2024, fiscalQuarter: 2, period: 'CY2024Q2', frame: 'CY2024Q2', form: '10-Q', value: 420 }];
+      const qDebt = calculateDerivedTotalDebt(shortQ, longQ);
+      expect(qDebt).toHaveLength(1);
+      expect(qDebt[0]).toMatchObject({ period: 'CY2024Q2', value: 500, calculated: true });
+    });
+
+    it('uses derived totalDebt inside normalizeCompanyFacts and ignores LongTermDebtAndCapitalLeaseObligationsCurrent', () => {
+      const facts = createCompanyFactsWithMetrics({
+        ShortTermBorrowings: [
+          createUnitEntry({ end: '2024-12-31', val: 50000000, form: '10-K', frame: 'CY2024Q4I', filed: '2025-02-15' }),
+        ],
+        LongTermDebtNoncurrent: [
+          createUnitEntry({ end: '2024-12-31', val: 350000000, form: '10-K', frame: 'CY2024Q4I', filed: '2025-02-15' }),
+        ],
+        LongTermDebtAndCapitalLeaseObligationsCurrent: [
+          createUnitEntry({ end: '2024-12-31', val: 50000000, form: '10-K', frame: 'CY2024Q4I', filed: '2025-02-15' }),
+        ],
+      });
+
+      const result = normalizeCompanyFacts(facts);
+      expect(result.metrics.totalDebt.tag).toBeNull();
+      expect(result.metrics.totalDebt.calculated).toBe(true);
+      expect(result.metrics.totalDebt.annual[0].value).toBe(400000000);
+      expect(result.metadata.missingMetrics).not.toContain('totalDebt');
+      expect(result.metadata.metricsFound).toBe(3);
+    });
+  });
+
+  describe('3 & 4. intangibleAssets & capitalExpenditures tag cleanups', () => {
+    it('excludes IntangibleAssetsNetIncludingGoodwill from GAAP_TAG_MAP.intangibleAssets', () => {
+      expect(GAAP_TAG_MAP.intangibleAssets).toEqual([
+        'IntangibleAssetsNetExcludingGoodwill',
+        'FiniteLivedIntangibleAssetsNet',
+      ]);
+      expect(GAAP_TAG_MAP.intangibleAssets).not.toContain('IntangibleAssetsNetIncludingGoodwill');
+    });
+
+    it('excludes CapitalExpendituresIncurredButNotYetPaid from GAAP_TAG_MAP.capitalExpenditures', () => {
+      expect(GAAP_TAG_MAP.capitalExpenditures).not.toContain('CapitalExpendituresIncurredButNotYetPaid');
+    });
+  });
+
+  describe('5. Missing tags, InterestPaidNet cash fallback, IFRS ProfitLossBeforeTax, and Bank Revenue', () => {
+    it('supports InterestExpenseOperating in GAAP_TAG_MAP.interestExpense and prefers accrual over newer 10-Q InterestPaidNet', () => {
+      expect(GAAP_TAG_MAP.interestExpense).toEqual([
+        'InterestExpense',
+        'InterestExpenseOperating',
+        'InterestExpenseDebt',
+        'InterestAndDebtExpense',
+      ]);
+      expect(INTEREST_EXPENSE_CASH_FALLBACK_TAGS).toEqual(['InterestPaidNet']);
+
+      // Accrual InterestExpenseOperating has 2024 10-K; InterestPaidNet has newer 2025 10-Q
+      const facts = createCompanyFactsWithMetrics({
+        InterestExpenseOperating: [
+          createUnitEntry({ end: '2024-12-31', val: 1200000000, form: '10-K', frame: 'CY2024', filed: '2025-02-20' }),
+        ],
+        InterestPaidNet: [
+          createUnitEntry({ end: '2025-03-31', val: 350000000, form: '10-Q', frame: 'CY2025Q1', filed: '2025-05-01' }),
+        ],
+      });
+
+      const result = normalizeCompanyFacts(facts);
+      expect(result.metrics.interestExpense.tag).toBe('InterestExpenseOperating');
+      expect(result.metrics.interestExpense.isCashFallback).toBeUndefined();
+      expect(result.metrics.interestExpense.annual[0].value).toBe(1200000000);
+    });
+
+    it('falls back to InterestPaidNet with isCashFallback: true ONLY when accrual interestExpense has 0 points', () => {
+      const facts = createCompanyFactsWithMetrics({
+        InterestPaidNet: [
+          createUnitEntry({ end: '2024-12-31', val: 950000000, form: '10-K', frame: 'CY2024', filed: '2025-02-20' }),
+        ],
+      });
+
+      const result = normalizeCompanyFacts(facts);
+      expect(result.metrics.interestExpense.tag).toBe('InterestPaidNet');
+      expect(result.metrics.interestExpense.isCashFallback).toBe(true);
+      expect(result.metrics.interestExpense.annual[0].value).toBe(950000000);
+      expect(result.metadata.missingMetrics).not.toContain('interestExpense');
+      expect(result.metadata.metricsFound).toBe(1);
+    });
+
+    it('normalizes stockBasedCompensation and deferredRevenueCurrent in US-GAAP and IFRS and includes them in METRIC_CATEGORIES', () => {
+      expect(METRIC_CATEGORIES.cashFlow).toContain('stockBasedCompensation');
+      expect(METRIC_CATEGORIES.balanceSheetLiabilities).toContain('deferredRevenueCurrent');
+
+      const usFacts = createCompanyFactsWithMetrics({
+        ShareBasedCompensation: [
+          createUnitEntry({ end: '2024-12-31', val: 450000000, form: '10-K', frame: 'CY2024', filed: '2025-02-15' }),
+        ],
+        ContractWithCustomerLiabilityCurrent: [
+          createUnitEntry({ end: '2024-12-31', val: 800000000, form: '10-K', frame: 'CY2024Q4I', filed: '2025-02-15' }),
+        ],
+      });
+
+      const usRes = normalizeCompanyFacts(usFacts);
+      expect(usRes.metrics.stockBasedCompensation.tag).toBe('ShareBasedCompensation');
+      expect(usRes.metrics.stockBasedCompensation.annual[0].value).toBe(450000000);
+      expect(usRes.metrics.deferredRevenueCurrent.tag).toBe('ContractWithCustomerLiabilityCurrent');
+      expect(usRes.metrics.deferredRevenueCurrent.annual[0].value).toBe(800000000);
+
+      const usGrouped = getMetricsByCategory(usRes);
+      expect(usGrouped.cashFlow.stockBasedCompensation).toBeDefined();
+      expect(usGrouped.balanceSheetLiabilities.deferredRevenueCurrent).toBeDefined();
+
+      const ifrsFacts = createCompanyFacts({
+        facts: {
+          'ifrs-full': {
+            ProfitLossBeforeTax: {
+              units: {
+                EUR: [createUnitEntry({ end: '2024-12-31', val: 300000000, form: '20-F', frame: 'CY2024', filed: '2025-03-01' })],
+              },
+            },
+            AdjustmentsForSharebasedPayments: {
+              units: {
+                EUR: [createUnitEntry({ end: '2024-12-31', val: 40000000, form: '20-F', frame: 'CY2024', filed: '2025-03-01' })],
+              },
+            },
+            CurrentContractLiabilities: {
+              units: {
+                EUR: [createUnitEntry({ end: '2024-12-31', val: 120000000, form: '20-F', frame: 'CY2024Q4I', filed: '2025-03-01' })],
+              },
+            },
+            InterestRevenueExpense: {
+              units: {
+                EUR: [createUnitEntry({ end: '2024-12-31', val: 900000000, form: '20-F', frame: 'CY2024', filed: '2025-03-01' })],
+              },
+            },
+          },
+        },
+      });
+
+      const ifrsRes = normalizeCompanyFacts(ifrsFacts);
+      expect(ifrsRes.metrics.operatingIncome.tag).toBe('ProfitLossBeforeTax');
+      expect(ifrsRes.metrics.stockBasedCompensation.tag).toBe('AdjustmentsForSharebasedPayments');
+      expect(ifrsRes.metrics.deferredRevenueCurrent.tag).toBe('CurrentContractLiabilities');
+      expect(BANK_REVENUE_TAGS).toContain('InterestRevenueExpense');
+      expect(ifrsRes.metrics.revenue.tag).toBe('InterestRevenueExpense');
+      expect(ifrsRes.metadata.warnings.some((w) => w.includes('Bank/fintech revenue tag'))).toBe(true);
+    });
+  });
+
+  describe('Issue #362 — Duration filtering & frame tie-breaker', () => {
+    it('filters 90/180/270-day 10-K footnote entries without frame in annual mode and preserves full-year revenue', () => {
+      const facts = {
+        cik: '0000320193',
+        entityName: 'Duration Test Corp',
+        facts: {
+          'us-gaap': {
+            Revenues: {
+              units: {
+                USD: [
+                  createUnitEntry({
+                    start: '2018-01-01',
+                    end: '2018-12-31',
+                    val: 265595000000,
+                    form: '10-K',
+                    fp: 'FY',
+                    filed: '2019-02-01',
+                    accn: '0000320193-19-000001',
+                  }),
+                  // 90-day Q4 footnote fact reported inside 10-K with newer filed date and no frame
+                  createUnitEntry({
+                    start: '2018-10-01',
+                    end: '2018-12-31',
+                    val: 84310000000,
+                    form: '10-K',
+                    fp: 'FY',
+                    filed: '2020-02-01',
+                    accn: '0000320193-20-000002',
+                  }),
+                  // 180-day half-year footnote fact inside 10-K without frame
+                  createUnitEntry({
+                    start: '2019-07-01',
+                    end: '2019-12-31',
+                    val: 140000000000,
+                    form: '10-K',
+                    fp: 'FY',
+                    filed: '2020-02-01',
+                    accn: '0000320193-20-000003',
+                  }),
+                  // 270-day 9M footnote fact inside 10-K without frame
+                  createUnitEntry({
+                    start: '2019-04-01',
+                    end: '2019-12-31',
+                    val: 200000000000,
+                    form: '10-K',
+                    fp: 'FY',
+                    filed: '2020-02-01',
+                    accn: '0000320193-20-000004',
+                  }),
+                  createUnitEntry({
+                    start: '2019-01-01',
+                    end: '2019-12-31',
+                    val: 274515000000,
+                    form: '10-K',
+                    fp: 'FY',
+                    filed: '2020-02-01',
+                    accn: '0000320193-20-000001',
+                  }),
+                ],
+              },
+            },
+            Assets: {
+              units: {
+                USD: [
+                  // Instant balance sheet facts lack `start` and must pass through unaffected
+                  createUnitEntry({
+                    end: '2019-12-31',
+                    val: 338516000000,
+                    form: '10-K',
+                    fp: 'FY',
+                    filed: '2020-02-01',
+                    accn: '0000320193-20-000001',
+                  }),
+                ],
+              },
+            },
+          },
+        },
+      };
+
+      const res = normalizeCompanyFacts(facts);
+      expect(res.metrics.revenue.annual).toHaveLength(2);
+      expect(res.metrics.revenue.annual.map((p) => [p.fiscalYear, p.value])).toEqual([
+        [2019, 274515000000],
+        [2018, 265595000000],
+      ]);
+      expect(res.metrics.totalAssets.annual).toHaveLength(1);
+      expect(res.metrics.totalAssets.annual[0].value).toBe(338516000000);
+    });
+
+    it('filters 180/270-day YTD cumulative 10-Q entries without frame in quarterly mode', () => {
+      const facts = {
+        cik: '0000789019',
+        entityName: 'Quarterly Duration Corp',
+        facts: {
+          'us-gaap': {
+            Revenues: {
+              units: {
+                USD: [
+                  // 90-day standalone Q3 entry without frame -> keep
+                  createUnitEntry({
+                    start: '2024-07-01',
+                    end: '2024-09-30',
+                    val: 65000000000,
+                    form: '10-Q',
+                    fp: 'Q3',
+                    filed: '2024-11-01',
+                    accn: '0000789019-24-000001',
+                  }),
+                  // 270-day 9M YTD entry without frame & newer accn -> reject
+                  createUnitEntry({
+                    start: '2024-01-01',
+                    end: '2024-09-30',
+                    val: 190000000000,
+                    form: '10-Q',
+                    fp: 'Q3',
+                    filed: '2024-11-01',
+                    accn: '0000789019-24-000002',
+                  }),
+                  // 180-day 6M YTD entry without frame -> reject
+                  createUnitEntry({
+                    start: '2024-01-01',
+                    end: '2024-06-30',
+                    val: 125000000000,
+                    form: '10-Q',
+                    fp: 'Q2',
+                    filed: '2024-08-01',
+                    accn: '0000789019-24-000003',
+                  }),
+                  // 90-day standalone Q2 entry -> keep
+                  createUnitEntry({
+                    start: '2024-04-01',
+                    end: '2024-06-30',
+                    val: 64000000000,
+                    form: '10-Q',
+                    fp: 'Q2',
+                    filed: '2024-08-01',
+                    accn: '0000789019-24-000001',
+                  }),
+                ],
+              },
+            },
+          },
+        },
+      };
+
+      const res = normalizeCompanyFacts(facts);
+      expect(res.metrics.revenue.quarterly.map((p) => [p.period, p.value])).toEqual([
+        ['2024-09-30', 65000000000],
+        ['2024-06-30', 64000000000],
+      ]);
+    });
+
+    it('prefers framed entry over unframed entry when end, filed, and accn tie', () => {
+      const facts = {
+        cik: '0000789019',
+        entityName: 'Frame TieBreak Corp',
+        facts: {
+          'us-gaap': {
+            Revenues: {
+              units: {
+                USD: [
+                  createUnitEntry({
+                    start: '2024-01-01',
+                    end: '2024-12-31',
+                    val: 111000000000,
+                    form: '10-K',
+                    fp: 'FY',
+                    filed: '2025-02-01',
+                    accn: '0000789019-25-000010',
+                  }),
+                  createUnitEntry({
+                    start: '2024-01-01',
+                    end: '2024-12-31',
+                    val: 245122000000,
+                    form: '10-K',
+                    fp: 'FY',
+                    frame: 'CY2024',
+                    filed: '2025-02-01',
+                    accn: '0000789019-25-000010',
+                  }),
+                  createUnitEntry({
+                    start: '2024-01-01',
+                    end: '2024-03-31',
+                    val: 50000000000,
+                    form: '10-Q',
+                    fp: 'Q1',
+                    filed: '2024-05-01',
+                    accn: '0000789019-24-000010',
+                  }),
+                  createUnitEntry({
+                    start: '2024-01-01',
+                    end: '2024-03-31',
+                    val: 61858000000,
+                    form: '10-Q',
+                    fp: 'Q1',
+                    frame: 'CY2024Q1',
+                    filed: '2024-05-01',
+                    accn: '0000789019-24-000010',
+                  }),
+                ],
+              },
+            },
+          },
+        },
+      };
+
+      const res = normalizeCompanyFacts(facts);
+      expect(res.metrics.revenue.annual).toHaveLength(1);
+      expect(res.metrics.revenue.annual[0].value).toBe(245122000000);
+      expect(res.metrics.revenue.quarterly).toHaveLength(1);
+      expect(res.metrics.revenue.quarterly[0].value).toBe(61858000000);
+    });
   });
 });
 
