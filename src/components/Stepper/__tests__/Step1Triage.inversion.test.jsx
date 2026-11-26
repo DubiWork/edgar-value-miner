@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { Step1Triage } from '../Step1Triage'
+import { Step1Triage, tokenizeBidiText } from '../Step1Triage'
 import { setCachedSummary } from '../../../services/aiSummaryService.js'
 
 function annualSeries(valuesByYear) {
@@ -391,9 +391,48 @@ describe('Step1Triage Inversion Risk Breakdown & A1 Guardrails UI (#357 Slice 4 
     expect(yellowContainer.querySelectorAll('[data-severity="yellow"]')).toHaveLength(3)
 
     const expandBtn = screen.getByTestId('risk-yellow-expand-btn')
+    expect(expandBtn.getAttribute('aria-expanded')).toBe('false')
     expect(expandBtn.textContent).toContain('+2')
 
     fireEvent.click(expandBtn)
+    expect(expandBtn.getAttribute('aria-expanded')).toBe('true')
     expect(yellowContainer.querySelectorAll('[data-severity="yellow"]')).toHaveLength(5)
+  })
+
+  it('shows all 4 watch warnings directly without hiding a single (+1) remainder and isolates RTL comparisons/ranges', async () => {
+    const bidiTokens = tokenizeBidiText('כיסוי ריבית מסוכן (< 1.5x) או 15%+ מול -2.5pp בטווח 0.80x–0.85x')
+    const ltrChunks = bidiTokens.filter((t) => t.isLtr).map((t) => t.text)
+    expect(ltrChunks).toEqual(['< 1.5x', '15%+', '-2.5pp', '0.80x–0.85x'])
+
+    await setCachedSummary('FOURWARN', {
+      ticker: 'FOURWARN',
+      summary: 'חברה עם 4 אזהרות למעקב.',
+      keyEngines: ['SaaS'],
+      businessArchetype: 'TECH_SAAS',
+      financialSubType: 'NONE',
+      schemaVersion: 2,
+      source: 'ai-live',
+      qualitativeFlags: [
+        { id: 'f1', severity: 'warn', category: 'supply-chain', titleHe: 'אזהרה 1', titleEn: 'W1', rationaleHe: 'א', rationaleEn: 'a' },
+        { id: 'f2', severity: 'warn', category: 'turnover', titleHe: 'אזהרה 2', titleEn: 'W2', rationaleHe: 'ב', rationaleEn: 'b' },
+        { id: 'f3', severity: 'warn', category: 'patent', titleHe: 'אזהרה 3', titleEn: 'W3', rationaleHe: 'ג', rationaleEn: 'c' },
+        { id: 'f4', severity: 'warn', category: 'litigation', titleHe: 'אזהרה 4', titleEn: 'W4', rationaleHe: 'ד', rationaleEn: 'd' },
+      ],
+    })
+
+    render(
+      <Step1Triage
+        company={{ ticker: 'FOURWARN', name: 'FourWarn Corp' }}
+        companyFacts={{
+          metrics: {
+            revenue: { annual: annualSeries([[2024, 1000], [2025, 1150]]) },
+          },
+        }}
+      />
+    )
+
+    const yellowContainer = await screen.findByTestId('risk-tier2-yellow')
+    expect(screen.queryByTestId('risk-yellow-expand-btn')).toBeNull()
+    expect(yellowContainer.querySelectorAll('[data-severity="yellow"]')).toHaveLength(4)
   })
 })

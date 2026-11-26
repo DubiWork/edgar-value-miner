@@ -434,7 +434,7 @@ const CARD_STATUS_STYLES = {
 }
 
 const LTR_TOKEN_REGEX =
-  /\d+-[A-Za-z][A-Za-z0-9]*(?:[./-][A-Za-z0-9]+)*|(?:[~+-][$€£¥₪]?|[$€£¥₪])?\d+(?:[.,]\d+)*[%xKMBT]?(?:[–-](?:[~+-][$€£¥₪]?|[$€£¥₪])?\d+(?:[.,]\d+)*[%xKMBT]?)*|[A-Za-z][A-Za-z0-9]*(?:[./-][A-Za-z0-9]+)*/g
+  /\d+-[A-Za-z][A-Za-z0-9]*(?:[./-][A-Za-z0-9]+)*|(?:(?:<=|>=|<|>)\s*)?(?:[~+-][$€£¥₪]?|[$€£¥₪])?\d+(?:[.,]\d+)*(?:[%xKMBT]|pp)?\+?(?:[–-](?:[~+-][$€£¥₪]?|[$€£¥₪])?\d+(?:[.,]\d+)*(?:[%xKMBT]|pp)?\+?)*|[A-Za-z][A-Za-z0-9]*(?:[./-][A-Za-z0-9]+)*/g
 
 function isHebrewCharCode(code) {
   return code >= 0x0590 && code <= 0x05ff
@@ -847,24 +847,24 @@ function GlossaryText({ text, lang = 'he' }) {
                 data-testid={`glossary-term-${tok.termKey}`}
                 aria-expanded={isOpen}
                 onClick={onToggle}
-                className="inline p-0 m-0 bg-transparent border-0 border-b border-dotted border-sky-500/70 dark:border-sky-400/70 cursor-help text-inherit font-inherit focus:outline-none focus:ring-1 focus:ring-sky-500 rounded-xs"
+                className="inline p-0 m-0 bg-transparent border-0 border-b border-dotted border-sky-600/80 dark:border-sky-400/80 cursor-help text-inherit font-inherit focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900 rounded-xs"
               >
                 <BidiText text={tok.text} isRtl={isHe} />
               </button>
             )}
           >
-            <span className="block space-y-1">
-              <span className="block font-bold text-white">
+            <span className="block space-y-1.5">
+              <span className="block text-xs font-bold text-white">
                 {isHe ? tok.entry.termHe : tok.entry.termEn}
               </span>
               {def && (
-                <span className="block text-[11px] text-slate-200 leading-relaxed">
+                <span className="block text-xs text-slate-100 leading-relaxed">
                   <BidiText text={def} isRtl={isHe} />
                 </span>
               )}
               {tok.entry.source && (
-                <span className="block text-[10px] text-slate-400">
-                  — {tok.entry.source}
+                <span className="block text-[11px] text-slate-300">
+                  — <bdi dir="ltr">{tok.entry.source}</bdi>
                 </span>
               )}
             </span>
@@ -932,7 +932,7 @@ function InversionFlagItem({ flag, lang = 'he', showQuote = true }) {
       </div>
 
       {explanationText && (
-        <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+        <p className="text-xs sm:text-[13px] text-slate-800 dark:text-slate-200 leading-relaxed">
           <GlossaryText text={explanationText} lang={lang} />
         </p>
       )}
@@ -943,43 +943,50 @@ function InversionFlagItem({ flag, lang = 'he', showQuote = true }) {
             type="button"
             data-testid={`quote-toggle-${flag.id}`}
             aria-expanded={isQuoteOpen}
+            aria-controls={`quote-drawer-${flag.id}`}
             onClick={() => setIsQuoteOpen((prev) => !prev)}
-            className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-sky-700 dark:text-sky-300 hover:text-sky-600 dark:hover:text-sky-200 cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-800 dark:text-sky-300 hover:text-sky-700 dark:hover:text-sky-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 rounded-md px-1 -mx-1 py-0.5"
           >
-            <BookOpen className="w-3.5 h-3.5 shrink-0" />
+            <BookOpen className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
             <span>
               {isHe
                 ? `תובנה וציטוט (${quote.attributionHe})`
                 : `Investor Lesson & Quote (${quote.attributionEn})`}
             </span>
             {isQuoteOpen ? (
-              <ChevronUp className="w-3.5 h-3.5" />
+              <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" />
             ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
+              <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
             )}
           </button>
 
           {isQuoteOpen && (
             <div
+              id={`quote-drawer-${flag.id}`}
               data-testid={`quote-drawer-${flag.id}`}
-              className={`mt-2 rounded-lg border p-2.5 space-y-1.5 text-xs ${tone.quoteBox}`}
+              className={`mt-2 rounded-lg border p-3 sm:p-3.5 space-y-2 ${tone.quoteBox}`}
             >
               {(isHe ? quote.insightHe : quote.insightEn) && (
-                <p className="font-semibold text-slate-800 dark:text-slate-200">
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-relaxed">
                   <GlossaryText text={isHe ? quote.insightHe : quote.insightEn} lang={lang} />
                 </p>
               )}
               {quote.quoteEn && (
                 <blockquote
                   dir="ltr"
-                  className="text-[11px] italic text-slate-600 dark:text-slate-400 border-l-2 border-slate-300 dark:border-slate-600 pl-2.5 leading-relaxed"
+                  className="text-xs sm:text-[13px] italic text-slate-800 dark:text-slate-200 border-l-2 border-sky-500/40 dark:border-sky-400/40 pl-3 leading-relaxed"
                 >
                   "{quote.quoteEn}"
                 </blockquote>
               )}
-              <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
+              <div className="text-xs font-medium text-slate-700 dark:text-slate-300">
                 — {isHe ? quote.attributionHe : quote.attributionEn}
-                {quote.sourceRef ? ` · ${quote.sourceRef}` : ''}
+                {quote.sourceRef && (
+                  <>
+                    {' · '}
+                    <bdi dir="ltr">{quote.sourceRef}</bdi>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -1048,10 +1055,15 @@ function RiskBreakdownCard({ inversion, lang = 'he' }) {
     return allowedIds
   }, [tier1Red, tier2Yellow, tier3Context])
 
-  const visibleYellow = showAllYellow
-    ? tier2Yellow
-    : tier2Yellow.slice(0, YELLOW_WARNINGS_PREVIEW_CAP)
-  const hiddenYellowCount = Math.max(0, tier2Yellow.length - YELLOW_WARNINGS_PREVIEW_CAP)
+  // Never hide a single (+1) remaining warning behind an expand button
+  const shouldCollapseYellow = tier2Yellow.length > YELLOW_WARNINGS_PREVIEW_CAP + 1
+  const visibleYellow =
+    showAllYellow || !shouldCollapseYellow
+      ? tier2Yellow
+      : tier2Yellow.slice(0, YELLOW_WARNINGS_PREVIEW_CAP)
+  const hiddenYellowCount = shouldCollapseYellow
+    ? tier2Yellow.length - YELLOW_WARNINGS_PREVIEW_CAP
+    : 0
 
   if (
     summary.overallStatus === 'unavailable' &&
@@ -1064,10 +1076,10 @@ function RiskBreakdownCard({ inversion, lang = 'he' }) {
         id="step1-risk-breakdown"
         data-testid="step1-risk-breakdown"
         dir={isHe ? 'rtl' : 'ltr'}
-        className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 px-4 py-3 text-xs text-slate-600 dark:text-slate-400"
+        className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 px-4 py-3 text-xs text-slate-700 dark:text-slate-300"
       >
         <div className="flex items-center gap-2 font-medium">
-          <Info className="w-4 h-4 shrink-0 text-slate-400" />
+          <Info className="w-4 h-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden="true" />
           <span>
             {isHe
               ? 'סינון סיכונים ודגלים אדומים יופיע כאן מיד עם טעינת הדוחות הכספיים מה-SEC.'
@@ -1118,7 +1130,7 @@ function RiskBreakdownCard({ inversion, lang = 'he' }) {
           <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
             {isHe ? 'פירוט דגלים אדומים, אזהרות והקשר מאזני' : 'Risk & Guardrail Breakdown'}
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-slate-600 dark:text-slate-300">
             {isHe
               ? 'בדיקת סיכונים ודגלים אדומים — זיהוי מוקדם של חולשות מאזניות, תזרימיות ועסקיות'
               : 'Risk & Red-Flag Screening — early detection of balance-sheet, cash-flow, and business weaknesses'}
@@ -1127,8 +1139,8 @@ function RiskBreakdownCard({ inversion, lang = 'he' }) {
 
         <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
           {summary.redCount > 0 && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/25">
-              <ShieldAlert className="w-3.5 h-3.5" />
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-800 dark:text-rose-200 border border-rose-500/25">
+              <ShieldAlert className="w-3.5 h-3.5" aria-hidden="true" />
               <BidiText
                 text={isHe ? `${summary.redCount} דגלים אדומים` : `${summary.redCount} Red`}
                 isRtl={isHe}
@@ -1136,8 +1148,8 @@ function RiskBreakdownCard({ inversion, lang = 'he' }) {
             </span>
           )}
           {summary.yellowCount > 0 && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/25">
-              <AlertTriangle className="w-3.5 h-3.5" />
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-900 dark:text-amber-200 border border-amber-500/25">
+              <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
               <BidiText
                 text={isHe ? `${summary.yellowCount} אזהרות` : `${summary.yellowCount} Warn`}
                 isRtl={isHe}
@@ -1147,9 +1159,9 @@ function RiskBreakdownCard({ inversion, lang = 'he' }) {
           {summary.isCleanPass && (
             <span
               data-testid="risk-breakdown-clean-pass"
-              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25"
+              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-200 border border-emerald-500/25"
             >
-              <CheckCircle2 className="w-3.5 h-3.5" />
+              <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
               <BidiText
                 text={isHe ? '✓ 0 דגלים אדומים · סינון נקי' : '✓ 0 Red Flags · Clean Pass'}
                 isRtl={isHe}
@@ -1162,7 +1174,7 @@ function RiskBreakdownCard({ inversion, lang = 'he' }) {
       {/* Disqualifying Red Flags */}
       {tier1Red.length > 0 && (
         <div data-testid="risk-tier1-red" className="space-y-2.5">
-          <div className="text-xs font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">
+          <div className="text-xs font-bold uppercase tracking-wider text-rose-800 dark:text-rose-300">
             {isHe ? 'דגלים אדומים מהותיים' : 'Disqualifying Red Flags'}
           </div>
           <div className="space-y-2.5">
@@ -1178,19 +1190,20 @@ function RiskBreakdownCard({ inversion, lang = 'he' }) {
         </div>
       )}
 
-      {/* Points to Watch (Capped at 3 with +N expand) */}
+      {/* Points to Watch (Never hides a single +1 remainder; collapses only when 2+ remain) */}
       {tier2Yellow.length > 0 && (
         <div data-testid="risk-tier2-yellow" className="space-y-2.5">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
               {isHe ? 'נקודות למעקב' : 'Points to Watch'}
             </span>
             {hiddenYellowCount > 0 && (
               <button
                 type="button"
                 data-testid="risk-yellow-expand-btn"
+                aria-expanded={showAllYellow}
                 onClick={() => setShowAllYellow((prev) => !prev)}
-                className="text-xs font-semibold text-amber-700 dark:text-amber-300 hover:underline cursor-pointer"
+                className="text-xs font-semibold text-amber-800 dark:text-amber-300 hover:underline cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-md px-1.5 py-0.5"
               >
                 {showAllYellow
                   ? isHe
@@ -1221,7 +1234,7 @@ function RiskBreakdownCard({ inversion, lang = 'he' }) {
           data-testid="risk-tier3-context"
           className="pt-2 border-t border-slate-200/80 dark:border-slate-800 space-y-2.5"
         >
-          <div className="text-xs font-bold text-sky-700 dark:text-sky-400">
+          <div className="text-xs font-bold text-sky-800 dark:text-sky-300">
             {isHe
               ? 'הקשר חשבונאי והגנות סקטור (אינם נספרים כדגל אדום או אזהרה)'
               : 'Accounting Context & Guardrails (Not Counted as Flags)'}
