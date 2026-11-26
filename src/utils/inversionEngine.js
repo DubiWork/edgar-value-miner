@@ -24,101 +24,270 @@ import { BANK_REVENUE_TAGS, calculateFreeCashFlow } from './gaapNormalizer.js';
 // Verbatim Public Education Quotes (Graham / Buffett / Quality Compounders)
 // =============================================================================
 
-const ATTRIBUTION = {
-  buffett: {
+const AUTHOR_ATTRIBUTION = {
+  'Warren Buffett': {
     attributionHe: 'מכתבי וורן באפט לבעלי המניות',
     attributionEn: 'Warren Buffett Shareholder Letters',
   },
-  graham: {
+  'Benjamin Graham': {
     attributionHe: 'המשקיע הנבון — בנג׳מין גראהם',
     attributionEn: 'The Intelligent Investor — Benjamin Graham',
   },
-  quality: {
-    attributionHe: 'מתודולוגיית Quality Compounders / Antifragile',
-    attributionEn: 'Quality Compounders / Antifragile Methodology',
+  commentary: {
+    attributionHe: 'המשקיע הנבון (פרשנות)',
+    attributionEn: 'The Intelligent Investor (Commentary)',
   },
 };
 
 export const WISDOM_QUOTES = {
-  grossMarginFail: {
-    ...ATTRIBUTION.graham,
-    insightHe: 'בלי רווח גולמי חיובי, כל מכירה נוספת מגדילה את ההפסד.',
-    insightEn: 'Without positive gross margin, every extra dollar sold deepens the loss.',
-    quoteEn: null,
-  },
-  revenueDecline: {
-    ...ATTRIBUTION.buffett,
-    insightHe: 'צמיחה שווה רק כשהיא יוצרת יותר מדולר ערך לכל דולר מושקע.',
-    insightEn: 'Growth creates value only when incremental capital earns above its cost.',
-    quoteEn: 'Growth benefits investors only when each dollar used to finance the growth creates over a dollar of long-term market value.',
-  },
-  marginLossYear: {
-    ...ATTRIBUTION.graham,
-    insightHe: 'חברה שספגה שנת הפסד בעשור האחרון דורשת זהירות כפולה.',
-    insightEn: 'A historical loss year violates classic earnings-stability margin of safety.',
-    quoteEn: 'No deficit in the last five years covered in the Stock Guide.',
-  },
-  cyclicalTiptoes: {
-    ...ATTRIBUTION.buffett,
-    insightHe: 'כשהתעשייה כולה עומדת על קצות האצבעות, היתרון התחרותי מתאפס.',
-    insightEn: 'Cyclical capacity booms often neutralize returns across the entire industry.',
-    quoteEn: "Viewed individually, each company's capital investment decision appeared cost-effective and rational; viewed collectively, the decisions neutralized each other and were irrational (just as happens when each person watching a parade decides he can see a little better if he stands on tiptoes).",
-  },
-  cashBurnFinancing: {
-    ...ATTRIBUTION.graham,
-    insightHe: 'תלות מתמדת בגיוסי הון היא נורת אזהרה למשקיע השמרן.',
-    insightEn: 'Consistent negative operating cash flow funded by financing reveals cash dependency.',
-    quoteEn: 'If cash from operating activities is consistently negative, while cash from financing activities is consistently positive, the company has a habit of craving more cash than its own businesses can produce.',
-  },
-  cashConversionQuality: {
-    ...ATTRIBUTION.buffett,
-    insightHe: 'הרווח החשבונאי הוא רק נקודת ההתחלה — המזומן בפועל קובע.',
-    insightEn: 'Accounting earnings are only the starting point; cash conversion is reality.',
-    quoteEn: 'Managers and investors alike must understand that accounting numbers are the beginning, not the end, of business valuation.',
-  },
-  leverageZipWallet: {
-    ...ATTRIBUTION.buffett,
-    insightHe: 'מינוף שאינו מכוסה בקלות מתזרים שוטף מחייב לסגור את הארנק.',
-    insightEn: 'If cash flow cannot comfortably cover interest and CapEx, zip up your wallet.',
-    quoteEn: 'Whenever someone creates a capital structure that does not allow all interest... to be comfortably met out of current cash flow net of ample capital expenditures – zip up your wallet.',
-  },
-  bankLeverage20x: {
-    ...ATTRIBUTION.buffett,
-    insightHe: 'במינוף בנקאי של פי עשרים, טעות קטנה בנכסים מוחקת את ההון.',
-    insightEn: 'At 20:1 bank leverage, even small asset losses rapidly wipe out equity.',
-    quoteEn: 'The banking business is no favorite of ours. When assets are twenty times equity — a common ratio in this industry — mistakes that involve only a small portion of assets can destroy a major portion of equity.',
-  },
-  currentRatio2to1: {
-    ...ATTRIBUTION.graham,
-    insightHe: 'גראהם דרש נכסים שוטפים כפולים מהתחייבויות שוטפות למרווח ביטחון.',
-    insightEn: 'Graham required current assets comfortably exceeding short-term obligations for safety.',
-    quoteEn: 'For industrial companies current assets should be at least twice current liabilities.',
-  },
-  sbcExpense: {
-    ...ATTRIBUTION.buffett,
-    insightHe: 'תגמול במניות הוא הוצאה כלכלית לכל דבר ולא כסף חינם.',
-    insightEn: 'Stock-based compensation is a real economic expense diluting owners.',
-    quoteEn: "If options aren't a form of compensation, what are they?",
-  },
-  dilutionChainLetter: {
-    ...ATTRIBUTION.buffett,
-    insightHe: 'הנפקת מניות סדרתית שוחקת את חלקך בעוגה שנה אחר שנה.',
-    insightEn: 'Persistent share issuance erodes your ownership stake every year.',
-    quoteEn: "Wall Street's version of a chain-letter scheme.",
-  },
-  goodwillNoWill: {
-    ...ATTRIBUTION.buffett,
-    insightHe: 'תשלום יתר ברכישות מנפח מוניטין שלעיתים ראוי לשם אי-רצון.',
-    insightEn: 'Overpaying for acquisitions bloats goodwill without lifting economic returns.',
-    quoteEn: "When an overexcited management purchases a business at a silly price, the silliness ends up in the Goodwill account... it might better be labeled 'No-Will'.",
-  },
-  debtFundedPayouts: {
-    ...ATTRIBUTION.buffett,
-    insightHe: 'אסור לממן דיבידנדים או בייבאק בהלוואות מעל התזרים החופשי.',
-    insightEn: 'Payouts exceeding free cash flow financed with new debt weaken solvency.',
-    quoteEn: 'Other companies sell newly issued shares to Peter in order to pay dividends to Paul.',
-  },
+  revenueContraction: [],
+  grossMarginFail: [
+    {
+      author: 'Warren Buffett',
+      source: 'Berkshire Hathaway Shareholder Letter, 1982',
+      quoteEn:
+        "For the great majority of companies selling 'commodity' products, a depressing equation of business economics prevails: persistent over-capacity without administered prices (or costs) equals poor profitability.",
+      insightHe: 'ללא כוח תמחור ובידול, עודף כושר ייצור מבטיח רווחיות ירודה.',
+      insightEn:
+        'Without pricing power or differentiation, excess industry capacity guarantees poor profitability.',
+    },
+  ],
+  marginLossYear: [
+    {
+      author: 'Benjamin Graham',
+      source: 'The Intelligent Investor, Ch. 7',
+      quoteEn:
+        'He should require an indication of at least reasonable stability of earnings over the past decade or more—i.e., no year of earnings deficit—plus sufficient size and financial strength to meet possible setbacks in the future.',
+      insightHe: 'הפסד תפעולי בשנים האחרונות מעיד על חוסר יציבות עסקי מסוכן.',
+      insightEn: 'A single deficit year shatters the earnings stability required for a safe investment.',
+    },
+    {
+      author: 'Warren Buffett',
+      source: 'Berkshire Hathaway Shareholder Letter, 1985',
+      quoteEn:
+        'However, I also feel it inappropriate for even an exceptionally profitable company to fund an operation once it appears to have unending losses in prospect.',
+      insightHe: 'אין להמשיך ולממן פעילות עסקית שצפויה לרשום הפסדים בלתי פוסקים.',
+      insightEn: 'Never continue funding an operation that faces unending prospective losses.',
+    },
+  ],
+  cyclicalTiptoes: [
+    {
+      author: 'Benjamin Graham',
+      source: 'The Intelligent Investor, Ch. 7',
+      quoteEn:
+        'Companies that are inherently speculative because of widely varying earnings tend to sell both at a relatively high price and at a relatively low multiplier in their good years, and conversely at low prices and high multipliers in their bad years.',
+      insightHe: 'חברות מחזוריות מטעות כשהרווחים בשיא והמכפיל נראה זול באופן מלאכותי.',
+      insightEn: 'Cyclical peaks create deceptive low P/E ratios right before earnings collapse.',
+    },
+    {
+      author: 'Warren Buffett',
+      source: 'Berkshire Hathaway Shareholder Letter, 1985',
+      quoteEn:
+        "Viewed individually, each company's capital investment decision appeared cost-effective and rational; viewed collectively, the decisions neutralized each other and were irrational (just as happens when each person watching a parade decides he can see a little better if he stands on tiptoes). After each round of investment, all the players had more money in the game and returns remained anemic.",
+      insightHe: 'השקעות הון כבדות בענף מחזורי מנטרלות זו את זו ומשאירות תשואה אפסית.',
+      insightEn:
+        'Heavy capital investments in commodity industries neutralize each other, leaving returns anemic.',
+    },
+  ],
+  leverageZipWallet: [
+    {
+      author: 'Benjamin Graham',
+      source: 'The Intelligent Investor, Ch. 5',
+      quoteEn:
+        'An industrial company’s finances are not conservative unless the common stock (at book value) represents at least half of the total capitalization, including all bank debt.',
+      insightHe: 'חוב העולה על ההון העצמי מסכן את יציבות החברה.',
+      insightEn: 'A conservative company must fund at least half its capital with equity.',
+    },
+    {
+      author: 'Warren Buffett',
+      source: 'Berkshire Hathaway Shareholder Letter, 1989',
+      quoteEn:
+        'Our advice: Whenever an investment banker starts talking about EBDIT - or whenever someone creates a capital structure that does not allow all interest, both payable and accrued, to be comfortably met out of current cash flow net of ample capital expenditures - zip up your wallet.',
+      insightHe: 'סגור את הארנק אם תזרים המזומנים אינו מכסה בנוחות את החוב וההשקעות.',
+      insightEn: 'Avoid capital structures where cash flow net of CapEx cannot comfortably service debt.',
+    },
+  ],
+  weakInterestCoverage: [
+    {
+      author: 'Benjamin Graham',
+      source: 'The Intelligent Investor, Ch. 20',
+      quoteEn:
+        'This past ability to earn in excess of interest requirements constitutes the margin of safety that is counted on to protect the investor against loss or discomfiture in the event of some future decline in net income.',
+      insightHe: 'רווח שאינו מכסה היטב את הוצאות הריבית מוחק את מרווח הביטחון.',
+      insightEn: 'Historical excess earnings over interest charges provide the true margin of safety.',
+    },
+    {
+      author: 'Warren Buffett',
+      source: 'Berkshire Hathaway Shareholder Letter, 1990',
+      quoteEn:
+        'At the height of the debt mania, capital structures were concocted that guaranteed failure: In some cases, so much debt was issued that even highly favorable business results could not produce the funds to service it.',
+      insightHe: 'מבנה חוב שבו תוצאות מעולות אינן מספיקות לתשלום ריבית מבטיח כישלון.',
+      insightEn:
+        'Debt structures that cannot be serviced even during favorable business conditions guarantee failure.',
+    },
+  ],
+  bankLeverage20x: [
+    {
+      author: 'Benjamin Graham',
+      source: 'The Intelligent Investor, Ch. 14',
+      quoteEn:
+        'It is characteristic of all these enterprises that they have a relatively small part of their assets in the form of material things—such as fixed assets and merchandise inventories—but on the other hand most categories have shortterm obligations well in excess of their stock capital.',
+      insightHe: 'מוסדות פיננסיים חשופים לסיכון כי התחייבויותיהם עולות בהרבה על הונם.',
+      insightEn: 'Financial firms carry high leverage with short-term obligations exceeding equity capital.',
+    },
+    {
+      author: 'Warren Buffett',
+      source: 'Berkshire Hathaway Shareholder Letter, 1990',
+      quoteEn:
+        'When assets are twenty times equity - a common ratio in this industry - mistakes that involve only a small portion of assets can destroy a major portion of equity.',
+      insightHe: 'במינוף של 20 ל-1, טעות קטנה בנכסי הבנק מוחקת את כל ההון.',
+      insightEn: 'At 20:1 bank leverage, minor asset errors can wipe out total equity.',
+    },
+  ],
+  currentRatio2to1: [
+    {
+      author: 'Benjamin Graham',
+      source: 'The Intelligent Investor, Ch. 14',
+      quoteEn:
+        "For industrial companies current assets should be at least twice current liabilities—a so-called two-to-one current ratio. Also, long-term debt should not exceed the net current assets (or 'working capital').",
+      insightHe: 'יחס שוטף מתחת ל-2 מסכן את נזילות החברה בהאטה.',
+      insightEn: 'Current assets must double current liabilities to cushion against unexpected hard times.',
+    },
+  ],
+  cashConversionQuality: [
+    {
+      author: null,
+      source: 'The Intelligent Investor, Commentary on Ch. 11',
+      quoteEn:
+        'Because it adjusts for accounting entries like amortization and depreciation that do not affect the company’s cash balances, owner earnings can be a better measure than reported net income.',
+      insightHe: 'תזרים מפעולות אמין בהרבה מרווח חשבונאי שניתן לעיוות וטשטוש.',
+      insightEn: 'Owner cash flow is far more reliable than reported accounting net income.',
+    },
+    {
+      author: 'Warren Buffett',
+      source: 'Berkshire Hathaway Shareholder Letter, 1980',
+      quoteEn:
+        'However attractive the earnings numbers, we remain leery of businesses that never seem able to convert such pretty numbers into no-strings-attached cash.',
+      insightHe: 'היזהרו מעסקים שמציגים רווחים יפים אך אינם ממירים אותם למזומן חופשי.',
+      insightEn: 'Be leery of attractive earnings numbers that never convert into no-strings-attached cash.',
+    },
+  ],
+  cashBurnFinancing: [
+    {
+      author: null,
+      source: 'The Intelligent Investor, Commentary on Ch. 11',
+      quoteEn:
+        "If cash from operating activities is consistently negative, while cash from financing activities is consistently positive, the company has a habit of craving more cash than its own businesses can produce—and you should not join the 'enablers' of that habitual abuse.",
+      insightHe: 'תזרים תפעולי שלילי הנשען על גיוסי הון וחוב הוא תמרור אזהרה.',
+      insightEn:
+        'Businesses constantly burning operating cash and relying on financing are living on borrowed time.',
+    },
+  ],
+  sbcExpense: [
+    {
+      author: null,
+      source: 'The Intelligent Investor, Commentary on Ch. 11',
+      quoteEn:
+        'To fine-tune the definition of owner earnings, you should also subtract from reported net income: any costs of granting stock options, which divert earnings away from existing shareholders into the hands of new inside owners...',
+      insightHe: 'תגמול באופציות מדלל בעלי מניות ומקטין את הרווח האמיתי.',
+      insightEn: 'Stock option expenses must be deducted because they divert profits away from shareholders.',
+    },
+    {
+      author: 'Warren Buffett',
+      source: 'Berkshire Hathaway Shareholder Letter, 1992',
+      quoteEn:
+        "It seems to me that the realities of stock options can be summarized quite simply: If options aren't a form of compensation, what are they? If compensation isn't an expense, what is it? And, if expenses shouldn't go into the calculation of earnings, where in the world should they go?",
+      insightHe: 'אופציות הן הוצאת שכר אמיתית, והתעלמות מהן מנפחת את הרווח באופן מלאכותי.',
+      insightEn:
+        'Stock options are real compensation expenses; ignoring them artificially inflates reported earnings.',
+    },
+  ],
+  dilutionChainLetter: [
+    {
+      author: 'Benjamin Graham',
+      source: 'The Intelligent Investor, Ch. 16',
+      quoteEn:
+        'When separate warrants are issued for the right to subscribe additional capital, that action takes away part of the value inherent in an ordinary common share and transfers it to a separate certificate.',
+      insightHe: 'הנפקת כתבי אופציה גוזלת ערך ומדללת את המשקיעים הקיימים.',
+      insightEn: 'Issuing subscription rights and warrants dilutes the intrinsic value of existing shares.',
+    },
+    {
+      author: 'Warren Buffett',
+      source: 'Berkshire Hathaway Shareholder Letter, 1997',
+      quoteEn:
+        "However, voracious buyers -- the ones that issue shares as fast as they can print them -- are tacitly conceding that point. (Often, also, they are running Wall Street's version of a chain-letter scheme.)",
+      insightHe: 'הדפסת מניות בלתי פוסקת לרכישות מדללת את בעלי המניות ומהווה מכתב שרשרת.',
+      insightEn:
+        'Voracious share issuance dilutes existing owners and often functions like a financial chain-letter.',
+    },
+  ],
+  goodwillNoWill: [
+    {
+      author: 'Benjamin Graham',
+      source: 'The Intelligent Investor, Ch. 18',
+      quoteEn:
+        "For the two enterprises combined, the 1969 price reflected almost $5 billion of good-will valuation. How many years of excellent future earnings would it take to 'realize' that good-will factor in the form of dividends or tangible assets?",
+      insightHe: 'מוניטין מנופח מרכישות עבר עלול להימחק ולהסב הפסדים כבדים.',
+      insightEn: 'Inflated goodwill from acquisitions represents future write-downs rather than genuine asset value.',
+    },
+    {
+      author: 'Warren Buffett',
+      source: 'Berkshire Hathaway Shareholder Letter, 1983',
+      quoteEn:
+        "When an overexcited management purchases a business at a silly price, the same accounting niceties described earlier are observed. Because it can't go anywhere else, the silliness ends up in the Goodwill account. Considering the lack of managerial discipline that created the account, under such circumstances it might better be labeled 'No-Will'.",
+      insightHe: 'רכישות במחיר מופרז מנפחות את המוניטין במאזן ומשקפות היעדר משמעת ניהולית.',
+      insightEn:
+        'Overpaying for acquisitions inflates balance-sheet Goodwill, reflecting a lack of managerial discipline.',
+    },
+  ],
+  debtFundedPayouts: [
+    {
+      author: 'Warren Buffett',
+      source: 'Berkshire Hathaway Shareholder Letter, 1981',
+      quoteEn:
+        "Other companies sell newly issued shares to Peter in order to pay dividends to Paul. Beware of 'dividends' that can be paid out only if someone promises to replace the capital distributed.",
+      insightHe: 'היזהרו מדיבידנדים הממומנים על ידי הנפקת מניות חדשות ומחזור הון.',
+      insightEn: 'Beware of dividends funded by issuing new shares rather than generated earnings.',
+    },
+  ],
 };
+
+function hashDeterministicKey(seed) {
+  let hash = 5381;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = ((hash << 5) + hash + seed.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+/**
+ * Deterministically selects a quote from a WISDOM_QUOTES array based on `ticker + quoteKey`
+ * so users see varied quotes across different companies. Returns `null` for empty arrays.
+ *
+ * @param {string} quoteKey
+ * @param {string} [ticker='']
+ * @returns {Object|null}
+ */
+export function selectWisdomQuote(quoteKey, ticker = '') {
+  const entries = WISDOM_QUOTES[quoteKey];
+  if (!Array.isArray(entries) || entries.length === 0) return null;
+
+  const seed = `${String(ticker || '').trim().toUpperCase()}:${quoteKey}`;
+  const selected = entries[hashDeterministicKey(seed) % entries.length];
+  if (!selected) return null;
+
+  const attr = AUTHOR_ATTRIBUTION[selected.author] || AUTHOR_ATTRIBUTION.commentary;
+  return {
+    author: selected.author ?? null,
+    source: selected.source || null,
+    sourceRef: selected.source || null,
+    attributionHe: attr.attributionHe,
+    attributionEn: attr.attributionEn,
+    insightHe: selected.insightHe || null,
+    insightEn: selected.insightEn || null,
+    quoteEn: selected.quoteEn || null,
+  };
+}
 
 // =============================================================================
 // Numeric & Time-Series Helpers
@@ -265,7 +434,7 @@ function createFlag({
     ...(valueDisplayEn ? { valueDisplayEn } : {}),
     explanationHe,
     explanationEn,
-    quote: quote ? { ...quote } : null,
+    quote: typeof quote === 'string' ? quote : quote ? { ...quote } : null,
     ...(metricsSnapshot ? { metricsSnapshot } : {}),
   };
 }
@@ -738,7 +907,7 @@ function evaluateSolvencyAndLeverage(snap, guardrails, archetype, financialSubTy
             'לבנק או פינטק מקבל פיקדונות חייבת להיות כרית הון חיובית הסופגת הפסדי אשראי. הון שלילי מעמיד את המוסד בסיכון חדלות פירעון חמור.',
           explanationEn:
             'Deposit-taking institutions require positive equity capital to absorb loan losses. Negative equity signals severe insolvency risk.',
-          quote: WISDOM_QUOTES.bankLeverage20x,
+          quote: 'bankLeverage20x',
         })
       );
     } else if (isNum(snap.equityToAssetsPct) && snap.equityToAssetsPct < 6) {
@@ -758,7 +927,7 @@ function evaluateSolvencyAndLeverage(snap, guardrails, archetype, financialSubTy
             'יחס הון לנכסים מתחת ל-6% משקף מינוף בנקאי של מעל פי 16–20. במצב זה הפסד קטן בתיק ההלוואות עלול למחוק חלק ניכר מהון בעלי המניות.',
           explanationEn:
             'Equity below 6% of total assets implies >16x–20x banking leverage, where small credit losses can wipe out shareholders.',
-          quote: WISDOM_QUOTES.bankLeverage20x,
+          quote: 'bankLeverage20x',
           metricsSnapshot: { equityToAssetsPct: snap.equityToAssetsPct },
         })
       );
@@ -777,7 +946,7 @@ function evaluateSolvencyAndLeverage(snap, guardrails, archetype, financialSubTy
             'כרית ההון נמצאת בין 6% ל-8% מהנכסים — טווח שדורש מעקב אחרי איכות תיק האשראי וההפרשות להפסדים.',
           explanationEn:
             'Equity sits between 6% and 8% of assets—warranting close attention to credit loss provisions.',
-          quote: WISDOM_QUOTES.bankLeverage20x,
+          quote: 'bankLeverage20x',
         })
       );
     }
@@ -798,7 +967,7 @@ function evaluateSolvencyAndLeverage(snap, guardrails, archetype, financialSubTy
             'ההתחייבויות של החברה גבוהות מסך הנכסים שלה, וללא גיבוי של תזרים חזק ורכישה עצמית מתועדת הדבר מאותת על מצוקת חוב וסיכון מאזני.',
           explanationEn:
             'Total liabilities exceed total assets without an offsetting cash-rich buyback profile, signaling balance-sheet distress risk.',
-          quote: WISDOM_QUOTES.leverageZipWallet,
+          quote: 'leverageZipWallet',
           metricsSnapshot: { equity: snap.equity },
         })
       );
@@ -832,7 +1001,7 @@ function evaluateSolvencyAndLeverage(snap, guardrails, archetype, financialSubTy
             valueDisplayEn: `L/E ${formatRatio(snap.liabilitiesToEquity)}`,
             explanationHe: `יחס ההתחייבויות להון העצמי (${formatRatio(snap.liabilitiesToEquity)}) חוצה את סף הסיכון (${redLeThreshold.toFixed(1)}x) ומותיר מרווח טעות צר בהאטה או עליית ריבית.`,
             explanationEn: `Liabilities-to-equity (${formatRatio(snap.liabilitiesToEquity)}) exceeds the ${redLeThreshold.toFixed(1)}x danger threshold, leaving little margin for downturns or refinancing shocks.`,
-            quote: WISDOM_QUOTES.leverageZipWallet,
+            quote: 'leverageZipWallet',
             metricsSnapshot: { liabilitiesToEquity: snap.liabilitiesToEquity },
           })
         );
@@ -854,7 +1023,7 @@ function evaluateSolvencyAndLeverage(snap, guardrails, archetype, financialSubTy
               'החברה פועלת עם מינוף נטו מוגבר; מומלץ לוודא שפריסת מועדי הפירעון ותזרים המזומנים מאפשרים שירות חוב נוח.',
             explanationEn:
               'Net debt leverage is elevated; verify debt maturity schedules and free cash flow coverage.',
-            quote: WISDOM_QUOTES.leverageZipWallet,
+            quote: 'leverageZipWallet',
             metricsSnapshot: { liabilitiesToEquity: snap.liabilitiesToEquity },
           })
         );
@@ -883,7 +1052,7 @@ function evaluateSolvencyAndLeverage(snap, guardrails, archetype, financialSubTy
               'הרווח התפעולי מכסה בקושי את תשלומי הריבית על החוב (< 1.5x). כל ירידה קטנה בהכנסות עלולה להוביל לקשיי פירעון.',
             explanationEn:
               'Operating profit barely covers interest payments (< 1.5x). Even a minor earnings dip can create debt-service strain.',
-            quote: WISDOM_QUOTES.leverageZipWallet,
+            quote: 'weakInterestCoverage',
             metricsSnapshot: { ebitInterestCoverage: snap.ebitInterestCoverage },
           })
         );
@@ -900,7 +1069,7 @@ function evaluateSolvencyAndLeverage(snap, guardrails, archetype, financialSubTy
             titleEn: `Narrow Interest Coverage (${formatRatio(snap.ebitInterestCoverage)} < ${warnCov.toFixed(1)}x)`,
             explanationHe: `מרווח הכיסוי של הוצאות הריבית (${formatRatio(snap.ebitInterestCoverage)}) מצומצם יחסית לסיכון הענפי.`,
             explanationEn: `Interest coverage (${formatRatio(snap.ebitInterestCoverage)}) provides a narrower cushion than preferred for this sector.`,
-            quote: WISDOM_QUOTES.leverageZipWallet,
+            quote: 'weakInterestCoverage',
             metricsSnapshot: { ebitInterestCoverage: snap.ebitInterestCoverage },
           })
         );
@@ -930,7 +1099,7 @@ function evaluateResilience3Y(snap, pushRed, pushYellow) {
             'לאורך 3 השנים האחרונות התזרים התפעולי נמוך מ-80% מהרווח הנקי המדווח — סימן אזהרה לכך שהרווח החשבונאי "תקוע" במלאי, בחובות לקוחות או בהיוונים ואינו נכנס לקופה.',
           explanationEn:
             'Over the past 3 years, cumulative operating cash flow captured under 80% of net income—warning that reported earnings are not converting into real cash.',
-          quote: WISDOM_QUOTES.cashConversionQuality,
+          quote: 'cashConversionQuality',
           metricsSnapshot: {
             cashConversionRatio: snap.cashConversionRatio,
             sumOcf3Y: snap.sumOcf3Y,
@@ -953,7 +1122,7 @@ function evaluateResilience3Y(snap, pushRed, pushYellow) {
             'התזרים התפעולי המצטבר ב-3 שנים נמוך מ-85% מהרווח הנקי — יש לבדוק גידול בהון חוזר או רישום הכנסות אגרסיבי.',
           explanationEn:
             '3-year operating cash flow lags reported net income (< 0.85x); inspect working capital build or revenue recognition.',
-          quote: WISDOM_QUOTES.cashConversionQuality,
+          quote: 'cashConversionQuality',
           metricsSnapshot: { cashConversionRatio: snap.cashConversionRatio },
         })
       );
@@ -981,7 +1150,7 @@ function evaluateResilience3Y(snap, pushRed, pushYellow) {
             'העסק שורף מזומנים מפעילותו השוטפת שנה אחר שנה ומממן את הפער באמצעות הלוואות או הנפקות מניות חוזרות.',
           explanationEn:
             'Core operations consistently burn cash while financing inflows keep the company afloat.',
-          quote: WISDOM_QUOTES.cashBurnFinancing,
+          quote: 'cashBurnFinancing',
         })
       );
     }
@@ -1005,7 +1174,7 @@ function evaluateResilience3Y(snap, pushRed, pushYellow) {
             'התזרים החופשי נראה חיובי רק מפני שמנטרלים את התגמול העצום במניות לעובדים (מעל 20% מההכנסות). בפועל, בניכוי העלות לבעלי המניות, התזרים של 3 השנים הוא שלילי.',
           explanationEn:
             'Reported FCF only stays positive by adding back heavy stock-based compensation (>= 20% of revenue). Deducting true SBC leaves negative 3-year FCF.',
-          quote: WISDOM_QUOTES.sbcExpense,
+          quote: 'sbcExpense',
           metricsSnapshot: { fcfExSbc3Y: snap.fcfExSbc3Y, sbcToRevenuePct: sbcPct },
         })
       );
@@ -1024,7 +1193,7 @@ function evaluateResilience3Y(snap, pushRed, pushYellow) {
             'כאשר מפחיתים את עלות התגמול במניות (SBC) מהתזרים החופשי של 3 השנים האחרונות, העסק לא ייצר עודף מזומן נקי לבעלי המניות.',
           explanationEn:
             'After subtracting stock-based compensation from 3Y free cash flow, net cash retained for owners is zero or negative.',
-          quote: WISDOM_QUOTES.sbcExpense,
+          quote: 'sbcExpense',
           metricsSnapshot: { fcfExSbc3Y: snap.fcfExSbc3Y },
         })
       );
@@ -1043,7 +1212,7 @@ function evaluateResilience3Y(snap, pushRed, pushYellow) {
             'נתח משמעותי מההכנסות (15%+) מחולק כתגמול במניות, מה ששוחק את שיעור הרווח האמיתי לבעל המניות.',
           explanationEn:
             'More than 15% of revenue is absorbed by stock-based compensation, diluting real economic earnings.',
-          quote: WISDOM_QUOTES.sbcExpense,
+          quote: 'sbcExpense',
           metricsSnapshot: { sbcToRevenueLatestPct: snap.sbcToRevenueLatestPct },
         })
       );
@@ -1078,7 +1247,7 @@ function evaluateResilience3Y(snap, pushRed, pushYellow) {
               'החברה מחזירה לבעלי המניות יותר מזומן מכפי שהעסק ייצר ב-3 שנים, תוך הגדלת החוב נטו או שחיקת המזומן מול חוב קצר-טווח — דגל אדום ליציבות עתידית.',
             explanationEn:
               'Cumulative 3Y dividends and buybacks exceeded 3Y free cash flow while net debt increased or cash fell below short-term debt.',
-            quote: WISDOM_QUOTES.debtFundedPayouts,
+            quote: 'debtFundedPayouts',
             metricsSnapshot: {
               capitalReturns3Y: snap.capitalReturns3Y,
               sumFcf3Y: snap.sumFcf3Y,
@@ -1101,7 +1270,7 @@ function evaluateResilience3Y(snap, pushRed, pushYellow) {
               'סך הדיבידנדים והרכישות העצמיות עלה על התזרים החופשי ב-3 השנים, אם כי כרגע הוא נתמך ביתרות מזומן ולא בעליית חוב נטו מסוכנת.',
             explanationEn:
               'Total dividends and buybacks topped 3Y free cash flow; currently cushioned by balance-sheet cash rather than rising net debt.',
-            quote: WISDOM_QUOTES.debtFundedPayouts,
+            quote: 'debtFundedPayouts',
             metricsSnapshot: { capitalReturns3Y: snap.capitalReturns3Y, sumFcf3Y: snap.sumFcf3Y },
           })
         );
@@ -1127,7 +1296,7 @@ function evaluateResilience3Y(snap, pushRed, pushYellow) {
             'למעלה מ-70% מהמזומן שהעסק מייצר מנותב לרכישת ציוד ותשתיות כדי לשרוד ולהתחרות, ומותיר מעט תזרים פנוי.',
           explanationEn:
             'Over 70% of operating cash flow goes back into capital expenditures, leaving slim free cash flow for owners.',
-          quote: WISDOM_QUOTES.cyclicalTiptoes,
+          quote: 'cyclicalTiptoes',
         })
       );
     }
@@ -1184,7 +1353,7 @@ function evaluateGoodwillAndReturns(snap, sharesMetric, isBuybackCannibal, pushR
             'למעלה ממחצית מנכסי החברה הם מוניטין — הפרמיה ששולמה מעל שווי הנכסים המוחשיים ברכישת חברות אחרות — ובמקביל התשואה על ההון המושקע (ROIC — הרווח הכלכלי שהעסק מפיק ביחס לסך ההון והחוב המושקעים בו), עומס החוב או דילול המניות מצביעים על תשלום יתר וסיכון למחיקות ערך.',
           explanationEn:
             'Goodwill (the premium paid above tangible assets in past acquisitions) exceeds 50% of total assets while paired with weak return on invested capital (ROIC < 10%), heavy Net Debt/FCF (> 4.0x), or dilution (> 2.5%/yr).',
-          quote: WISDOM_QUOTES.goodwillNoWill,
+          quote: 'goodwillNoWill',
           metricsSnapshot: {
             goodwillToAssetsPct: snap.goodwillToAssetsPct,
             roicPct: snap.roicPct,
@@ -1208,7 +1377,7 @@ function evaluateGoodwillAndReturns(snap, sharesMetric, isBuybackCannibal, pushR
             'למעלה מ-40% מנכסי החברה הם מוניטין — הפרמיה ששולמה מעל שווי הנכסים המוחשיים ברכישת חברות אחרות. כל עוד התשואה על ההון המושקע (ROIC — הרווח הכלכלי ביחס לסך הכסף המושקע בעסק) גבוהה והחוב נשלט מדובר בנקודה למעקב בלבד ולא בפסילה, אך חשוב לוודא שהרכישות מצדיקות את מחירן.',
           explanationEn:
             'Goodwill (the premium paid above tangible net assets in acquisitions) exceeds 40% of assets; while strong ROIC (profit relative to total invested capital) and controlled debt prevent disqualification, monitor acquisition discipline.',
-          quote: WISDOM_QUOTES.goodwillNoWill,
+          quote: 'goodwillNoWill',
           metricsSnapshot: { goodwillToAssetsPct: snap.goodwillToAssetsPct, roicPct: snap.roicPct },
         })
       );
@@ -1230,7 +1399,7 @@ function evaluateGoodwillAndReturns(snap, sharesMetric, isBuybackCannibal, pushR
           'תשואה ממוצעת על ההון מתחת ל-10% מעידה על עסק איכותי פחות המתקשה לייצר ערך מואץ מההון המושקע בו.',
         explanationEn:
           'Multi-year ROE below 10% points to modest capital efficiency and thinner moat economics.',
-        quote: WISDOM_QUOTES.revenueDecline,
+        quote: 'revenueContraction',
         metricsSnapshot: { roe5YAvgPct: snap.roe5YAvgPct },
       })
     );
@@ -1270,7 +1439,7 @@ function evaluateCorePillarsAndArchetype(
               'יתרת המזומנים מספיקה לפחות משנתיים (8 רבעונים) בקצב השריפה הנוכחי — סיכון גבוה להנפקת מניות מדללת לפני אישור FDA.',
             explanationEn:
               'Cash covers fewer than 8 quarters at current burn—high risk of dilutive financing before clinical milestones.',
-            quote: WISDOM_QUOTES.cashBurnFinancing,
+            quote: 'cashBurnFinancing',
           })
         );
       } else {
@@ -1287,7 +1456,7 @@ function evaluateCorePillarsAndArchetype(
               'לחברה עדיין אין הכנסות מסחריות קבועות; ההשקעה תלויה בהצלחה קלינית ורגולטורית.',
             explanationEn:
               'No commercial revenue stream yet; thesis depends heavily on regulatory and trial outcomes.',
-            quote: WISDOM_QUOTES.cashBurnFinancing,
+            quote: 'cashBurnFinancing',
           })
         );
       }
@@ -1306,7 +1475,7 @@ function evaluateCorePillarsAndArchetype(
             'עלות המכר עולה על מחיר המכירה (או שאין הכנסות כלל). ללא רווח גולמי חיובי, הגדלת המכירות אינה בונה רווחיות.',
           explanationEn:
             'Direct production costs meet or exceed sales price (or revenue is zero), blocking unit-economic profitability.',
-          quote: WISDOM_QUOTES.grossMarginFail,
+          quote: 'grossMarginFail',
         })
       );
     }
@@ -1324,7 +1493,7 @@ function evaluateCorePillarsAndArchetype(
           'חברות תוכנה טהורות מציגות לרוב שוליים גולמיים של 70%+. שוליים מתחת ל-50% רומזים על מרכיב גבוה של שירותי ייעוץ, חומרה או עלויות ענן כבדות.',
         explanationEn:
           'Pure software peers usually exceed 70% gross margin; below 50% points to heavy hosting or services overhead.',
-        quote: WISDOM_QUOTES.grossMarginFail,
+        quote: 'grossMarginFail',
       })
     );
   }
@@ -1345,7 +1514,7 @@ function evaluateCorePillarsAndArchetype(
           'ירידה מתמשכת או שלילית בהכנסות מסכנת את המינוף התפעולי ועלולה להעיד על דעיכה מבנית בביקוש למוצר.',
         explanationEn:
           'Persistent top-line contraction erodes operating leverage and signals weakening demand or market share loss.',
-        quote: WISDOM_QUOTES.revenueDecline,
+        quote: 'revenueContraction',
       })
     );
   } else if (revenue.status === 'warn') {
@@ -1363,7 +1532,7 @@ function evaluateCorePillarsAndArchetype(
           'צמיחה תת-אינפלציונית (< 5%), מחזורית או מואטת בחדות מצמצמת את קצב בניית הערך העתידי.',
         explanationEn:
           'Slow (< 5% CAGR), cyclical, or sharply decelerating sales limits compounding potential.',
-        quote: WISDOM_QUOTES.revenueDecline,
+        quote: 'revenueContraction',
       })
     );
   }
@@ -1385,7 +1554,7 @@ function evaluateCorePillarsAndArchetype(
             'בעסקי מימון והשכרה שולי הרווח התפעולי מושפעים מהוצאות ריבית מובנות, ולכן ההפסד הנקי בשורה התחתונה מעיד על שחיקת הון ממשית.',
           explanationEn:
             'For spread-driven finance companies, negative bottom-line net income directly erodes book capital.',
-          quote: WISDOM_QUOTES.marginLossYear,
+          quote: 'marginLossYear',
         })
       );
     } else if (isNum(snap.netMarginLatestPct) && snap.netMarginLatestPct < 10) {
@@ -1403,7 +1572,7 @@ function evaluateCorePillarsAndArchetype(
             'שולי רווח נקי מתחת ל-10% במימון מותירים מרווח ספיגה דק מול תנודות ריבית והפרשות אשראי.',
           explanationEn:
             'Net margins under 10% leave thinner buffer against funding-cost spikes or credit losses.',
-          quote: WISDOM_QUOTES.marginLossYear,
+          quote: 'marginLossYear',
         })
       );
     }
@@ -1444,8 +1613,8 @@ function evaluateCorePillarsAndArchetype(
             ? 'At least one operating loss year in the historical window exposes downside cyclical fragility.'
             : 'Sub-10% operating margins offer weak cushion against cost inflation or price competition.',
         quote: isCyclicalFail && archetype === 'CYCLICAL_INDUSTRIAL'
-          ? WISDOM_QUOTES.cyclicalTiptoes
-          : WISDOM_QUOTES.marginLossYear,
+          ? 'cyclicalTiptoes'
+          : 'marginLossYear',
       })
     );
   } else if (margins.status === 'warn') {
@@ -1465,8 +1634,8 @@ function evaluateCorePillarsAndArchetype(
           'Wide cyclical margin swings or steady multi-year erosion warn of weakening pricing power.',
         quote:
           archetype === 'CYCLICAL_INDUSTRIAL'
-            ? WISDOM_QUOTES.cyclicalTiptoes
-            : WISDOM_QUOTES.marginLossYear,
+            ? 'cyclicalTiptoes'
+            : 'marginLossYear',
       })
     );
   }
@@ -1525,7 +1694,7 @@ function evaluateCorePillarsAndArchetype(
             'אפילו לאחר ניכוי תשלומי המנויים מראש, הנכסים השוטפים אינם מכסים את ההתחייבויות התזרימיות לשנה הקרובה (< 1.0x).',
           explanationEn:
             'Even after removing prepaid subscription liabilities, liquid current assets fall short of remaining obligations (< 1.0x).',
-          quote: WISDOM_QUOTES.currentRatio2to1,
+          quote: 'currentRatio2to1',
         })
       );
     } else if (saasGc.adjustedRatio < 1.5) {
@@ -1543,7 +1712,7 @@ function evaluateCorePillarsAndArchetype(
             'לאחר נטרול הכנסות נדחות היחס השוטף תקין חלקית (1.0x–1.49x), מה שמשאיר כרית נזילות מתונה.',
           explanationEn:
             'Adjusted liquidity excluding unearned revenue sits in the borderline 1.0x–1.49x range.',
-          quote: WISDOM_QUOTES.currentRatio2to1,
+          quote: 'currentRatio2to1',
         })
       );
     }
@@ -1562,7 +1731,7 @@ function evaluateCorePillarsAndArchetype(
           'התחייבויות השנה הקרובה גבוהות מהנכסים השוטפים הזמינים (< 1.0x), מצב שעלול לאלץ מימון מחדש בתנאי שוק קשים.',
         explanationEn:
           'Near-term obligations exceed liquid current assets (< 1.0x), risking tight short-term refinancing pressure.',
-        quote: WISDOM_QUOTES.currentRatio2to1,
+        quote: 'currentRatio2to1',
       })
     );
   } else if (currentRatio.status === 'warn') {
@@ -1580,7 +1749,7 @@ function evaluateCorePillarsAndArchetype(
           'יחס שוטף בין 1.0x ל-1.5x מספק הגנה קצרה צנועה לעומת כלל האצבע השמרני.',
         explanationEn:
           'Current ratio between 1.0x and 1.5x offers a modest buffer compared with classic defensive standards.',
-        quote: WISDOM_QUOTES.currentRatio2to1,
+        quote: 'currentRatio2to1',
       })
     );
   }
@@ -1601,7 +1770,7 @@ function evaluateCorePillarsAndArchetype(
           'הנפקת מניות בקצב של מעל 3% בשנה מדללת את אחזקת המשקיע ונוגסת בצמיחת הרווח למניה (EPS).',
         explanationEn:
           'Annual share count growth above 3% materially shrinks each investor’s ownership slice.',
-        quote: WISDOM_QUOTES.dilutionChainLetter,
+        quote: 'dilutionChainLetter',
       })
     );
   } else if (shares.status === 'warn') {
@@ -1619,7 +1788,7 @@ function evaluateCorePillarsAndArchetype(
           'גידול קל במספר המניות המדוללות מפחית מעט את חלקך בחברה לאורך זמן.',
         explanationEn:
           'Modest share-count creep gradually nibbles away at per-share compounding.',
-        quote: WISDOM_QUOTES.dilutionChainLetter,
+        quote: 'dilutionChainLetter',
       })
     );
   }
@@ -1651,7 +1820,7 @@ function evaluateCorePillarsAndArchetype(
               'חיבור צמיחת ההכנסות השנתית ושיעור ה-FCF/רווח תפעולי נמוך מ-40%, תמהיל חלש יחסית לתוכנה איכותית.',
             explanationEn:
               'Combined YoY revenue growth plus FCF/operating margin falls below the 40% software efficiency benchmark.',
-            quote: WISDOM_QUOTES.revenueDecline,
+            quote: 'revenueContraction',
           })
         );
       }
@@ -1685,7 +1854,7 @@ function evaluateCorePillarsAndArchetype(
               'כשמלאי הקמעונאי גדל ביותר מ-10% מעל קצב צמיחת המכירות, עולה הסיכון להנחות סוף-עונה ושחיקת רווחים.',
             explanationEn:
               'Retail inventory growing >10 percentage points faster than revenue raises markdown and cash-tie-up risk.',
-            quote: WISDOM_QUOTES.cashConversionQuality,
+            quote: 'cashConversionQuality',
           })
         );
       }
@@ -1710,7 +1879,7 @@ function evaluateCorePillarsAndArchetype(
             'ירידה בשיעור הרווח הגולמי בקמעונאות משקפת לעיתים מכירות חיסול, גניבות מלאי או אובדן כוח תמחור.',
           explanationEn:
             'Shrinking retail gross margins often signal promotional discounting, shrink, or higher input costs.',
-          quote: WISDOM_QUOTES.grossMarginFail,
+          quote: 'grossMarginFail',
         })
       );
     }
@@ -1736,7 +1905,7 @@ function evaluateCorePillarsAndArchetype(
           'שילוב של צמיחה איטית ותשואה נמוכה מ-10% על ההון מקשה על החברה להתמודד עם שחיקה אינפלציונית.',
         explanationEn:
           'Slow top-line growth paired with <= 10% return on capital struggles to compound ahead of inflation.',
-        quote: WISDOM_QUOTES.revenueDecline,
+        quote: 'revenueContraction',
       })
     );
   }
@@ -2049,6 +2218,7 @@ export function evaluateInversionFlags(companyFacts, options = {}) {
       currentRatio: { status: 'unavailable' },
     },
     isLowCostRetailException = false,
+    ticker = companyFacts?.ticker || '',
   } = options;
 
   const snap = extractFinancialSnapshot(metrics, triageMetrics.shares, archetype, financialSubType);
@@ -2069,9 +2239,14 @@ export function evaluateInversionFlags(companyFacts, options = {}) {
   const rawYellow = [];
   const tier3Context = [];
 
-  const pushRed = (flag) => rawRed.push(flag);
-  const pushYellow = (flag) => rawYellow.push(flag);
-  const pushContext = (item) => tier3Context.push(item);
+  const resolveFlagQuote = (flag) =>
+    flag && typeof flag.quote === 'string'
+      ? { ...flag, quote: selectWisdomQuote(flag.quote, ticker) }
+      : flag;
+
+  const pushRed = (flag) => rawRed.push(resolveFlagQuote(flag));
+  const pushYellow = (flag) => rawYellow.push(resolveFlagQuote(flag));
+  const pushContext = (item) => tier3Context.push(resolveFlagQuote(item));
 
   const isUnavailable = !snap.hasAnyMetrics;
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { calculateTriageMetrics } from '../triageCalculator.js';
-import { evaluateInversionFlags, WISDOM_QUOTES } from '../inversionEngine.js';
+import { evaluateInversionFlags, selectWisdomQuote, WISDOM_QUOTES } from '../inversionEngine.js';
 
 function annualSeries(valuesByYear) {
   return valuesByYear.map(([fiscalYear, value]) => ({ fiscalYear, value }));
@@ -918,22 +918,78 @@ describe('inversionEngine & triageCalculator (#357 Slice 3)', () => {
     });
   });
 
-  describe('Educational Copy, Word-Count (<= 12w) & Zero Private Mentor Names', () => {
-    it('enforces <= 12 Hebrew words per quote insightHe and prohibits private analyst/mentor names', () => {
-      const entries = Object.values(WISDOM_QUOTES);
-      expect(entries.length).toBeGreaterThanOrEqual(10);
+  describe('Educational Copy, Deterministic Quote Variety & Zero Private Mentor Names', () => {
+    it('stores arrays of verified quotes, handles empty revenueContraction safely, and rotates deterministically by ticker', () => {
+      const keys = Object.keys(WISDOM_QUOTES);
+      expect(keys.length).toBe(14);
+      expect(WISDOM_QUOTES.revenueContraction).toEqual([]);
+      expect(selectWisdomQuote('revenueContraction', 'MSFT')).toBeNull();
 
-      for (const q of entries) {
-        const words = q.insightHe.trim().split(/\s+/).filter(Boolean);
-        expect(words.length).toBeLessThanOrEqual(12);
-        expect(q.attributionHe.length).toBeGreaterThan(5);
-        expect(q.attributionEn.length).toBeGreaterThan(5);
-        expect(q.attributionHe).toMatch(/המשקיע הנבון|באפט|Quality Compounders/);
+      for (const list of Object.values(WISDOM_QUOTES)) {
+        expect(Array.isArray(list)).toBe(true);
+        for (const q of list) {
+          const words = q.insightHe.trim().split(/\s+/).filter(Boolean);
+          expect(words.length).toBeLessThanOrEqual(15);
+          expect(q.quoteEn.length).toBeGreaterThan(20);
+          expect(q.source.length).toBeGreaterThan(5);
+        }
       }
 
-      expect(WISDOM_QUOTES.cashConversionQuality.quoteEn).not.toBe(
-        WISDOM_QUOTES.cashBurnFinancing.quoteEn
+      // Deterministic across repeated calls for same ticker + key
+      const q1 = selectWisdomQuote('leverageZipWallet', 'AER');
+      const q2 = selectWisdomQuote('leverageZipWallet', 'AER');
+      expect(q1).toEqual(q2);
+      expect(q1.sourceRef).toBeTruthy();
+      expect(q1.attributionHe).toMatch(/המשקיע הנבון|באפט/);
+
+      // Produces variety (not static index 0) across different tickers for multi-quote keys
+      const tickers = ['AAPL', 'MSFT', 'AER', 'HD', 'ADBE', 'SAP', 'JPM', 'COST'];
+      const distinctLeverageQuotes = new Set(
+        tickers.map((t) => selectWisdomQuote('leverageZipWallet', t)?.quoteEn)
       );
+      expect(distinctLeverageQuotes.size).toBe(WISDOM_QUOTES.leverageZipWallet.length);
+
+      // Dedicated weakInterestCoverage key is distinct from leverageZipWallet
+      const covQuote = selectWisdomQuote('weakInterestCoverage', 'AER');
+      expect(covQuote).not.toBeNull();
+      expect(covQuote.quoteEn).toMatch(/interest|service it/i);
+
+      // End-to-end resolution through evaluateInversionFlags(..., { ticker })
+      const leveredFacts = {
+        metrics: {
+          revenue: { annual: annualSeries([[2023, 100], [2024, 90], [2025, 80]]) },
+          totalAssets: { annual: annualSeries([[2025, 500]]) },
+          totalLiabilities: { annual: annualSeries([[2025, 420]]) },
+          stockholdersEquity: { annual: annualSeries([[2025, 80]]) },
+        },
+      };
+      const resA = evaluateInversionFlags(leveredFacts, {
+        ticker: 'AER',
+        triageMetrics: {
+          revenue: { status: 'fail', badge: 'Contraction', badgeHe: 'התכווצות', detail: 'ירידה' },
+          margins: { status: 'pass' },
+          shares: { status: 'pass' },
+          currentRatio: { status: 'pass' },
+        },
+      });
+      const levFlagA = resA.tier1Red.find((f) => f.id === 'high-leverage-fail');
+      expect(levFlagA?.quote?.quoteEn).toBeTruthy();
+      expect(levFlagA?.quote?.sourceRef).toBeTruthy();
+      expect(levFlagA?.quote?.attributionHe).toMatch(/המשקיע הנבון|באפט/);
+
+      const revFlagA = resA.tier1Red.find((f) => f.id === 'revenue-contraction-fail');
+      expect(revFlagA?.quote).toBeNull();
+
+      // Different tickers produce varied resolved quotes end-to-end
+      const resolvedQuotes = new Set(
+        tickers.map(
+          (t) =>
+            evaluateInversionFlags(leveredFacts, { ticker: t }).tier1Red.find(
+              (f) => f.id === 'high-leverage-fail'
+            )?.quote?.quoteEn
+        )
+      );
+      expect(resolvedQuotes.size).toBe(WISDOM_QUOTES.leverageZipWallet.length);
     });
   });
 });

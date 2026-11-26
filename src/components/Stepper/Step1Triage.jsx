@@ -33,6 +33,7 @@ import {
   ReferenceLine,
 } from 'recharts'
 import { calculateTriageMetrics } from '../../utils/triageCalculator.js'
+import { tokenizeGlossaryText } from '../../utils/financialGlossary.js'
 import {
   getOrFetchCompanySummary,
   invalidateCachedSummary,
@@ -815,6 +816,71 @@ const INVERSION_CATEGORY_LABELS = {
 }
 
 /**
+ * Renders text with subtle inline glossary tooltips (`border-b border-dotted cursor-help`)
+ * for matched financial terms in `FINANCIAL_GLOSSARY`. Passes straight through `<BidiText>`
+ * when no terms match (or while the glossary is empty).
+ */
+function GlossaryText({ text, lang = 'he' }) {
+  const isHe = lang === 'he'
+  const tokens = useMemo(() => tokenizeGlossaryText(text, lang), [text, lang])
+
+  if (tokens.length === 1 && tokens[0].type === 'text') {
+    return <BidiText text={text} isRtl={isHe} />
+  }
+
+  return (
+    <>
+      {tokens.map((tok, idx) => {
+        if (tok.type !== 'term') {
+          return <BidiText key={idx} text={tok.text} isRtl={isHe} />
+        }
+        const def = isHe ? tok.entry.definitionHe : tok.entry.definitionEn
+        return (
+          <ResponsiveTooltip
+            key={`${tok.termKey}-${idx}`}
+            dir={isHe ? 'rtl' : 'ltr'}
+            align={isHe ? 'end' : 'start'}
+            widthClass="w-64 sm:w-72"
+            trigger={({ isOpen, onToggle }) => (
+              <button
+                type="button"
+                data-testid={`glossary-term-${tok.termKey}`}
+                aria-expanded={isOpen}
+                onClick={onToggle}
+                className="inline p-0 m-0 bg-transparent border-0 border-b border-dotted border-sky-500/70 dark:border-sky-400/70 cursor-help text-inherit font-inherit focus:outline-none focus:ring-1 focus:ring-sky-500 rounded-xs"
+              >
+                <BidiText text={tok.text} isRtl={isHe} />
+              </button>
+            )}
+          >
+            <span className="block space-y-1">
+              <span className="block font-bold text-white">
+                {isHe ? tok.entry.termHe : tok.entry.termEn}
+              </span>
+              {def && (
+                <span className="block text-[11px] text-slate-200 leading-relaxed">
+                  <BidiText text={def} isRtl={isHe} />
+                </span>
+              )}
+              {tok.entry.source && (
+                <span className="block text-[10px] text-slate-400">
+                  — {tok.entry.source}
+                </span>
+              )}
+            </span>
+          </ResponsiveTooltip>
+        )
+      })}
+    </>
+  )
+}
+
+GlossaryText.propTypes = {
+  text: PropTypes.string,
+  lang: PropTypes.oneOf(['he', 'en']),
+}
+
+/**
  * Single Inversion Flag Row with plain-Hebrew self-contained explanation and expandable
  * Benjamin Graham / Warren Buffett / SEC Filing quote drawer.
  */
@@ -867,7 +933,7 @@ function InversionFlagItem({ flag, lang = 'he', showQuote = true }) {
 
       {explanationText && (
         <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-          <BidiText text={explanationText} isRtl={isHe} />
+          <GlossaryText text={explanationText} lang={lang} />
         </p>
       )}
 
@@ -900,7 +966,7 @@ function InversionFlagItem({ flag, lang = 'he', showQuote = true }) {
             >
               {(isHe ? quote.insightHe : quote.insightEn) && (
                 <p className="font-semibold text-slate-800 dark:text-slate-200">
-                  <BidiText text={isHe ? quote.insightHe : quote.insightEn} isRtl={isHe} />
+                  <GlossaryText text={isHe ? quote.insightHe : quote.insightEn} lang={lang} />
                 </p>
               )}
               {quote.quoteEn && (
@@ -1464,8 +1530,9 @@ export function Step1Triage({
       archetype: resolvedArchetype,
       financialSubType: resolvedSubType,
       aiSummary,
+      ticker,
     })
-  }, [companyFacts, resolvedArchetype, resolvedSubType, aiSummary])
+  }, [companyFacts, resolvedArchetype, resolvedSubType, aiSummary, ticker])
 
   const inversion = triageData.inversion
   const buybackGuardrail = inversion?.guardrails?.buybackCannibal?.active

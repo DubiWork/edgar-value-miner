@@ -148,19 +148,23 @@ describe('Step1Triage Inversion Risk Breakdown & A1 Guardrails UI (#357 Slice 4 
     expect(screen.getByTestId('inversion-flag-high-leverage-fail')).toBeTruthy()
     expect(screen.getByTestId('inversion-flag-weak-interest-coverage-fail')).toBeTruthy()
 
-    // First flag using leverageZipWallet renders its quote toggle; second flag sharing the exact quote hides the duplicate toggle
+    // Both flags now map to distinct quote pools (leverageZipWallet vs weakInterestCoverage) so neither duplicates the other
     const quoteToggle = screen.getByTestId('quote-toggle-high-leverage-fail')
-    expect(screen.queryByTestId('quote-toggle-weak-interest-coverage-fail')).toBeNull()
+    const covQuoteToggle = screen.getByTestId('quote-toggle-weak-interest-coverage-fail')
+    expect(covQuoteToggle).toBeTruthy()
 
     fireEvent.click(quoteToggle)
     const drawer = screen.getByTestId('quote-drawer-high-leverage-fail')
-    expect(drawer.textContent).toContain('מכתבי וורן באפט')
-    expect(drawer.textContent).toContain('zip up your wallet')
+    expect(drawer.textContent).toMatch(/מכתבי וורן באפט|המשקיע הנבון/)
+
+    fireEvent.click(covQuoteToggle)
+    const covDrawer = screen.getByTestId('quote-drawer-weak-interest-coverage-fail')
+    expect(covDrawer.textContent).not.toBe(drawer.textContent)
 
     fireEvent.click(screen.getByTestId('lang-btn-en'))
     expect(breakdown.textContent).toContain('Disqualifying Red Flags')
-    expect(screen.getByTestId('quote-drawer-high-leverage-fail').textContent).toContain(
-      'Warren Buffett Shareholder Letters'
+    expect(screen.getByTestId('quote-drawer-high-leverage-fail').textContent).toMatch(
+      /Warren Buffett Shareholder Letters|The Intelligent Investor/
     )
   })
 
