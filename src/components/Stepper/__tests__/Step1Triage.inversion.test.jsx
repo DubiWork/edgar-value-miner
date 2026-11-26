@@ -157,6 +157,12 @@ describe('Step1Triage Inversion Risk Breakdown & A1 Guardrails UI (#357 Slice 4 
     const drawer = screen.getByTestId('quote-drawer-high-leverage-fail')
     expect(drawer.textContent).toMatch(/מכתבי וורן באפט|המשקיע הנבון/)
 
+    // Grounded inline glossary term renders with subtle dotted underline trigger and opens tooltip with definition + source
+    const glossaryBtn = drawer.querySelector('[data-testid^="glossary-term-"]')
+    expect(glossaryBtn).toBeTruthy()
+    fireEvent.click(glossaryBtn)
+    expect(drawer.textContent).toMatch(/The Intelligent Investor|Berkshire Hathaway/)
+
     fireEvent.click(covQuoteToggle)
     const covDrawer = screen.getByTestId('quote-drawer-weak-interest-coverage-fail')
     expect(covDrawer.textContent).not.toBe(drawer.textContent)
