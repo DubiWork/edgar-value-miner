@@ -94,7 +94,8 @@ describe('Step1Triage Grounding Auto-Upgrade (#328, #324)', () => {
       { tenKDate: null, eightKDate: null },
       { cik: '0001141391' }
     )
-    expect(mockInvalidateCachedSummary).toHaveBeenCalledWith('MA')
+    // Opportunistic upgrade must NOT pre-delete cached summary before server responds (#357)
+    expect(mockInvalidateCachedSummary).not.toHaveBeenCalled()
     expect(mockGetOrFetchCompanySummary).toHaveBeenNthCalledWith(
       2,
       'MA',
@@ -168,5 +169,74 @@ describe('Step1Triage Grounding Auto-Upgrade (#328, #324)', () => {
 
     expect(mockInvalidateCachedSummary).not.toHaveBeenCalled()
     expect(mockGetOrFetchCompanySummary).toHaveBeenCalledTimes(1)
+  })
+
+  it('immediately renders v1 cache with 0ms deterministic archetype and opportunistically upgrades to v2 when !businessArchetype && !budgetExhausted (#357)', async () => {
+    const upgradeDeferred = deferred()
+    const adbeFacts = {
+      metrics: {
+        revenue: { annual: [{ fiscalYear: 2025, value: 21500000000 }] },
+        grossProfit: { annual: [{ fiscalYear: 2025, value: 19100000000 }] }, // 88.8% GM
+        researchAndDevelopment: { annual: [{ fiscalYear: 2025, value: 3900000000 }] }, // 18% R&D
+        deferredRevenueCurrent: { annual: [{ fiscalYear: 2025, value: 6200000000 }] }, // 28.8% rev
+        currentLiabilities: { annual: [{ fiscalYear: 2025, value: 10000000000 }] },
+      },
+    }
+
+    mockGetOrFetchCompanySummary
+      .mockResolvedValueOnce({
+        ticker: 'ADBE',
+        summary: 'אדובי (v1) מספקת תוכנות יצירה ומסמכים בענן.',
+        keyEngines: ['Creative Cloud', 'Document Cloud'],
+        source: 'cache',
+        originalSource: 'ai-live',
+        businessArchetype: null, // legacy v1 cached summary
+        ingestionStatus: {
+          tenK: { status: 'ok', form: '10-K', date: '2026-01-15' },
+          eightK: { status: 'ok', form: '8-K', date: '2026-09-12' },
+          transcript: { status: 'fallback_8k', date: '2026-09-12' },
+        },
+      })
+      .mockImplementationOnce(() => upgradeDeferred.promise)
+
+    mockGetCompanyContextStatus.mockResolvedValueOnce({
+      tenK: { status: 'ok', form: '10-K', date: '2026-01-15' },
+      eightK: { status: 'ok', form: '8-K', date: '2026-09-12' },
+      transcript: { status: 'fallback_8k', date: '2026-09-12' },
+      _serverReachable: true,
+      _contextMissing: false,
+      budgetStatus: 'active',
+      hasNewerFilings: false,
+    })
+
+    render(
+      <Step1Triage
+        company={{ ticker: 'ADBE', name: 'Adobe Inc.' }}
+        companyFacts={adbeFacts}
+      />
+    )
+
+    // 1. Valid v1 summary renders immediately alongside 0ms deterministic archetype (no layout shift, no cache wipe)
+    await screen.findByText('אדובי (v1) מספקת תוכנות יצירה ומסמכים בענן.')
+    expect(screen.getByTestId('tear-sheet-blade').getAttribute('data-archetype')).toBe('TECH_SAAS')
+    expect(mockInvalidateCachedSummary).not.toHaveBeenCalled()
+
+    await waitFor(() => {
+      expect(mockGetOrFetchCompanySummary).toHaveBeenCalledTimes(2)
+    })
+
+    // 2. Live v2 upgrade completes cleanly
+    upgradeDeferred.resolve({
+      ticker: 'ADBE',
+      summary: 'אדובי (v2) מפעילה מנויי ענן ליצירה ומסמכים (Creative & Document Cloud).',
+      keyEngines: ['Creative Cloud', 'Document Cloud'],
+      businessArchetype: 'TECH_SAAS',
+      financialSubType: 'NONE',
+      source: 'ai-live',
+      schemaVersion: 2,
+    })
+
+    await screen.findByText('אדובי (v2) מפעילה מנויי ענן ליצירה ומסמכים (Creative & Document Cloud).')
+    expect(mockInvalidateCachedSummary).not.toHaveBeenCalled()
   })
 })

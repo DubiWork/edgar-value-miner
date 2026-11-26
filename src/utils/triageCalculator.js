@@ -17,6 +17,10 @@
  */
 
 import gaapNormalizer from './gaapNormalizer.js';
+import {
+  evaluateInversionFlags,
+  evaluateSaaSDeferredRevenueGuardrail,
+} from './inversionEngine.js';
 
 // =============================================================================
 // Unavailable Metric State Factory
@@ -469,9 +473,33 @@ function calculateRevenueMetric(metrics, currencySymbol = '$') {
 }
 
 /**
+ * Checks whether a low-cost scale retailer maintains narrow (2%–10%) yet completely steady margins
+ * backed by operating cash flow >= net income (e.g., warehouse club / discount model).
+ */
+function hasLowCostRetailCashBacking(metrics) {
+  const ocfList = metrics?.operatingCashFlow?.annual || [];
+  const niList = metrics?.netIncome?.annual || [];
+  if (ocfList.length === 0 || niList.length === 0) return true;
+  const niByYear = new Map(
+    niList.filter((x) => x && isNumeric(x.fiscalYear) && isNumeric(x.value)).map((x) => [x.fiscalYear, x.value])
+  );
+  let sumOcf = 0;
+  let sumNi = 0;
+  let matched = 0;
+  for (const pt of ocfList.slice(-3)) {
+    if (pt && isNumeric(pt.fiscalYear) && isNumeric(pt.value) && niByYear.has(pt.fiscalYear)) {
+      sumOcf += pt.value;
+      sumNi += niByYear.get(pt.fiscalYear);
+      matched += 1;
+    }
+  }
+  return matched === 0 || (sumNi > 0 && sumOcf >= sumNi * 0.95);
+}
+
+/**
  * 2. Operating Margins (Weakest-Link evaluated BEFORE >= 25%)
  */
-function calculateOperatingMarginsMetric(metrics) {
+function calculateOperatingMarginsMetric(metrics, options = {}) {
   const revList = metrics?.revenue?.annual || [];
   const opIncomeList = metrics?.operatingIncome?.annual || [];
 
@@ -540,6 +568,16 @@ function calculateOperatingMarginsMetric(metrics) {
   let detail;
   let detailEn;
 
+  const isLowCostRetailEligible =
+    options?.archetype === 'RETAIL_ECOMMERCE' &&
+    !hasNegativeYear &&
+    latest.value >= 2 &&
+    latest.value <= 6 &&
+    spread <= 2.5 &&
+    !isVolatileCollapse &&
+    !isCyclical &&
+    hasLowCostRetailCashBacking(metrics);
+
   if (latest.value < 0) {
     status = 'fail';
     badgeEn = 'Negative Margins';
@@ -554,6 +592,12 @@ function calculateOperatingMarginsMetric(metrics) {
     badgeHe = 'תנודתיים (שנת הפסד)';
     detail = `שוליים נוכחיים ${latestFmt}%, אך כללו שנת הפסד — נעו בין ${minFmt}% ל-${maxFmt}%`;
     detailEn = `Current margin ${latestFmt}%, but suffered historical loss year (${minFmt}%–${maxFmt}% range)`;
+  } else if (isLowCostRetailEligible) {
+    status = 'pass';
+    badgeEn = 'Low-Cost Stable';
+    badgeHe = 'יציבים (עלות-נמוכה)';
+    detail = `שולי קמעונאות עלות-נמוכה יציבים (${latestFmt}%) המגובים בתזרים חזק`;
+    detailEn = `Consistent low-cost retail margin (${latestFmt}%) backed by strong cash conversion`;
   } else if (latest.value < 10) {
     status = 'fail';
     badgeEn = isCyclical ? 'Low & Cyclical' : 'Low Margins';
@@ -612,6 +656,7 @@ function calculateOperatingMarginsMetric(metrics) {
       : `שולי רווח תפעולי: ${latestFmt}%`,
     sparklineUnit: '%',
     historyMeta,
+    isLowCostRetailException: isLowCostRetailEligible,
     status,
     sparkline: sortedPoints,
   };
@@ -913,10 +958,30 @@ function calculateShareDilutionMetric(metrics, currencySymbol = '$') {
 
 /**
  * 4. Current Ratio (Liquidity: >= 1.5x pass; 1.0x–1.5x warn; < 1.0x fail)
+ * Applies Locked A1 Guardrail #2 (SaaS Deferred Revenue) and A2 Deposit Bank exemption.
  */
-function calculateCurrentRatioMetric(metrics) {
+function calculateCurrentRatioMetric(metrics, options = {}) {
+  const { archetype = null, financialSubType = null, saasGuardrail = null } = options;
+
+  if (archetype === 'FINANCIAL_SPREAD' && financialSubType === 'DEPOSIT_BANK') {
+    return {
+      ...createUnavailableMetric('currentRatio'),
+      value: 'N/A (Bank)',
+      valueHe: 'לא רלוונטי לבנק',
+      badge: 'Bank Exempt',
+      badgeHe: 'החרגת בנק',
+      detail: 'פיקדונות לקוחות מסווגים כהתחייבות שוטפת בבנקים — נמדד ביחס הון לנכסים (Equity/Assets).',
+      detailEn: 'Customer deposits are short-term liabilities by definition — evaluated via Equity/Assets cushion.',
+      metricSummary: 'Not applicable to deposit banks',
+      metricSummaryHe: 'לא רלוונטי בבנקים מקבלי פיקדונות',
+      isBankExempt: true,
+      status: 'pass',
+    };
+  }
+
   const currentAssets = metrics?.currentAssets?.annual || [];
   const currentLiabilities = metrics?.currentLiabilities?.annual || [];
+  const deferredRevList = metrics?.deferredRevenueCurrent?.annual || [];
 
   if (!Array.isArray(currentAssets) || !Array.isArray(currentLiabilities)) {
     return createUnavailableMetric('currentRatio');
@@ -929,12 +994,27 @@ function calculateCurrentRatioMetric(metrics) {
     }
   }
 
+  const activeSaasGuardrail =
+    saasGuardrail || evaluateSaaSDeferredRevenueGuardrail(metrics, archetype);
+  const applyDeferredAdj = activeSaasGuardrail?.active === true;
+
+  const defRevByYear = new Map();
+  if (applyDeferredAdj && Array.isArray(deferredRevList)) {
+    for (const item of deferredRevList) {
+      if (item && isNumeric(item.fiscalYear) && isNumeric(item.value) && item.value > 0) {
+        defRevByYear.set(item.fiscalYear, item.value);
+      }
+    }
+  }
+
   const ratioPoints = [];
   for (const assetItem of currentAssets) {
     if (assetItem && isNumeric(assetItem.fiscalYear) && isNumeric(assetItem.value)) {
       const liab = liabilitiesByYear.get(assetItem.fiscalYear);
       if (isNumeric(liab) && liab > 0) {
-        const ratio = Math.round((assetItem.value / liab) * 100) / 100;
+        const defRev = applyDeferredAdj ? defRevByYear.get(assetItem.fiscalYear) || 0 : 0;
+        const effectiveLiab = liab - defRev > 0 ? liab - defRev : liab;
+        const ratio = Math.round((assetItem.value / effectiveLiab) * 100) / 100;
         ratioPoints.push({
           year: assetItem.fiscalYear,
           value: ratio,
@@ -964,7 +1044,8 @@ function calculateCurrentRatioMetric(metrics) {
     historyMeta.cycleBadgeEn = `Range ${historyMeta.minVal.toFixed(1)}x–${historyMeta.maxVal.toFixed(1)}x`;
   }
 
-  const latestFmt = latest.value.toFixed(2);
+  const evaluatedRatio = applyDeferredAdj ? activeSaasGuardrail.adjustedRatio : latest.value;
+  const latestFmt = evaluatedRatio.toFixed(2);
   let status = 'fail';
   let badge = 'At Risk (< 1.0)';
   let badgeHe = 'סיכון (מתחת ל-1.0)';
@@ -973,20 +1054,32 @@ function calculateCurrentRatioMetric(metrics) {
   let metricSummary = 'Short-term liabilities exceed liquid assets';
   let metricSummaryHe = 'התחייבויות שוטפות עולות על נכסים נזילים';
 
-  if (latest.value >= 1.5) {
+  if (evaluatedRatio >= 1.5) {
     status = 'pass';
-    badge = 'Safe (>= 1.5x)';
-    badgeHe = 'בטוח (מעל 1.5x)';
-    detail = `יחס שוטף תקין ובטוח (${latestFmt}x, מעל 1.5x)`;
-    detailEn = `Healthy liquidity (${latestFmt}x >= 1.5x)`;
-    metricSummary = 'Current assets comfortably cover near-term obligations';
-    metricSummaryHe = 'נכסים שוטפים מכסים בנוחות התחייבויות קרובות';
-  } else if (latest.value >= 1.0) {
+    badge = applyDeferredAdj ? 'Healthy Liquidity' : 'Safe (>= 1.5x)';
+    badgeHe = applyDeferredAdj ? 'נזילות תקינה' : 'בטוח (מעל 1.5x)';
+    detail = applyDeferredAdj
+      ? `נזילות תקינה בניכוי הכנסות מראש (${activeSaasGuardrail.adjustedDisplayHe}, ${activeSaasGuardrail.reportedSublabelHe})`
+      : `יחס שוטף תקין ובטוח (${latestFmt}x, מעל 1.5x)`;
+    detailEn = applyDeferredAdj
+      ? `Healthy liquidity excluding deferred revenue (${activeSaasGuardrail.adjustedDisplayEn}, ${activeSaasGuardrail.reportedSublabelEn})`
+      : `Healthy liquidity (${latestFmt}x >= 1.5x)`;
+    metricSummary = applyDeferredAdj
+      ? 'Adjusted for upfront subscription cash already collected'
+      : 'Current assets comfortably cover near-term obligations';
+    metricSummaryHe = applyDeferredAdj
+      ? 'מנוטרל מהכנסות מנויים שכבר התקבלו במזומן'
+      : 'נכסים שוטפים מכסים בנוחות התחייבויות קרובות';
+  } else if (evaluatedRatio >= 1.0) {
     status = 'warn';
-    badge = 'Borderline (1.0–1.5x)';
-    badgeHe = 'גבולי (1.0x–1.5x)';
-    detail = `יחס שוטף גבולי (${latestFmt}x — בין 1.0x ל-1.5x)`;
-    detailEn = `Borderline short-term liquidity (${latestFmt}x, 1.0x–1.5x)`;
+    badge = applyDeferredAdj ? 'Borderline Liquidity' : 'Borderline (1.0–1.5x)';
+    badgeHe = applyDeferredAdj ? 'נזילות בינונית' : 'גבולי (1.0x–1.5x)';
+    detail = applyDeferredAdj
+      ? `נזילות בינונית גם בניכוי הכנסות מראש (${activeSaasGuardrail.adjustedDisplayHe}, ${activeSaasGuardrail.reportedSublabelHe})`
+      : `יחס שוטף גבולי (${latestFmt}x — בין 1.0x ל-1.5x)`;
+    detailEn = applyDeferredAdj
+      ? `Borderline adjusted liquidity (${activeSaasGuardrail.adjustedDisplayEn}, ${activeSaasGuardrail.reportedSublabelEn})`
+      : `Borderline short-term liquidity (${latestFmt}x, 1.0x–1.5x)`;
     metricSummary = 'Modest short-term liquidity buffer';
     metricSummaryHe = 'כרית נזילות צרה לטווח הקצר';
   }
@@ -995,11 +1088,11 @@ function calculateCurrentRatioMetric(metrics) {
     id: 'balance-sheet',
     title: 'Current Ratio (Liquidity)',
     titleHe: 'יחס שוטף (נזילות)',
-    value: `${latestFmt}x`,
-    valueHe: `${latestFmt}x`,
+    value: applyDeferredAdj ? activeSaasGuardrail.adjustedDisplayEn : `${latestFmt}x`,
+    valueHe: applyDeferredAdj ? activeSaasGuardrail.adjustedDisplayHe : `${latestFmt}x`,
     target: 'Target: >= 1.5x',
     targetHe: 'תנאי למעבר: מעל 1.5x',
-    latestValue: latest.value,
+    latestValue: evaluatedRatio,
     badge,
     badgeHe,
     detail,
@@ -1010,6 +1103,19 @@ function calculateCurrentRatioMetric(metrics) {
     historyMeta,
     status,
     sparkline: sortedPoints,
+    ...(applyDeferredAdj
+      ? {
+          isAdjustedForDeferredRevenue: true,
+          reportedValue: activeSaasGuardrail.reportedRatio,
+          adjustedValue: activeSaasGuardrail.adjustedRatio,
+          reportedSublabelHe: activeSaasGuardrail.reportedSublabelHe,
+          reportedSublabelEn: activeSaasGuardrail.reportedSublabelEn,
+          guardrailTagHe: activeSaasGuardrail.tagHe,
+          guardrailTagEn: activeSaasGuardrail.tagEn,
+          guardrailExplanationHe: activeSaasGuardrail.explanationHe,
+          guardrailExplanationEn: activeSaasGuardrail.explanationEn,
+        }
+      : {}),
   };
 }
 
@@ -1018,34 +1124,63 @@ function calculateCurrentRatioMetric(metrics) {
 // =============================================================================
 
 /**
- * Calculates triage metrics and sparkline history from raw or normalized company facts.
+ * Calculates triage metrics, sparkline history, and Inversion Red-Flag Matrix
+ * from raw or normalized company facts.
  *
  * @param {Object} companyFacts - Raw SEC Company Facts or normalized company data
+ * @param {Object} [options={}] - Optional archetype, sub-type, and AI summary context
  * @returns {{
  *   revenue: Object,
  *   margins: Object,
  *   shares: Object,
- *   currentRatio: Object
+ *   currentRatio: Object,
+ *   capitalStructure: Object,
+ *   inversion: Object
  * }}
  */
-export function calculateTriageMetrics(companyFacts) {
+export function calculateTriageMetrics(companyFacts, options = {}) {
   const { metrics, currencySymbol } = getMetricsAndCurrency(companyFacts);
 
   if (!metrics) {
-    return {
+    const unavailable = {
       revenue: createUnavailableMetric('revenue', currencySymbol),
       margins: createUnavailableMetric('margins'),
       shares: createUnavailableMetric('shares'),
       currentRatio: createUnavailableMetric('currentRatio'),
     };
+    const inversion = evaluateInversionFlags(null, { ...options, triageMetrics: unavailable });
+    return {
+      ...unavailable,
+      capitalStructure: inversion.capitalStructure,
+      inversion,
+    };
   }
 
+  const revenue = calculateRevenueMetric(metrics, currencySymbol);
+  const margins = calculateOperatingMarginsMetric(metrics, options);
+  const shares = calculateShareDilutionMetric(metrics, currencySymbol);
+  const saasGuardrail = evaluateSaaSDeferredRevenueGuardrail(metrics, options?.archetype);
+  const currentRatio = calculateCurrentRatioMetric(metrics, {
+    ...options,
+    saasGuardrail,
+  });
+
+  const triageMetrics = { revenue, margins, shares, currentRatio };
+  const inversion = evaluateInversionFlags(
+    { metrics },
+    {
+      ...options,
+      triageMetrics,
+      isLowCostRetailException: Boolean(margins.isLowCostRetailException),
+    }
+  );
+
   return {
-    revenue: calculateRevenueMetric(metrics, currencySymbol),
-    margins: calculateOperatingMarginsMetric(metrics),
-    shares: calculateShareDilutionMetric(metrics, currencySymbol),
-    currentRatio: calculateCurrentRatioMetric(metrics),
+    ...triageMetrics,
+    capitalStructure: inversion.capitalStructure,
+    inversion,
   };
 }
 
+export { evaluateInversionFlags };
 export default calculateTriageMetrics;

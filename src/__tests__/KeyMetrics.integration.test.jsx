@@ -44,19 +44,24 @@ vi.mock('../hooks/useCompanySearch', () => ({
   default: () => mockHookReturn,
 }));
 
-vi.mock('../utils/gaapNormalizer', () => ({
-  default: {
-    getLatestValue: vi.fn((metric) => {
-      if (!metric || !metric.annual || metric.annual.length === 0) return null;
-      return {
-        value: metric.annual[0].value,
-        period: metric.annual[0].period,
-        fiscalYear: metric.annual[0].fiscalYear,
-      };
-    }),
-    normalizeCompanyFacts: vi.fn(),
-  },
-}));
+vi.mock('../utils/gaapNormalizer', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    default: {
+      ...actual.default,
+      getLatestValue: vi.fn((metric) => {
+        if (!metric || !metric.annual || metric.annual.length === 0) return null;
+        return {
+          value: metric.annual[0].value,
+          period: metric.annual[0].period,
+          fiscalYear: metric.annual[0].fiscalYear,
+        };
+      }),
+      normalizeCompanyFacts: vi.fn(),
+    },
+  };
+});
 
 // Mock calculateDebtToEquity to control D/E output in integration context
 const mockCalculateDebtToEquity = vi.fn();

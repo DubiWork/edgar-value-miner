@@ -49,20 +49,25 @@ vi.mock('../hooks/useCompanySearch', () => ({
   default: () => mockHookReturn,
 }));
 
-// Mock gaapNormalizer so we control getLatestValue
-vi.mock('../utils/gaapNormalizer', () => ({
-  default: {
-    getLatestValue: vi.fn((metric) => {
-      if (!metric || !metric.annual || metric.annual.length === 0) return null;
-      return {
-        value: metric.annual[0].value,
-        period: metric.annual[0].period,
-        fiscalYear: metric.annual[0].fiscalYear,
-      };
-    }),
-    normalizeCompanyFacts: vi.fn(),
-  },
-}));
+// Mock gaapNormalizer so we control getLatestValue while keeping named exports intact
+vi.mock('../utils/gaapNormalizer', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    default: {
+      ...actual.default,
+      getLatestValue: vi.fn((metric) => {
+        if (!metric || !metric.annual || metric.annual.length === 0) return null;
+        return {
+          value: metric.annual[0].value,
+          period: metric.annual[0].period,
+          fiscalYear: metric.annual[0].fiscalYear,
+        };
+      }),
+      normalizeCompanyFacts: vi.fn(),
+    },
+  };
+});
 
 // Mock useKeyMetrics hook — returns metrics array based on data
 let mockKeyMetricsReturn = [];

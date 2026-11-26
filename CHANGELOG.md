@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
-> Active `1.2.6` release train on `develop` (staged prior to `main` promotion).
+> Active `1.3.0` release train on `develop` (staged prior to `main` promotion).
 
 ### Added
+- Step 1 Inversion & Red-Flag Engine (`#357`): AI summary `AI_SUMMARY_SCHEMA_VERSION = 2` with opportunistic v1→v2 background cache upgrades, synchronous `0ms` / `0px` CLS 6-archetype XBRL+metadata classifier (`inferArchetypeFromXbrlAndMeta`), archetype-aware `evaluateInversionFlags` & `A1` guardrails (`HD` buyback-cannibal exemption, `ADBE`/`CRM` SaaS deferred-revenue adjusted Current Ratio, Roll-Up Goodwill rules, 3Y cash conversion / `FCF ex-SBC` / debt-funded capital return checks, and `FINANCIAL_SPREAD` subtype rules), `A3` Option C hybrid top status strip (`step1-inversion-strip`) + `#step1-risk-breakdown` card, and plain-Hebrew educational tooltips with public *Intelligent Investor* / *Warren Buffett Shareholder Letters* quotes (#357).
 - Canonical Step 1 Inversion, Red-Flag Engine & Trust Gatekeeper master specification (`docs/specs/step1_inversion_master_spec.md`) for Epic #355 (#356).
 - Step 1 Triage Gatekeeper UI, Vertex AI `generateAiSummary` Cloud Function, and admin cache/ingestion controls (`PR #316`).
 - Step 1 `10-K`/`8-K` & transcript SEC grounding pipeline with Firestore L2 cache and filing freshness check (`#318`, `PR #320`).
@@ -24,6 +25,8 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - Pinned Playwright E2E workflow runners to `ubuntu-24.04` (`PR #316`) and enabled `CodeQL Advanced` on `develop` (`PR #320`).
 
 ### Fixed
+- Dynamically displayed fetched SEC filing forms (`20-F`, `40-F`, `10-K`) and matching item numbers across Step 1 grounding labels, tooltips, admin ingestion monitor, and Tear Sheet headings instead of hardcoded `10-K` strings (#369).
+- Delegated named exports via `importOriginal` in `gaapNormalizer` integration test mocks (`App.test.jsx`, `Dashboard.integration.test.jsx`, `KeyMetrics.integration.test.jsx`, `FairValue.integration.test.jsx`, `loadingSkeleton.integration.test.jsx`, `errorBoundary.integration.test.jsx`) (#357).
 - Filtered XBRL duration facts in `gaapNormalizer.js` (`300–420` days annual, `60–120` days quarterly, with framed tie-breaking and `seenQuarterlyEnds` dedup) to stop unframed 90-day `10-K` footnote entries from inflating margins, bumped `NORMALIZATION_VERSION = 3` and IndexedDB `DB_VERSION = 5`, calibrated recency-aware 10Y operating margin drawdown (`recentMarginDrawdown`) and 3-year trailing margin erosion (`שחיקה בשוליים`) in `triageCalculator.js`, and fixed 1-decimal CAGR rounding (`roundedCagr`) and singular Hebrew down-year grammar (`שנת ירידה אחת`) (#362).
 - Aligned `calculateShareDilutionMetric` 1-decimal rounding (`roundedAnnualChangePct`) with pass/warn thresholds (`+0.23%` → `+0.2%` `pass`), distinguished temporary buyback pauses/slowdowns on net-retiring compounders (`HD`), and simplified Share Dilution card copy (`(שנה אחרונה)`, no double arrows, no confusing buyback-spend CAGR, and non-duplicative spend/span summary) (#363).
 - Separated the Step 1 Fundamentals Status Legend (`fundamentals-status-legend`) from KPI tooltips, refactored KPI tooltips into concise structured header/description/threshold rows (`YoY`, `CAGR`, dashed-line historical average), deduplicated Operating Margins (`ממוצע YYYY–YYYY: X% (הקו המקווקו בגרף)`) and Current Ratio card summaries, and replaced middle-dot (`·`) separators adjacent to numbers with spaced pipes (` | `) (#364).

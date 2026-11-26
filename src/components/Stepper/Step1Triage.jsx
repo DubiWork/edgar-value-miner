@@ -19,6 +19,10 @@ import {
   Package,
   Banknote,
   BookOpen,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Info,
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -29,6 +33,7 @@ import {
   ReferenceLine,
 } from 'recharts'
 import { calculateTriageMetrics } from '../../utils/triageCalculator.js'
+import { tokenizeGlossaryText } from '../../utils/financialGlossary.js'
 import {
   getOrFetchCompanySummary,
   invalidateCachedSummary,
@@ -42,6 +47,7 @@ import {
   normalizeBusinessInfographic,
   normalizeCompetitors,
   normalizeGlossary,
+  inferArchetypeFromXbrlAndMeta,
 } from '../../services/aiSummaryService.js'
 
 /**
@@ -111,16 +117,61 @@ CompanyLogo.propTypes = {
 }
 
 /**
+ * Resolves dynamic SEC filing form identifiers and item labels (10-K, 20-F, 40-F, 8-K, 6-K).
+ */
+function getSecFormMeta(ingestionStatus) {
+  const rawTenK = typeof ingestionStatus?.tenK?.form === 'string' ? ingestionStatus.tenK.form.trim() : ''
+  const rawEightK =
+    typeof ingestionStatus?.eightK?.form === 'string' ? ingestionStatus.eightK.form.trim() : ''
+  const tenKForm = rawTenK || '10-K'
+  const eightKForm = rawEightK || '8-K'
+  const upperTenK = tenKForm.toUpperCase()
+  const upperEightK = eightKForm.toUpperCase()
+
+  let itemsHe = ''
+  let itemsEn = ''
+  let adminItems = ''
+  if (upperTenK.startsWith('10-K')) {
+    itemsHe = ' (סעיפים 1, 1A, 7)'
+    itemsEn = ' (Item 1, 1A, 7)'
+    adminItems = ' (Item 1/1A/7)'
+  } else if (upperTenK.startsWith('20-F')) {
+    itemsHe = ' (סעיפים 3, 4, 5)'
+    itemsEn = ' (Item 3, 4, 5)'
+    adminItems = ' (Item 3/4/5)'
+  }
+
+  const eightKItemSuffix = upperEightK.startsWith('8-K') ? ' (Item 2.02)' : ''
+  return {
+    tenKForm,
+    eightKForm,
+    annualTooltipLabelHe: `דוח שנתי SEC ${tenKForm}${itemsHe}`,
+    annualTooltipLabelEn: `SEC ${tenKForm} Annual Report${itemsEn}`,
+    annualAdminLabel: `${tenKForm}${adminItems}`,
+    currentTooltipLabelHe: `דיווח כספי רבעוני SEC ${eightKForm}${eightKItemSuffix}`,
+    currentTooltipLabelEn: `${
+      upperEightK.startsWith('8-K')
+        ? `SEC ${eightKForm} Earnings Release`
+        : `SEC ${eightKForm} Current Report`
+    }${eightKItemSuffix}`,
+  }
+}
+
+/**
  * Computes transparent data-grounding status from the summary source and SEC ingestionStatus.
  */
 function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgrading = false) {
   const isHe = lang === 'he'
+  const formMeta = getSecFormMeta(ingestionStatus)
+
   if (isLoading) {
     return {
       isMock: false,
       verifiedCount: 0,
       badgeLabel: isHe ? 'בודק מקורות מידע...' : 'Checking data sources...',
-      subtitle: isHe ? 'מאמת זמינות דוח 10-K, 8-K ותמליל שיחת ועידה...' : 'Verifying SEC 10-K, 8-K & transcript sources...',
+      subtitle: isHe
+        ? `מאמת זמינות דוח ${formMeta.tenKForm}, ${formMeta.eightKForm} ותמליל שיחת ועידה...`
+        : `Verifying SEC ${formMeta.tenKForm}, ${formMeta.eightKForm} & transcript sources...`,
       toneClass:
         'bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 border-sky-300/40 dark:border-sky-800/50',
       checks: [],
@@ -133,8 +184,8 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgra
       verifiedCount: 0,
       badgeLabel: isHe ? 'שולף דוחות SEC...' : 'Fetching SEC filings...',
       subtitle: isHe
-        ? 'מאמת ושולף דוחות SEC 10-K / 8-K לעדכון התקציר...'
-        : 'Fetching missing SEC 10-K / 8-K filings to ground summary...',
+        ? `מאמת ושולף דוחות SEC ${formMeta.tenKForm} / ${formMeta.eightKForm} לעדכון התקציר...`
+        : `Fetching missing SEC ${formMeta.tenKForm} / ${formMeta.eightKForm} filings to ground summary...`,
       toneClass:
         'bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-300 border-sky-300/40 dark:border-sky-800/50',
       checks: [],
@@ -157,7 +208,7 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgra
     {
       id: 'tenK',
       ok: hasTenK,
-      label: isHe ? 'דוח שנתי SEC 10-K (סעיפים 1, 1A, 7)' : 'SEC 10-K Annual Report (Item 1, 1A, 7)',
+      label: isHe ? formMeta.annualTooltipLabelHe : formMeta.annualTooltipLabelEn,
       detail: hasTenK
         ? isHe
           ? `חולץ (${ingestionStatus.tenK.date || 'עדכני'})`
@@ -173,7 +224,7 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgra
     {
       id: 'eightK',
       ok: hasEightK,
-      label: isHe ? 'דיווח כספי רבעוני SEC 8-K (Item 2.02)' : 'SEC 8-K Earnings Release (Item 2.02)',
+      label: isHe ? formMeta.currentTooltipLabelHe : formMeta.currentTooltipLabelEn,
       detail: hasEightK
         ? isHe
           ? `חולץ (${ingestionStatus.eightK?.date || ingestionStatus.transcript?.date || 'עדכני'})`
@@ -196,8 +247,8 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgra
           : `Available (${ingestionStatus.transcript.status === 'manual' ? 'Manual' : ingestionStatus.transcript.source || 'Verified'})`
         : !isMock && ingestionStatus?.transcript?.status === 'fallback_8k'
         ? isHe
-          ? 'אין תמליל שיחה — הסתמכות על 8-K'
-          : 'No transcript — using 8-K fallback'
+          ? `אין תמליל שיחה — הסתמכות על ${formMeta.eightKForm}`
+          : `No transcript — using ${formMeta.eightKForm} fallback`
         : isHe
         ? 'אין תמליל שיחת ועידה'
         : 'No earnings transcript available',
@@ -212,8 +263,8 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgra
       verifiedCount: 0,
       badgeLabel: isHe ? 'ביסוס נתונים: 0/3 (דוגמת תצוגה)' : 'Data Grounding: 0/3 (Demo)',
       subtitle: isHe
-        ? 'תקציר דוגמה מובנה • ללא קריאת דוח 10-K או שיחת ועידה מה-SEC'
-        : 'Structured demo summary • Live SEC 10-K & transcript not yet fetched',
+        ? `תקציר דוגמה מובנה • ללא קריאת דוח ${formMeta.tenKForm} או שיחת ועידה מה-SEC`
+        : `Structured demo summary • Live SEC ${formMeta.tenKForm} & transcript not yet fetched`,
       toneClass:
         'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30',
       checks,
@@ -226,8 +277,8 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgra
       verifiedCount: 0,
       badgeLabel: isHe ? 'ביסוס נתונים: 0/3 (AI כללי)' : 'Data Grounding: 0/3 (General AI)',
       subtitle: isHe
-        ? 'ניתוח AI כללי • טרם צורפו דוחות 10-K או תמליל שיחת ועידה מהשרת'
-        : 'General AI output • SEC 10-K and earnings call transcript not yet attached',
+        ? `ניתוח AI כללי • טרם צורפו דוחות ${formMeta.tenKForm} או תמליל שיחת ועידה מהשרת`
+        : `General AI output • SEC ${formMeta.tenKForm} and earnings call transcript not yet attached`,
       toneClass:
         'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700',
       checks,
@@ -235,14 +286,14 @@ function buildGroundingInfo(aiSummary, ingestionStatus, lang, isLoading, isUpgra
   }
 
   const partsHe = [
-    hasTenK ? 'דוח 10-K' : null,
-    hasEightK ? 'דיווח 8-K' : null,
+    hasTenK ? `דוח ${formMeta.tenKForm}` : null,
+    hasEightK ? `דיווח ${formMeta.eightKForm}` : null,
     hasTranscript ? 'תמליל שיחת ועידה' : null,
   ].filter(Boolean)
 
   const partsEn = [
-    hasTenK ? 'SEC 10-K' : null,
-    hasEightK ? '8-K Filing' : null,
+    hasTenK ? `SEC ${formMeta.tenKForm}` : null,
+    hasEightK ? `${formMeta.eightKForm} Filing` : null,
     hasTranscript ? 'Earnings Call' : null,
   ].filter(Boolean)
 
@@ -383,7 +434,7 @@ const CARD_STATUS_STYLES = {
 }
 
 const LTR_TOKEN_REGEX =
-  /\d+-[A-Za-z][A-Za-z0-9]*(?:[./-][A-Za-z0-9]+)*|(?:[~+-][$€£¥₪]?|[$€£¥₪])?\d+(?:[.,]\d+)*[%xKMBT]?(?:[–-](?:[~+-][$€£¥₪]?|[$€£¥₪])?\d+(?:[.,]\d+)*[%xKMBT]?)*|[A-Za-z][A-Za-z0-9]*(?:[./-][A-Za-z0-9]+)*/g
+  /\d+-[A-Za-z][A-Za-z0-9]*(?:[./-][A-Za-z0-9]+)*|(?:(?:<=|>=|<|>)\s*)?(?:[~+-][$€£¥₪]?|[$€£¥₪])?\d+(?:[.,]\d+)*(?:[%xKMBT]|pp)?\+?(?:[–-](?:[~+-][$€£¥₪]?|[$€£¥₪])?\d+(?:[.,]\d+)*(?:[%xKMBT]|pp)?\+?)*|[A-Za-z][A-Za-z0-9]*(?:[./-][A-Za-z0-9]+)*/g
 
 function isHebrewCharCode(code) {
   return code >= 0x0590 && code <= 0x05ff
@@ -722,6 +773,504 @@ InfoTooltip.propTypes = {
   dir: PropTypes.oneOf(['rtl', 'ltr']),
 }
 
+const INVERSION_FLAG_TONES = {
+  red: {
+    container:
+      'border-rose-500/30 bg-rose-50/70 dark:bg-rose-950/20',
+    badge:
+      'bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/25',
+    dot: 'bg-rose-500',
+    quoteBox: 'border-rose-500/20 bg-white/80 dark:bg-slate-900/70',
+  },
+  yellow: {
+    container:
+      'border-amber-500/30 bg-amber-50/70 dark:bg-amber-950/20',
+    badge:
+      'bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/25',
+    dot: 'bg-amber-500',
+    quoteBox: 'border-amber-500/20 bg-white/80 dark:bg-slate-900/70',
+  },
+  info: {
+    container:
+      'border-sky-500/25 bg-sky-50/60 dark:bg-sky-950/20',
+    badge:
+      'bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/25',
+    dot: 'bg-sky-500',
+    quoteBox: 'border-sky-500/20 bg-white/80 dark:bg-slate-900/70',
+  },
+}
+
+const YELLOW_WARNINGS_PREVIEW_CAP = 3
+
+const INVERSION_CATEGORY_LABELS = {
+  solvency: { he: 'מינוף וחוב', en: 'Solvency & Debt' },
+  liquidity: { he: 'נזילות קצרה', en: 'Short-Term Liquidity' },
+  margins: { he: 'שולי רווח', en: 'Profit Margins' },
+  growth: { he: 'צמיחה', en: 'Revenue Growth' },
+  cashflow: { he: 'תזרים מזומנים', en: 'Cash Conversion' },
+  dilution: { he: 'דילול ו-SBC', en: 'Dilution & SBC' },
+  goodwill: { he: 'מוניטין / רכישות', en: 'Goodwill / M&A' },
+  'capital-allocation': { he: 'החזרי הון', en: 'Capital Returns' },
+  archetype: { he: 'חוק ענפי', en: 'Sector Benchmark' },
+  qualitative: { he: 'סריקת SEC', en: 'SEC Filing Risk' },
+}
+
+/**
+ * Renders text with subtle inline glossary tooltips (`border-b border-dotted cursor-help`)
+ * for matched financial terms in `FINANCIAL_GLOSSARY`. Passes straight through `<BidiText>`
+ * when no terms match (or while the glossary is empty).
+ */
+function GlossaryText({ text, lang = 'he' }) {
+  const isHe = lang === 'he'
+  const tokens = useMemo(() => tokenizeGlossaryText(text, lang), [text, lang])
+
+  if (tokens.length === 1 && tokens[0].type === 'text') {
+    return <BidiText text={text} isRtl={isHe} />
+  }
+
+  return (
+    <>
+      {tokens.map((tok, idx) => {
+        if (tok.type !== 'term') {
+          return <BidiText key={idx} text={tok.text} isRtl={isHe} />
+        }
+        const def = isHe ? tok.entry.definitionHe : tok.entry.definitionEn
+        return (
+          <ResponsiveTooltip
+            key={`${tok.termKey}-${idx}`}
+            dir={isHe ? 'rtl' : 'ltr'}
+            align={isHe ? 'end' : 'start'}
+            widthClass="w-64 sm:w-72"
+            trigger={({ isOpen, onToggle }) => (
+              <button
+                type="button"
+                data-testid={`glossary-term-${tok.termKey}`}
+                aria-expanded={isOpen}
+                onClick={onToggle}
+                className="inline p-0 m-0 bg-transparent border-0 border-b border-dotted border-sky-600/80 dark:border-sky-400/80 cursor-help text-inherit font-inherit focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900 rounded-xs"
+              >
+                <BidiText text={tok.text} isRtl={isHe} />
+              </button>
+            )}
+          >
+            <span className="block space-y-1.5">
+              <span className="block text-xs font-bold text-white">
+                {isHe ? tok.entry.termHe : tok.entry.termEn}
+              </span>
+              {def && (
+                <span className="block text-xs text-slate-100 leading-relaxed">
+                  <BidiText text={def} isRtl={isHe} />
+                </span>
+              )}
+              {tok.entry.source && (
+                <span className="block text-[11px] text-slate-300">
+                  — <bdi dir="ltr">{tok.entry.source}</bdi>
+                </span>
+              )}
+            </span>
+          </ResponsiveTooltip>
+        )
+      })}
+    </>
+  )
+}
+
+GlossaryText.propTypes = {
+  text: PropTypes.string,
+  lang: PropTypes.oneOf(['he', 'en']),
+}
+
+/**
+ * Single Inversion Flag Row with plain-Hebrew self-contained explanation and expandable
+ * Benjamin Graham / Warren Buffett / SEC Filing quote drawer.
+ */
+function InversionFlagItem({ flag, lang = 'he', showQuote = true }) {
+  const [isQuoteOpen, setIsQuoteOpen] = useState(false)
+  const isHe = lang === 'he'
+  const tone = INVERSION_FLAG_TONES[flag.severity] || INVERSION_FLAG_TONES.yellow
+  const catLabel = INVERSION_CATEGORY_LABELS[flag.category]
+  const badgeText =
+    flag.severity === 'info'
+      ? isHe
+        ? flag.badgeHe
+        : flag.badgeEn
+      : catLabel
+      ? isHe
+        ? catLabel.he
+        : catLabel.en
+      : isHe
+      ? flag.badgeHe
+      : flag.badgeEn
+  const titleText = isHe ? flag.titleHe : flag.titleEn
+  const valueText = isHe ? flag.valueDisplayHe : flag.valueDisplayEn
+  const explanationText = isHe ? flag.explanationHe : flag.explanationEn
+  const quote = showQuote ? flag.quote : null
+
+  return (
+    <div
+      data-testid={`inversion-flag-${flag.id}`}
+      data-severity={flag.severity}
+      className={`rounded-xl border p-3.5 space-y-2 ${tone.container}`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold ${tone.badge}`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${tone.dot}`} aria-hidden="true" />
+            <BidiText text={badgeText} isRtl={isHe} />
+          </span>
+          <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+            <BidiText text={titleText} isRtl={isHe} />
+          </h4>
+        </div>
+        {valueText && (
+          <span className="text-[11px] font-mono font-semibold text-slate-700 dark:text-slate-200 bg-white/70 dark:bg-slate-900/60 px-2 py-0.5 rounded-md border border-slate-200/80 dark:border-slate-700/70">
+            <BidiText text={valueText} isRtl={isHe} />
+          </span>
+        )}
+      </div>
+
+      {explanationText && (
+        <p className="text-xs sm:text-[13px] text-slate-800 dark:text-slate-200 leading-relaxed">
+          <GlossaryText text={explanationText} lang={lang} />
+        </p>
+      )}
+
+      {quote && (quote.insightHe || quote.quoteEn) && (
+        <div>
+          <button
+            type="button"
+            data-testid={`quote-toggle-${flag.id}`}
+            aria-expanded={isQuoteOpen}
+            aria-controls={`quote-drawer-${flag.id}`}
+            onClick={() => setIsQuoteOpen((prev) => !prev)}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-800 dark:text-sky-300 hover:text-sky-700 dark:hover:text-sky-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 rounded-md px-1 -mx-1 py-0.5"
+          >
+            <BookOpen className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+            <span>
+              {isHe
+                ? `תובנה וציטוט (${quote.attributionHe})`
+                : `Investor Lesson & Quote (${quote.attributionEn})`}
+            </span>
+            {isQuoteOpen ? (
+              <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
+            )}
+          </button>
+
+          {isQuoteOpen && (
+            <div
+              id={`quote-drawer-${flag.id}`}
+              data-testid={`quote-drawer-${flag.id}`}
+              className={`mt-2 rounded-lg border p-3 sm:p-3.5 space-y-2 ${tone.quoteBox}`}
+            >
+              {(isHe ? quote.insightHe : quote.insightEn) && (
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-relaxed">
+                  <GlossaryText text={isHe ? quote.insightHe : quote.insightEn} lang={lang} />
+                </p>
+              )}
+              {quote.quoteEn && (
+                <blockquote
+                  dir="ltr"
+                  className="text-xs sm:text-[13px] italic text-slate-800 dark:text-slate-200 border-l-2 border-sky-500/40 dark:border-sky-400/40 pl-3 leading-relaxed"
+                >
+                  "{quote.quoteEn}"
+                </blockquote>
+              )}
+              <div className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                — {isHe ? quote.attributionHe : quote.attributionEn}
+                {quote.sourceRef && (
+                  <>
+                    {' · '}
+                    <bdi dir="ltr">{quote.sourceRef}</bdi>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+InversionFlagItem.propTypes = {
+  flag: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    severity: PropTypes.oneOf(['red', 'yellow', 'info']).isRequired,
+    category: PropTypes.string,
+    badgeHe: PropTypes.string,
+    badgeEn: PropTypes.string,
+    titleHe: PropTypes.string,
+    titleEn: PropTypes.string,
+    valueDisplayHe: PropTypes.string,
+    valueDisplayEn: PropTypes.string,
+    explanationHe: PropTypes.string,
+    explanationEn: PropTypes.string,
+    quote: PropTypes.shape({
+      attributionHe: PropTypes.string,
+      attributionEn: PropTypes.string,
+      insightHe: PropTypes.string,
+      insightEn: PropTypes.string,
+      quoteEn: PropTypes.string,
+      sourceRef: PropTypes.string,
+    }),
+  }).isRequired,
+  lang: PropTypes.oneOf(['he', 'en']),
+  showQuote: PropTypes.bool,
+}
+
+/**
+ * Bottom Risk Breakdown Card (`#step1-risk-breakdown`):
+ * Collapses cleanly on healthy companies, shows Red flags / capped Watch items (+N) / Accounting Context.
+ */
+function RiskBreakdownCard({ inversion, lang = 'he' }) {
+  const [showAllYellow, setShowAllYellow] = useState(false)
+  const isHe = lang === 'he'
+
+  const tier1Red = useMemo(() => inversion?.tier1Red || [], [inversion])
+  const tier2Yellow = useMemo(() => inversion?.tier2Yellow || [], [inversion])
+  const tier3Context = useMemo(() => inversion?.tier3Context || [], [inversion])
+  const summary = inversion?.summary || {
+    redCount: 0,
+    yellowCount: 0,
+    contextCount: 0,
+    overallStatus: 'unavailable',
+    isCleanPass: false,
+  }
+
+  // Show each Buffett/Graham quote at most once per company screen across Red and Watch items
+  const shownQuoteFlagIds = useMemo(() => {
+    const seenQuotes = new Set()
+    const allowedIds = new Set()
+    for (const flag of [...tier1Red, ...tier2Yellow, ...tier3Context]) {
+      const qKey = flag.quote?.quoteEn || flag.quote?.insightHe
+      if (qKey && !seenQuotes.has(qKey)) {
+        seenQuotes.add(qKey)
+        allowedIds.add(flag.id)
+      }
+    }
+    return allowedIds
+  }, [tier1Red, tier2Yellow, tier3Context])
+
+  // Never hide a single (+1) remaining warning behind an expand button
+  const shouldCollapseYellow = tier2Yellow.length > YELLOW_WARNINGS_PREVIEW_CAP + 1
+  const visibleYellow =
+    showAllYellow || !shouldCollapseYellow
+      ? tier2Yellow
+      : tier2Yellow.slice(0, YELLOW_WARNINGS_PREVIEW_CAP)
+  const hiddenYellowCount = shouldCollapseYellow
+    ? tier2Yellow.length - YELLOW_WARNINGS_PREVIEW_CAP
+    : 0
+
+  if (
+    summary.overallStatus === 'unavailable' &&
+    tier1Red.length === 0 &&
+    tier2Yellow.length === 0 &&
+    tier3Context.length === 0
+  ) {
+    return (
+      <div
+        id="step1-risk-breakdown"
+        data-testid="step1-risk-breakdown"
+        dir={isHe ? 'rtl' : 'ltr'}
+        className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 px-4 py-3 text-xs text-slate-700 dark:text-slate-300"
+      >
+        <div className="flex items-center gap-2 font-medium">
+          <Info className="w-4 h-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+          <span>
+            {isHe
+              ? 'סינון סיכונים ודגלים אדומים יופיע כאן מיד עם טעינת הדוחות הכספיים מה-SEC.'
+              : 'Risk & Red-Flag Screening will appear once SEC financials are loaded.'}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  if (summary.isCleanPass && tier3Context.length === 0) {
+    return (
+      <div
+        id="step1-risk-breakdown"
+        data-testid="step1-risk-breakdown"
+        dir={isHe ? 'rtl' : 'ltr'}
+        className="rounded-2xl border border-emerald-500/25 bg-emerald-50/70 dark:bg-emerald-950/20 px-4 py-3.5"
+      >
+        <div
+          data-testid="risk-breakdown-clean-pass"
+          className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm font-semibold text-emerald-800 dark:text-emerald-300"
+        >
+          <span className="inline-flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <BidiText
+              text={
+                isHe
+                  ? '✓ 0 דגלים אדומים · סינון נקי (כל בדיקות היציבות, התזרים והמינוף תקינות)'
+                  : '✓ 0 Red Flags · Clean Pass (All solvency, 3Y cash flow, and guardrail checks passed)'
+              }
+              isRtl={isHe}
+            />
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      id="step1-risk-breakdown"
+      data-testid="step1-risk-breakdown"
+      dir={isHe ? 'rtl' : 'ltr'}
+      className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-4 sm:p-5 space-y-4 shadow-xs"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+            {isHe ? 'פירוט דגלים אדומים, אזהרות והקשר מאזני' : 'Risk & Guardrail Breakdown'}
+          </h3>
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            {isHe
+              ? 'בדיקת סיכונים ודגלים אדומים — זיהוי מוקדם של חולשות מאזניות, תזרימיות ועסקיות'
+              : 'Risk & Red-Flag Screening — early detection of balance-sheet, cash-flow, and business weaknesses'}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+          {summary.redCount > 0 && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-800 dark:text-rose-200 border border-rose-500/25">
+              <ShieldAlert className="w-3.5 h-3.5" aria-hidden="true" />
+              <BidiText
+                text={isHe ? `${summary.redCount} דגלים אדומים` : `${summary.redCount} Red`}
+                isRtl={isHe}
+              />
+            </span>
+          )}
+          {summary.yellowCount > 0 && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-900 dark:text-amber-200 border border-amber-500/25">
+              <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
+              <BidiText
+                text={isHe ? `${summary.yellowCount} אזהרות` : `${summary.yellowCount} Warn`}
+                isRtl={isHe}
+              />
+            </span>
+          )}
+          {summary.isCleanPass && (
+            <span
+              data-testid="risk-breakdown-clean-pass"
+              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-200 border border-emerald-500/25"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+              <BidiText
+                text={isHe ? '✓ 0 דגלים אדומים · סינון נקי' : '✓ 0 Red Flags · Clean Pass'}
+                isRtl={isHe}
+              />
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Disqualifying Red Flags */}
+      {tier1Red.length > 0 && (
+        <div data-testid="risk-tier1-red" className="space-y-2.5">
+          <div className="text-xs font-bold uppercase tracking-wider text-rose-800 dark:text-rose-300">
+            {isHe ? 'דגלים אדומים מהותיים' : 'Disqualifying Red Flags'}
+          </div>
+          <div className="space-y-2.5">
+            {tier1Red.map((flag) => (
+              <InversionFlagItem
+                key={flag.id}
+                flag={flag}
+                lang={lang}
+                showQuote={shownQuoteFlagIds.has(flag.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Points to Watch (Never hides a single +1 remainder; collapses only when 2+ remain) */}
+      {tier2Yellow.length > 0 && (
+        <div data-testid="risk-tier2-yellow" className="space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+              {isHe ? 'נקודות למעקב' : 'Points to Watch'}
+            </span>
+            {hiddenYellowCount > 0 && (
+              <button
+                type="button"
+                data-testid="risk-yellow-expand-btn"
+                aria-expanded={showAllYellow}
+                onClick={() => setShowAllYellow((prev) => !prev)}
+                className="text-xs font-semibold text-amber-800 dark:text-amber-300 hover:underline cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-md px-1.5 py-0.5"
+              >
+                {showAllYellow
+                  ? isHe
+                    ? 'הצג פחות'
+                    : 'Show fewer'
+                  : isHe
+                  ? `+${hiddenYellowCount} אזהרות נוספות`
+                  : `+${hiddenYellowCount} more warnings`}
+              </button>
+            )}
+          </div>
+          <div className="space-y-2.5">
+            {visibleYellow.map((flag) => (
+              <InversionFlagItem
+                key={flag.id}
+                flag={flag}
+                lang={lang}
+                showQuote={shownQuoteFlagIds.has(flag.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Accounting Context & Guardrails (Not counted as warnings/red flags) */}
+      {tier3Context.length > 0 && (
+        <div
+          data-testid="risk-tier3-context"
+          className="pt-2 border-t border-slate-200/80 dark:border-slate-800 space-y-2.5"
+        >
+          <div className="text-xs font-bold text-sky-800 dark:text-sky-300">
+            {isHe
+              ? 'הקשר חשבונאי והגנות סקטור (אינם נספרים כדגל אדום או אזהרה)'
+              : 'Accounting Context & Guardrails (Not Counted as Flags)'}
+          </div>
+          <div className="space-y-2">
+            {tier3Context.map((item) => (
+              <InversionFlagItem
+                key={item.id}
+                flag={item}
+                lang={lang}
+                showQuote={shownQuoteFlagIds.has(item.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+RiskBreakdownCard.propTypes = {
+  inversion: PropTypes.shape({
+    tier1Red: PropTypes.array,
+    tier2Yellow: PropTypes.array,
+    tier3Context: PropTypes.array,
+    summary: PropTypes.shape({
+      redCount: PropTypes.number,
+      yellowCount: PropTypes.number,
+      contextCount: PropTypes.number,
+      overallStatus: PropTypes.string,
+      isCleanPass: PropTypes.bool,
+    }),
+  }),
+  lang: PropTypes.oneOf(['he', 'en']),
+}
+
 /**
  * Step1Triage - 10-Second Gatekeeper & Business Clarity Screen
  * Inspired by Stock Simplifier's guided investment flow.
@@ -764,6 +1313,16 @@ export function Step1Triage({
   const ticker = company?.ticker || companyFacts?.ticker || 'MSFT'
   const companyName = company?.name || companyFacts?.companyName || ticker
   const companyCik = company?.cik ?? companyFacts?.cik ?? null
+  const secFormMeta = useMemo(() => getSecFormMeta(ingestionStatus), [ingestionStatus])
+  const deterministicArchetype = useMemo(
+    () => inferArchetypeFromXbrlAndMeta(companyFacts, company),
+    [companyFacts, company]
+  )
+  const resolvedArchetype = aiSummary?.businessArchetype || deterministicArchetype.archetype
+  const resolvedSubType =
+    aiSummary?.financialSubType && aiSummary.financialSubType !== 'NONE'
+      ? aiSummary.financialSubType
+      : deterministicArchetype.financialSubType
 
   const refreshAdminBudget = useCallback(async () => {
     if (!isAdmin) return
@@ -831,6 +1390,7 @@ export function Step1Triage({
             const cachedMissedTenK = !cachedHasTenK && serverHasTenK
             const cachedMissedEightK = !cachedHasEightK && serverHasEightK
             const cachedUngrounded = !cachedHasTenK && !cachedHasEightK
+            const needsSchemaV2Upgrade = !result?.businessArchetype
             const needsUpgrade =
               !budgetExhausted &&
               (isCachedMock ||
@@ -839,13 +1399,14 @@ export function Step1Triage({
                 cachedMissedTenK ||
                 cachedMissedEightK ||
                 cachedUngrounded ||
+                needsSchemaV2Upgrade ||
                 Boolean(ctxStatus?.hasNewerFilings))
 
             if (needsUpgrade && autoRefreshedTickerRef.current !== ticker) {
               autoRefreshedTickerRef.current = ticker
               setIsUpgradingSummary(true)
               try {
-                await invalidateCachedSummary(ticker)
+                // Opportunistic upgrade: keep valid cached summary intact until live v2 succeeds
                 const upgraded = await getOrFetchCompanySummary(
                   ticker,
                   { name: companyName, sector: company?.sector, cik: companyCik },
@@ -854,7 +1415,7 @@ export function Step1Triage({
                 if (!isCancelled && upgraded) {
                   const upgradedIsMock =
                     upgraded.source === 'mock-dynamic' || upgraded.source === 'mock-preset'
-                  if (upgraded.source === 'ai-live' || !result?.summary || !upgradedIsMock) {
+                  if (upgraded.source === 'ai-live' || (!result?.summary && !upgradedIsMock)) {
                     setAiSummary(upgraded)
                   }
                   if (upgraded.ingestionStatus) {
@@ -869,6 +1430,8 @@ export function Step1Triage({
                 }
               }
             }
+          } else if (result?.ingestionStatus) {
+            setIngestionStatus(result.ingestionStatus)
           }
         } else if (result?.ingestionStatus) {
           setIngestionStatus(result.ingestionStatus)
@@ -933,7 +1496,9 @@ export function Step1Triage({
 
   // Admin handler: Clear both EDGAR + AI caches and force refresh company facts from SEC into Firestore DB
   const handleFullCompanyCacheReset = useCallback(async () => {
-    setAdminStatusMessage(`מנקה מטמון עבור ${ticker} ומרענן נתוני SEC + דוחות 10-K/8-K ל-Firestore...`)
+    setAdminStatusMessage(
+      `מנקה מטמון עבור ${ticker} ומרענן נתוני SEC + דוחות ${secFormMeta.tenKForm}/${secFormMeta.eightKForm} ל-Firestore...`
+    )
     await invalidateCachedSummary(ticker)
     if (onForceRefreshCompany) {
       await onForceRefreshCompany(ticker)
@@ -943,7 +1508,14 @@ export function Step1Triage({
       setIngestionStatus(freshCtx)
     }
     await handleRefreshAiSummary()
-  }, [ticker, companyCik, onForceRefreshCompany, handleRefreshAiSummary])
+  }, [
+    ticker,
+    companyCik,
+    onForceRefreshCompany,
+    handleRefreshAiSummary,
+    secFormMeta.tenKForm,
+    secFormMeta.eightKForm,
+  ])
 
   const handleSaveManualTranscript = useCallback(async () => {
     if (!manualTranscriptInput.trim()) return
@@ -965,10 +1537,25 @@ export function Step1Triage({
     }
   }, [ticker, manualTranscriptInput, handleRefreshAiSummary])
 
-  // Calculate real fundamental indicators & 10-15Y historical sparklines
+  // Calculate real fundamental indicators, A1 guardrails & Inversion Risk Breakdown
   const triageData = useMemo(() => {
-    return calculateTriageMetrics(companyFacts)
-  }, [companyFacts])
+    return calculateTriageMetrics(companyFacts, {
+      archetype: resolvedArchetype,
+      financialSubType: resolvedSubType,
+      aiSummary,
+      ticker,
+    })
+  }, [companyFacts, resolvedArchetype, resolvedSubType, aiSummary, ticker])
+
+  const inversion = triageData.inversion
+  const buybackGuardrail = inversion?.guardrails?.buybackCannibal?.active
+    ? inversion.guardrails.buybackCannibal
+    : null
+  const saasGuardrail = inversion?.guardrails?.saasDeferredRevenue?.active
+    ? inversion.guardrails.saasDeferredRevenue
+    : null
+  const useBuybackHeadline =
+    Boolean(buybackGuardrail) && triageData.currentRatio.status === 'unavailable'
 
   // 4 Fast Fundamentals Indicators with Sparklines
   const fundamentalIndicators = [
@@ -1100,19 +1687,68 @@ export function Step1Triage({
     },
     {
       id: 'balance-sheet',
-      title: triageData.currentRatio.title,
-      titleHe: triageData.currentRatio.titleHe || 'יחס שוטף (נזילות)',
-      status: triageData.currentRatio.status,
-      value: triageData.currentRatio.value,
-      valueHe: triageData.currentRatio.valueHe || triageData.currentRatio.value,
+      title: useBuybackHeadline ? 'Balance Sheet Soundness' : triageData.currentRatio.title,
+      titleHe: useBuybackHeadline
+        ? 'חוסן מאזני (רכישה עצמית)'
+        : triageData.currentRatio.titleHe || 'יחס שוטף (נזילות)',
+      status: useBuybackHeadline ? triageData.capitalStructure.status : triageData.currentRatio.status,
+      value: useBuybackHeadline
+        ? triageData.capitalStructure.primaryValueEn
+        : triageData.currentRatio.value,
+      valueHe: useBuybackHeadline
+        ? triageData.capitalStructure.primaryValueHe
+        : triageData.currentRatio.valueHe || triageData.currentRatio.value,
       target: triageData.currentRatio.target,
       targetHe: triageData.currentRatio.targetHe || 'תנאי למעבר: מעל 1.5x',
-      badge: triageData.currentRatio.badge,
-      badgeHe: triageData.currentRatio.badgeHe || triageData.currentRatio.badge,
-      detail: triageData.currentRatio.detail,
-      detailEn: triageData.currentRatio.detailEn || triageData.currentRatio.detail,
-      metricSummary: triageData.currentRatio.metricSummary,
-      metricSummaryHe: triageData.currentRatio.metricSummaryHe || triageData.currentRatio.metricSummary,
+      reportedSublabelHe: saasGuardrail
+        ? triageData.currentRatio.reportedSublabelHe || null
+        : buybackGuardrail
+        ? useBuybackHeadline
+          ? 'רכישה עצמית — מאזן תקין'
+          : `${buybackGuardrail.badgeHe} · ${buybackGuardrail.primaryValueHe}`
+        : null,
+      reportedSublabelEn: saasGuardrail
+        ? triageData.currentRatio.reportedSublabelEn || null
+        : buybackGuardrail
+        ? useBuybackHeadline
+          ? 'Buyback-driven equity'
+          : `${buybackGuardrail.badgeEn} · ${buybackGuardrail.primaryValueEn}`
+        : null,
+      inlineGuardrailInfo: saasGuardrail
+        ? {
+            testId: 'guardrail-info-saas',
+            tagHe: saasGuardrail.tagHe,
+            tagEn: saasGuardrail.tagEn,
+            explanationHe: saasGuardrail.explanationHe,
+            explanationEn: saasGuardrail.explanationEn,
+          }
+        : buybackGuardrail
+        ? {
+            testId: 'guardrail-info-buyback',
+            tagHe: buybackGuardrail.tagHe,
+            tagEn: buybackGuardrail.tagEn,
+            explanationHe: buybackGuardrail.explanationHe,
+            explanationEn: buybackGuardrail.explanationEn,
+          }
+        : null,
+      badge: useBuybackHeadline
+        ? triageData.capitalStructure.badgeEn
+        : triageData.currentRatio.badge,
+      badgeHe: useBuybackHeadline
+        ? triageData.capitalStructure.badgeHe
+        : triageData.currentRatio.badgeHe || triageData.currentRatio.badge,
+      detail: useBuybackHeadline
+        ? triageData.capitalStructure.tooltipHe
+        : triageData.currentRatio.detail,
+      detailEn: useBuybackHeadline
+        ? triageData.capitalStructure.tooltipEn
+        : triageData.currentRatio.detailEn || triageData.currentRatio.detail,
+      metricSummary: useBuybackHeadline
+        ? triageData.capitalStructure.badgeEn
+        : triageData.currentRatio.metricSummary,
+      metricSummaryHe: useBuybackHeadline
+        ? triageData.capitalStructure.badgeHe
+        : triageData.currentRatio.metricSummaryHe || triageData.currentRatio.metricSummary,
       sparkline: triageData.currentRatio.sparkline,
       sparklineUnit: triageData.currentRatio.sparklineUnit || 'x',
       historyMeta: triageData.currentRatio.historyMeta,
@@ -1446,7 +2082,7 @@ export function Step1Triage({
             </div>
           )}
 
-          {/* Admin Document Ingestion Monitor (10-K / Transcript / 8-K) */}
+          {/* Admin Document Ingestion Monitor (Annual Filing / Transcript / Current Report) */}
           <div
             data-testid="admin-ingestion-monitor"
             className="pt-2 border-t border-amber-500/20 flex flex-col gap-2 text-xs"
@@ -1457,7 +2093,7 @@ export function Step1Triage({
                   ניטור קבצי מקור ב-DB:
                 </span>
                 <span data-testid="admin-tenk-status">
-                  10-K (Item 1/1A/7):{' '}
+                  {secFormMeta.annualAdminLabel}:{' '}
                   <strong
                     className={
                       ingestionStatus?.tenK?.status === 'ok'
@@ -1472,7 +2108,7 @@ export function Step1Triage({
                 </span>
                 <span>&bull;</span>
                 <span data-testid="admin-transcript-status">
-                  שיחת ועידה / 8-K:{' '}
+                  שיחת ועידה / {secFormMeta.eightKForm}:{' '}
                   <strong
                     className={
                       ingestionStatus?.transcript?.status === 'ok' ||
@@ -1488,7 +2124,7 @@ export function Step1Triage({
                       : ingestionStatus?.transcript?.status === 'manual'
                       ? `תמליל ידני (${ingestionStatus.transcript.date})`
                       : ingestionStatus?.transcript?.status === 'fallback_8k'
-                      ? `גיבוי 8-K (${ingestionStatus.transcript.date})`
+                      ? `גיבוי ${secFormMeta.eightKForm} (${ingestionStatus.transcript.date})`
                       : ingestionStatus?.transcript?.error || 'חסר'}
                   </strong>
                 </span>
@@ -1539,6 +2175,8 @@ export function Step1Triage({
       {/* SECTION 1: Business Clarity & Economic Moat Tear Sheet Blade (#319) */}
       <div
         data-testid="tear-sheet-blade"
+        data-archetype={resolvedArchetype}
+        data-archetype-sub={resolvedSubType}
         dir={lang === 'he' ? 'rtl' : 'ltr'}
         className="relative rounded-2xl border border-sky-500/20 bg-linear-to-b from-sky-50/50 via-white to-white dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900 shadow-sm p-4 sm:p-7"
       >
@@ -1572,7 +2210,7 @@ export function Step1Triage({
                     dir="ltr"
                     className="inline-flex items-center gap-0.5 font-semibold text-sky-600 dark:text-sky-400 hover:underline"
                   >
-                    SEC {ingestionStatus.tenK.form || '10-K'} ↗
+                    SEC {secFormMeta.tenKForm} ↗
                   </a>
                 )}
               </div>
@@ -1953,11 +2591,11 @@ export function Step1Triage({
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">
                     {lang === 'he'
-                      ? 'פילוח הכנסות לפי מגזרים (10-K)'
+                      ? `פילוח הכנסות לפי מגזרים (${secFormMeta.tenKForm})`
                       : 'Revenue Segments Breakdown'}
                   </h3>
                   <span className="text-xs text-slate-400">
-                    {lang === 'he' ? 'תמהיל חטיבות' : '10-K Segment Mix'}
+                    {lang === 'he' ? 'תמהיל חטיבות' : `${secFormMeta.tenKForm} Segment Mix`}
                   </span>
                 </div>
                 <div className="space-y-2.5" dir="ltr">
@@ -2118,7 +2756,7 @@ export function Step1Triage({
                   <h3 className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
                     {lang === 'he'
                       ? 'מפת תחרות ומתחרים עיקריים'
-                      : 'Competitive Landscape (10-K Peers)'}
+                      : `Competitive Landscape (${secFormMeta.tenKForm} Peers)`}
                   </h3>
                   <span className="text-[11px] text-slate-400">
                     {lang === 'he' ? 'לחץ/רחף למיקוד' : 'Tap/hover for focus'}
@@ -2245,6 +2883,16 @@ export function Step1Triage({
               <span>{item.label}</span>
             </span>
           ))}
+          <span
+            data-testid="legend-dashed-avg"
+            className="inline-flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-400"
+          >
+            <span
+              className="w-4 border-t-2 border-dashed border-slate-400 dark:border-slate-500 shrink-0"
+              aria-hidden="true"
+            />
+            <span>{lang === 'he' ? 'ממוצע רב-שנתי' : 'Multi-year avg'}</span>
+          </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2304,7 +2952,67 @@ export function Step1Triage({
                         isRtl={lang === 'he'}
                       />
                     </div>
-                    {(indicator.trendLabelHe || indicator.trendLabelEn) ? (
+                    {(indicator.reportedSublabelHe || indicator.reportedSublabelEn) ? (
+                      <div
+                        data-testid="balance-sheet-reported-sublabel"
+                        className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400"
+                      >
+                        <BidiText
+                          text={
+                            lang === 'he'
+                              ? indicator.reportedSublabelHe
+                              : indicator.reportedSublabelEn
+                          }
+                          isRtl={lang === 'he'}
+                        />
+                        {indicator.inlineGuardrailInfo && (
+                          <ResponsiveTooltip
+                            placement="top"
+                            align="end"
+                            widthClass="lg:w-72"
+                            dir={lang === 'he' ? 'rtl' : 'ltr'}
+                            showArrow
+                            trigger={({ isOpen, onToggle }) => (
+                              <button
+                                type="button"
+                                data-testid={indicator.inlineGuardrailInfo.testId}
+                                aria-label={
+                                  lang === 'he'
+                                    ? 'הסבר הקשר חשבונאי'
+                                    : 'Accounting context explanation'
+                                }
+                                aria-expanded={isOpen}
+                                onClick={onToggle}
+                                className="inline-flex items-center justify-center text-sky-600 dark:text-sky-400 hover:text-sky-500 cursor-help rounded-full focus:outline-none focus:ring-1 focus:ring-sky-500"
+                              >
+                                <Info className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          >
+                            <span className="block font-bold text-sky-300 mb-1">
+                              <BidiText
+                                text={
+                                  lang === 'he'
+                                    ? indicator.inlineGuardrailInfo.tagHe
+                                    : indicator.inlineGuardrailInfo.tagEn
+                                }
+                                isRtl={lang === 'he'}
+                              />
+                            </span>
+                            <span className="block leading-relaxed text-slate-200">
+                              <BidiText
+                                text={
+                                  lang === 'he'
+                                    ? indicator.inlineGuardrailInfo.explanationHe
+                                    : indicator.inlineGuardrailInfo.explanationEn
+                                }
+                                isRtl={lang === 'he'}
+                              />
+                            </span>
+                          </ResponsiveTooltip>
+                        )}
+                      </div>
+                    ) : (indicator.trendLabelHe || indicator.trendLabelEn) ? (
                       <div
                         data-testid={`fundamental-trend-${indicator.id}`}
                         className={`text-[11px] font-semibold ${
@@ -2433,6 +3141,9 @@ export function Step1Triage({
           })}
         </div>
       </div>
+
+      {/* Risk Breakdown & Guardrails (#357) */}
+      <RiskBreakdownCard key={ticker} inversion={inversion} lang={lang} />
 
       {/* SECTION 3: The Gatekeeper (Bottom Action Button) */}
       <div className="pt-4 pb-2">

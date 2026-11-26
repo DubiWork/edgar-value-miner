@@ -19,6 +19,8 @@ vi.mock('../../lib/firebase.js', () => ({
 }));
 
 import {
+  AI_SUMMARY_SCHEMA_VERSION,
+  BUSINESS_ARCHETYPES,
   getOrFetchCompanySummary,
   getCachedSummary,
   setCachedSummary,
@@ -28,8 +30,10 @@ import {
   normalizeBusinessInfographic,
   normalizeCompetitors,
   normalizeGlossary,
+  normalizeQualitativeFlags,
   resolveTraitDisplay,
   translateSummaryOnDemand,
+  inferArchetypeFromXbrlAndMeta,
   CANONICAL_MOAT_SOURCES,
 } from '../aiSummaryService.js';
 import llmFactory from '../llm/llmFactory.js';
@@ -445,5 +449,291 @@ describe('aiSummaryService', () => {
     // Returns null only when server call itself fails
     mockHttpsCallable.mockReturnValueOnce(() => Promise.reject(new Error('Network down')));
     expect(await getCompanyContextStatus('MA')).toBeNull();
+  });
+});
+
+describe('Slice 2 (#357) — Schema v2, Bilingual Red Flags & Deterministic Archetype Classifier', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('exposes AI_SUMMARY_SCHEMA_VERSION = 2, populates PRESET_MOCKS defaults, and preserves null businessArchetype for legacy v1 cache entries', async () => {
+    expect(AI_SUMMARY_SCHEMA_VERSION).toBe(2);
+    expect(BUSINESS_ARCHETYPES).toHaveLength(6);
+
+    // Preset mock fallback emits v2 schema + valid businessArchetype
+    await invalidateCachedSummary('MSFT');
+    mockHttpsCallable.mockReturnValueOnce(() => Promise.reject(new Error('Offline')));
+    const presetMsft = await getOrFetchCompanySummary('MSFT', { name: 'Microsoft Corp' });
+    expect(presetMsft.schemaVersion).toBe(2);
+    expect(presetMsft.businessArchetype).toBe('TECH_SAAS');
+    expect(presetMsft.financialSubType).toBe('NONE');
+    expect(presetMsft.qualitativeFlags).toEqual([]);
+    expect(presetMsft.customerConcentration).toEqual({
+      detected: false,
+      maxCustomerPct: null,
+      detailHe: '',
+      detailEn: '',
+      quoteEn: null,
+    });
+    expect(presetMsft.governanceAndMoatRisks.hasRestatement).toBe(false);
+
+    // Legacy v1 cached object without businessArchetype keeps businessArchetype: null for opportunistic upgrade
+    await setCachedSummary('LEG1', {
+      ticker: 'LEG1',
+      summary: 'תקציר גרסה 1 ישנה',
+      keyEngines: ['Core Product'],
+      source: 'ai-live',
+    });
+    const legacy = await getOrFetchCompanySummary('LEG1');
+    expect(legacy.schemaVersion).toBe(1);
+    expect(legacy.businessArchetype).toBeNull();
+    expect(legacy.qualitativeFlags).toEqual([]);
+  }, 10000);
+
+  it('preserves valid v1 cached summary in IndexedDB when forceRefresh fails on transient error (no pre-deletion bug)', async () => {
+    await setCachedSummary('SAP', {
+      ticker: 'SAP',
+      summary: 'סאפ תקציר v1 מאומת מהמטמון',
+      keyEngines: ['Cloud ERP'],
+      source: 'ai-live',
+    });
+
+    mockHttpsCallable.mockReturnValueOnce(() => Promise.reject(new Error('504 Gateway Timeout')));
+
+    const result = await getOrFetchCompanySummary(
+      'SAP',
+      { name: 'SAP SE' },
+      { forceRefresh: true }
+    );
+
+    // Must serve valid cached summary instead of deleting it or replacing with generic mock
+    expect(result.source).toBe('cache');
+    expect(result.summary).toBe('סאפ תקציר v1 מאומת מהמטמון');
+    const stillCached = await getCachedSummary('SAP');
+    expect(stillCached?.summary).toBe('סאפ תקציר v1 מאומת מהמטמון');
+  });
+
+  it('parses Schema v2 bilingual qualitativeFlags + verbatim SEC quotes in callLlmApi and preserves quoteEn across translateSummaryOnDemand', async () => {
+    await invalidateCachedSummary('SMCI');
+    const liveCallable = vi.fn().mockResolvedValueOnce({
+      data: {
+        text: JSON.stringify({
+          summary: 'סופר מיקרו מייצרת שרתי AI ופתרונות קירור למרכזי נתונים.',
+          businessArchetype: 'CYCLICAL_INDUSTRIAL',
+          financialSubType: 'NONE',
+          keyEngines: ['AI Server Racks', 'Liquid Cooling Systems'],
+          customerConcentration: {
+            detected: true,
+            maxCustomerPct: 24,
+            detailHe: 'לקוח יחיד מהווה 24% מהכנסות החברה',
+            detailEn: 'A single customer accounts for 24% of total revenue',
+            quoteEn: 'Customer A accounted for 24% of net sales in fiscal 2025.',
+          },
+          governanceAndMoatRisks: {
+            hasRestatement: true,
+            hasExecutiveTurnover: false,
+            hasOptionRepricing: false,
+            supplyChainOrSovereignRisk: false,
+            erodingMoatRisk: false,
+            summaryHe: 'זוהה תיקון דוחות (Restatement) בדוח 10-K/A.',
+            summaryEn: 'Restatement disclosed in Form 10-K/A.',
+          },
+          qualitativeFlags: [
+            {
+              id: 'customer-concentration',
+              severity: 'fail',
+              category: 'concentration',
+              titleHe: 'ריכוזיות לקוחות קיצונית (24%)',
+              rationaleHe: 'אובדן של לקוח מרכזי אחד יפגע בחמישית מההכנסות.',
+              quoteEn: 'Customer A accounted for 24% of net sales in fiscal 2025.',
+              sourceRef: '10-K Item 1A',
+            },
+          ],
+        }),
+      },
+    });
+    mockHttpsCallable.mockReturnValueOnce(liveCallable);
+
+    const liveRes = await getOrFetchCompanySummary('SMCI', { name: 'Super Micro Computer Inc.' });
+    expect(liveRes.schemaVersion).toBe(2);
+    expect(liveRes.businessArchetype).toBe('CYCLICAL_INDUSTRIAL');
+    expect(liveRes.customerConcentration.maxCustomerPct).toBe(24);
+    expect(liveRes.governanceAndMoatRisks.hasRestatement).toBe(true);
+    expect(liveRes.qualitativeFlags).toHaveLength(1);
+    expect(liveRes.qualitativeFlags[0].quoteEn).toBe(
+      'Customer A accounted for 24% of net sales in fiscal 2025.'
+    );
+    expect(liveRes.qualitativeFlags[0].sourceRef).toBe('10-K Item 1A');
+
+    // On-demand translation translates qualitativeFlags + concentration while preserving verbatim quoteEn
+    const translateCallable = vi.fn().mockResolvedValueOnce({
+      data: {
+        text: JSON.stringify({
+          summary: 'Super Micro builds AI server racks and liquid cooling solutions.',
+          qualitativeFlags: [
+            {
+              id: 'customer-concentration',
+              title: 'Extreme Customer Concentration (24%)',
+              rationale: 'Losing one anchor customer would hit nearly a quarter of sales.',
+            },
+          ],
+          customerConcentrationDetail: 'One customer generates 24% of total net sales.',
+          governanceSummary: 'Financial restatement disclosed in Form 10-K/A.',
+        }),
+      },
+    });
+    mockHttpsCallable.mockReturnValueOnce(translateCallable);
+
+    const translated = await translateSummaryOnDemand('SMCI', liveRes, 'en');
+    const enFlags = normalizeQualitativeFlags(translated.translations.en.qualitativeFlags, 'en');
+    expect(enFlags[0].title).toBe('Extreme Customer Concentration (24%)');
+    expect(enFlags[0].rationale).toBe(
+      'Losing one anchor customer would hit nearly a quarter of sales.'
+    );
+    // Verbatim SEC quote and severity remain untouched
+    expect(enFlags[0].quoteEn).toBe(
+      'Customer A accounted for 24% of net sales in fiscal 2025.'
+    );
+    expect(enFlags[0].severity).toBe('fail');
+    expect(enFlags[0].sourceRef).toBe('10-K Item 1A');
+    expect(translated.translations.en.customerConcentration.detailEn).toBe(
+      'One customer generates 24% of total net sales.'
+    );
+    expect(translated.translations.en.governanceAndMoatRisks.summaryEn).toBe(
+      'Financial restatement disclosed in Form 10-K/A.'
+    );
+  });
+
+  it('deterministically classifies all 6 archetypes & 9 benchmark companies (MSFT, ADBE, SAP, AER, JPM, HD, COST, JNJ, CAT) from XBRL and metadata', () => {
+    // 1. MSFT (Pure XBRL: deferred revenue + high GM + R&D + low inventory)
+    expect(
+      inferArchetypeFromXbrlAndMeta({
+        metrics: {
+          revenue: { annual: [{ fiscalYear: 2025, value: 281700000000 }] },
+          grossProfit: { annual: [{ fiscalYear: 2025, value: 194000000000 }] }, // 68.9%
+          researchAndDevelopment: { annual: [{ fiscalYear: 2025, value: 32000000000 }] }, // 11.4%
+          deferredRevenueCurrent: { annual: [{ fiscalYear: 2025, value: 57000000000 }] },
+          inventory: { annual: [{ fiscalYear: 2025, value: 1200000000 }] },
+        },
+      }).archetype
+    ).toBe('TECH_SAAS');
+
+    // 2. ADBE (Pure XBRL: deferred revenue / currentLiabilities >= 10%, 88% GM)
+    expect(
+      inferArchetypeFromXbrlAndMeta({
+        metrics: {
+          revenue: { annual: [{ fiscalYear: 2025, value: 21500000000 }] },
+          grossProfit: { annual: [{ fiscalYear: 2025, value: 19100000000 }] }, // 88.8%
+          researchAndDevelopment: { annual: [{ fiscalYear: 2025, value: 3900000000 }] },
+          deferredRevenueCurrent: { annual: [{ fiscalYear: 2025, value: 6200000000 }] },
+          currentLiabilities: { annual: [{ fiscalYear: 2025, value: 10000000000 }] },
+        },
+      }).archetype
+    ).toBe('TECH_SAAS');
+
+    // 3. SAP (Pure XBRL IFRS contract liabilities + 73% GM)
+    expect(
+      inferArchetypeFromXbrlAndMeta({
+        metadata: { accountingStandard: 'IFRS' },
+        metrics: {
+          revenue: { annual: [{ fiscalYear: 2025, value: 36800000000 }] },
+          grossProfit: { annual: [{ fiscalYear: 2025, value: 27000000000 }] },
+          researchAndDevelopment: { annual: [{ fiscalYear: 2025, value: 6600000000 }] },
+          deferredRevenueCurrent: {
+            tag: 'CurrentContractLiabilities',
+            annual: [{ fiscalYear: 2025, value: 5200000000 }],
+          },
+        },
+      }).archetype
+    ).toBe('TECH_SAAS');
+
+    // 4. AER (Pure XBRL non-bank aircraft leasing: high interest/rev, leverage, heavy PPE, zero inventory)
+    const aerRes = inferArchetypeFromXbrlAndMeta({
+      metrics: {
+        revenue: { annual: [{ fiscalYear: 2024, value: 8000000000 }] },
+        interestExpense: { annual: [{ fiscalYear: 2024, value: 1900000000 }] }, // 23.8% of rev
+        totalAssets: { annual: [{ fiscalYear: 2024, value: 71000000000 }] },
+        totalLiabilities: { annual: [{ fiscalYear: 2024, value: 54000000000 }] },
+        stockholdersEquity: { annual: [{ fiscalYear: 2024, value: 17000000000 }] }, // L/E 3.18x
+        propertyPlantEquipment: { annual: [{ fiscalYear: 2024, value: 58000000000 }] }, // 81.7% PPE/Assets
+      },
+    });
+    expect(aerRes.archetype).toBe('FINANCIAL_SPREAD');
+    expect(aerRes.financialSubType).toBe('NON_BANK_FINANCE');
+
+    // 5. JPM (Deposit bank via BANK_REVENUE_TAGS + SIC 6021)
+    const jpmRes = inferArchetypeFromXbrlAndMeta({
+      metrics: {
+        revenue: {
+          tag: 'InterestRevenueExpense',
+          annual: [{ fiscalYear: 2025, value: 177000000000 }],
+        },
+        totalAssets: { annual: [{ fiscalYear: 2025, value: 4000000000000 }] },
+        stockholdersEquity: { annual: [{ fiscalYear: 2025, value: 345000000000 }] },
+      },
+    });
+    expect(jpmRes.archetype).toBe('FINANCIAL_SPREAD');
+    expect(jpmRes.financialSubType).toBe('DEPOSIT_BANK');
+
+    // 6. HD (Pure XBRL retail: inventory + 33.5% GM + zero R&D + low CapEx/Rev)
+    expect(
+      inferArchetypeFromXbrlAndMeta({
+        metrics: {
+          revenue: { annual: [{ fiscalYear: 2025, value: 159500000000 }] },
+          grossProfit: { annual: [{ fiscalYear: 2025, value: 53400000000 }] }, // 33.5%
+          operatingIncome: { annual: [{ fiscalYear: 2025, value: 21500000000 }] },
+          inventory: { annual: [{ fiscalYear: 2025, value: 23500000000 }] }, // 14.7%
+          capitalExpenditures: { annual: [{ fiscalYear: 2025, value: 3200000000 }] }, // 2.0%
+        },
+      }).archetype
+    ).toBe('RETAIL_ECOMMERCE');
+
+    // 7. COST (Pure XBRL low-margin warehouse retail: 12.6% GM + inventory + steady margin)
+    expect(
+      inferArchetypeFromXbrlAndMeta({
+        metrics: {
+          revenue: { annual: [{ fiscalYear: 2025, value: 254000000000 }] },
+          grossProfit: { annual: [{ fiscalYear: 2025, value: 32000000000 }] }, // 12.6%
+          operatingIncome: { annual: [{ fiscalYear: 2025, value: 9300000000 }] },
+          inventory: { annual: [{ fiscalYear: 2025, value: 18600000000 }] }, // 7.3%
+          capitalExpenditures: { annual: [{ fiscalYear: 2025, value: 4700000000 }] }, // 1.85%
+        },
+      }).archetype
+    ).toBe('RETAIL_ECOMMERCE');
+
+    // 8. JNJ (Pure XBRL pharma: 69% GM + 16% R&D + physical drug inventory + zero deferred revenue)
+    expect(
+      inferArchetypeFromXbrlAndMeta({
+        metrics: {
+          revenue: { annual: [{ fiscalYear: 2025, value: 88800000000 }] },
+          grossProfit: { annual: [{ fiscalYear: 2025, value: 61300000000 }] }, // 69%
+          researchAndDevelopment: { annual: [{ fiscalYear: 2025, value: 14500000000 }] }, // 16.3%
+          inventory: { annual: [{ fiscalYear: 2025, value: 12400000000 }] }, // 14.0%
+        },
+      }).archetype
+    ).toBe('HEALTHCARE_PHARMA');
+
+    // 9. CAT (Pure XBRL cyclical machinery: inventory + 35% GM + 3.2% R&D + 4.5% CapEx)
+    expect(
+      inferArchetypeFromXbrlAndMeta({
+        metrics: {
+          revenue: { annual: [{ fiscalYear: 2025, value: 64800000000 }] },
+          grossProfit: { annual: [{ fiscalYear: 2025, value: 22700000000 }] }, // 35%
+          researchAndDevelopment: { annual: [{ fiscalYear: 2025, value: 2100000000 }] }, // 3.2%
+          inventory: { annual: [{ fiscalYear: 2025, value: 16800000000 }] }, // 25.9%
+          capitalExpenditures: { annual: [{ fiscalYear: 2025, value: 2900000000 }] }, // 4.5%
+        },
+      }).archetype
+    ).toBe('CYCLICAL_INDUSTRIAL');
+
+    // 10. SIC & Staples/Utilities metadata + null fallback
+    expect(inferArchetypeFromXbrlAndMeta(null, { sic: 2086, name: 'Coca-Cola Co' }).archetype).toBe(
+      'STAPLES_GENERAL'
+    );
+    expect(inferArchetypeFromXbrlAndMeta(null, { sic: 7359, name: 'AerCap Holdings' }).archetype).toBe(
+      'FINANCIAL_SPREAD'
+    );
+    expect(inferArchetypeFromXbrlAndMeta(null, null).archetype).toBe('STAPLES_GENERAL');
   });
 });

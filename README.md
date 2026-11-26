@@ -4,7 +4,7 @@
 
 ### *The AI Research Analyst for Serious Retail Investors*
 
-[![Version](https://img.shields.io/badge/Version-1.2.6--develop-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.3.0--develop-blue.svg)](./CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![React 19](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Firebase](https://img.shields.io/badge/Firebase-12-ffca28.svg)](https://firebase.google.com/)

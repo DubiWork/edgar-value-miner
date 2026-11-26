@@ -19,6 +19,7 @@
 import { httpsCallable } from 'firebase/functions';
 import * as firebaseLib from '../lib/firebase.js';
 import llmFactory from './llm/llmFactory.js';
+import { BANK_REVENUE_TAGS } from '../utils/gaapNormalizer.js';
 
 // =============================================================================
 // Canonical Moat & Business Model Dictionaries
@@ -556,8 +557,420 @@ export function resolveTraitDisplay(rawTrait, lang = 'he') {
 }
 
 // =============================================================================
-// Constants & Configuration
+// Constants, Schema v2 & Deterministic Archetype Classifier (#357)
 // =============================================================================
+
+export const AI_SUMMARY_SCHEMA_VERSION = 2;
+
+export const BUSINESS_ARCHETYPES = [
+  'TECH_SAAS',
+  'FINANCIAL_SPREAD',
+  'RETAIL_ECOMMERCE',
+  'CYCLICAL_INDUSTRIAL',
+  'HEALTHCARE_PHARMA',
+  'STAPLES_GENERAL',
+];
+
+export const FINANCIAL_SUBTYPES = ['DEPOSIT_BANK', 'NON_BANK_FINANCE', 'NONE'];
+
+export function normalizeArchetypeCode(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const upper = raw.trim().toUpperCase();
+  return BUSINESS_ARCHETYPES.includes(upper) ? upper : null;
+}
+
+export function normalizeFinancialSubType(raw, archetype = null) {
+  if (archetype && archetype !== 'FINANCIAL_SPREAD') return 'NONE';
+  if (typeof raw === 'string') {
+    const upper = raw.trim().toUpperCase();
+    if (FINANCIAL_SUBTYPES.includes(upper)) return upper;
+  }
+  return archetype === 'FINANCIAL_SPREAD' ? 'NON_BANK_FINANCE' : 'NONE';
+}
+
+export function normalizeQualitativeFlags(rawFlags, lang = 'he') {
+  if (!Array.isArray(rawFlags)) return [];
+  const isHe = lang === 'he';
+  return rawFlags
+    .filter((f) => f && typeof f === 'object' && (f.titleHe || f.titleEn || f.title))
+    .map((f, idx) => {
+      const severity = ['fail', 'warn', 'info'].includes(f.severity) ? f.severity : 'warn';
+      const titleHe = String(f.titleHe || f.title || f.titleEn || '').trim();
+      const titleEn = String(f.titleEn || f.title || titleHe).trim();
+      const rationaleHe = String(f.rationaleHe || f.rationale || f.rationaleEn || '').trim();
+      const rationaleEn = String(f.rationaleEn || f.rationale || rationaleHe).trim();
+      const quoteEn = typeof f.quoteEn === 'string' && f.quoteEn.trim() ? f.quoteEn.trim() : null;
+      const sourceRef =
+        typeof f.sourceRef === 'string' && f.sourceRef.trim() ? f.sourceRef.trim() : null;
+      return {
+        id: String(f.id || `qual-flag-${idx + 1}`).trim(),
+        severity,
+        category: String(f.category || 'governance').trim(),
+        titleHe,
+        titleEn,
+        rationaleHe,
+        rationaleEn,
+        title: isHe ? titleHe : titleEn,
+        rationale: isHe ? rationaleHe : rationaleEn,
+        quoteEn,
+        sourceRef,
+      };
+    });
+}
+
+export function normalizeCustomerConcentration(rawConc) {
+  if (!rawConc || typeof rawConc !== 'object') {
+    return {
+      detected: false,
+      maxCustomerPct: null,
+      detailHe: '',
+      detailEn: '',
+      quoteEn: null,
+    };
+  }
+  const pctNum = Number(rawConc.maxCustomerPct);
+  const maxCustomerPct = Number.isFinite(pctNum) && pctNum > 0 ? pctNum : null;
+  return {
+    detected: Boolean(rawConc.detected || (maxCustomerPct !== null && maxCustomerPct >= 10)),
+    maxCustomerPct,
+    detailHe: typeof rawConc.detailHe === 'string' ? rawConc.detailHe.trim() : '',
+    detailEn: typeof rawConc.detailEn === 'string' ? rawConc.detailEn.trim() : '',
+    quoteEn:
+      typeof rawConc.quoteEn === 'string' && rawConc.quoteEn.trim() ? rawConc.quoteEn.trim() : null,
+  };
+}
+
+export function normalizeGovernanceRisks(rawGov) {
+  if (!rawGov || typeof rawGov !== 'object') {
+    return {
+      hasRestatement: false,
+      hasExecutiveTurnover: false,
+      hasOptionRepricing: false,
+      supplyChainOrSovereignRisk: false,
+      erodingMoatRisk: false,
+      summaryHe: '',
+      summaryEn: '',
+    };
+  }
+  return {
+    hasRestatement: Boolean(rawGov.hasRestatement),
+    hasExecutiveTurnover: Boolean(rawGov.hasExecutiveTurnover),
+    hasOptionRepricing: Boolean(rawGov.hasOptionRepricing),
+    supplyChainOrSovereignRisk: Boolean(rawGov.supplyChainOrSovereignRisk),
+    erodingMoatRisk: Boolean(rawGov.erodingMoatRisk),
+    summaryHe: typeof rawGov.summaryHe === 'string' ? rawGov.summaryHe.trim() : '',
+    summaryEn: typeof rawGov.summaryEn === 'string' ? rawGov.summaryEn.trim() : '',
+  };
+}
+
+function getLatestMetricValue(metrics, metricName) {
+  const arr = metrics?.[metricName]?.annual;
+  if (!Array.isArray(arr) || arr.length === 0) return null;
+  let bestYear = -Infinity;
+  let bestVal = null;
+  for (const pt of arr) {
+    if (pt && typeof pt.value === 'number' && Number.isFinite(pt.value)) {
+      const yr = typeof pt.fiscalYear === 'number' ? pt.fiscalYear : 0;
+      if (yr >= bestYear) {
+        bestYear = yr;
+        bestVal = pt.value;
+      }
+    }
+  }
+  return bestVal;
+}
+
+function extractOperatingMarginProfile(metrics) {
+  const revArr = Array.isArray(metrics?.revenue?.annual) ? metrics.revenue.annual : [];
+  const opArr = Array.isArray(metrics?.operatingIncome?.annual) ? metrics.operatingIncome.annual : [];
+  const netArr = Array.isArray(metrics?.netIncome?.annual) ? metrics.netIncome.annual : [];
+  const opByYear = new Map(
+    opArr.filter((x) => x && Number.isFinite(x.fiscalYear) && Number.isFinite(x.value)).map((x) => [x.fiscalYear, x.value])
+  );
+  const margins = [];
+  let hasLossYear = netArr.some((x) => x && Number.isFinite(x.value) && x.value < 0);
+  for (const r of revArr) {
+    if (r && Number.isFinite(r.fiscalYear) && Number.isFinite(r.value) && r.value > 0) {
+      const op = opByYear.get(r.fiscalYear);
+      if (Number.isFinite(op)) {
+        const m = (op / r.value) * 100;
+        margins.push(m);
+        if (m < 0) hasLossYear = true;
+      }
+    }
+  }
+  if (margins.length === 0) return { spread: 0, hasLossYear };
+  return {
+    spread: Math.max(...margins) - Math.min(...margins),
+    hasLossYear,
+  };
+}
+
+function classifyFromSic(sicNum) {
+  if (!Number.isInteger(sicNum) || sicNum < 100) return null;
+  if ((sicNum >= 6000 && sicNum <= 6099) || (sicNum >= 6120 && sicNum <= 6129)) {
+    return { archetype: 'FINANCIAL_SPREAD', financialSubType: 'DEPOSIT_BANK', confidence: 'high', source: 'sic' };
+  }
+  if (
+    (sicNum >= 6140 && sicNum <= 6499) ||
+    (sicNum >= 6510 && sicNum <= 6519) ||
+    sicNum === 6798 ||
+    sicNum === 7359
+  ) {
+    return { archetype: 'FINANCIAL_SPREAD', financialSubType: 'NON_BANK_FINANCE', confidence: 'high', source: 'sic' };
+  }
+  if (
+    (sicNum >= 2830 && sicNum <= 2836) ||
+    (sicNum >= 3841 && sicNum <= 3851) ||
+    (sicNum >= 8000 && sicNum <= 8099)
+  ) {
+    return { archetype: 'HEALTHCARE_PHARMA', financialSubType: 'NONE', confidence: 'high', source: 'sic' };
+  }
+  if (
+    (sicNum >= 7370 && sicNum <= 7379) ||
+    (sicNum >= 3570 && sicNum <= 3579) ||
+    (sicNum >= 3670 && sicNum <= 3679) ||
+    (sicNum >= 4810 && sicNum <= 4899)
+  ) {
+    return { archetype: 'TECH_SAAS', financialSubType: 'NONE', confidence: 'high', source: 'sic' };
+  }
+  if (sicNum >= 5200 && sicNum <= 5999) {
+    return { archetype: 'RETAIL_ECOMMERCE', financialSubType: 'NONE', confidence: 'high', source: 'sic' };
+  }
+  if (
+    (sicNum >= 1000 && sicNum <= 1799) ||
+    (sicNum >= 2800 && sicNum <= 2829) ||
+    (sicNum >= 2900 && sicNum <= 2999) ||
+    (sicNum >= 3300 && sicNum <= 3799) ||
+    (sicNum >= 4000 && sicNum <= 4799)
+  ) {
+    return { archetype: 'CYCLICAL_INDUSTRIAL', financialSubType: 'NONE', confidence: 'high', source: 'sic' };
+  }
+  if (
+    (sicNum >= 2000 && sicNum <= 2199) ||
+    (sicNum >= 2840 && sicNum <= 2844) ||
+    (sicNum >= 4900 && sicNum <= 4999)
+  ) {
+    return { archetype: 'STAPLES_GENERAL', financialSubType: 'NONE', confidence: 'high', source: 'sic' };
+  }
+  return null;
+}
+
+function classifyFromMetaKeywords(metaText) {
+  if (!metaText) return null;
+  if (/\b(pharma|biotech|biopharma|therapeutics|medical device|health\s?care|diagnostics|life sciences|oncology)\b/i.test(metaText)) {
+    return { archetype: 'HEALTHCARE_PHARMA', financialSubType: 'NONE', confidence: 'high', source: 'meta' };
+  }
+  if (/\b(leasing|aircraft leasing|reit|real estate investment|consumer finance|equipment finance|mortgage|insurance)\b/i.test(metaText)) {
+    return { archetype: 'FINANCIAL_SPREAD', financialSubType: 'NON_BANK_FINANCE', confidence: 'high', source: 'meta' };
+  }
+  if (/\b(software|saas|cloud|cybersecurity|semiconductor|enterprise software|erp|operating system|databases?|digital media|technology)\b/i.test(metaText)) {
+    return { archetype: 'TECH_SAAS', financialSubType: 'NONE', confidence: 'high', source: 'meta' };
+  }
+  if (/\b(retail|e-?commerce|home improvement|warehouse club|department store|supermarket|grocery|apparel|merchandise|restaurant)\b/i.test(metaText)) {
+    return { archetype: 'RETAIL_ECOMMERCE', financialSubType: 'NONE', confidence: 'high', source: 'meta' };
+  }
+  if (/\b(bank|bancorp|deposits|fintech|credit union|financial services)\b/i.test(metaText)) {
+    return { archetype: 'FINANCIAL_SPREAD', financialSubType: 'DEPOSIT_BANK', confidence: 'high', source: 'meta' };
+  }
+  if (/\b(machinery|heavy equipment|industrial|aerospace|automotive|automaker|airline|railroad|mining|steel|metals|chemical|petroleum|oil|gas|manufacturing|freight)\b/i.test(metaText)) {
+    return { archetype: 'CYCLICAL_INDUSTRIAL', financialSubType: 'NONE', confidence: 'high', source: 'meta' };
+  }
+  if (/\b(consumer staples|beverage|food|household products|personal care|tobacco|utilities|electric utility|water utility|telecom)\b/i.test(metaText)) {
+    return { archetype: 'STAPLES_GENERAL', financialSubType: 'NONE', confidence: 'high', source: 'meta' };
+  }
+  return null;
+}
+
+/**
+ * Deterministic ~0-1ms Archetype Classifier from XBRL financial structure and SEC/company metadata.
+ * Eliminates layout shifts while Vertex AI generates qualitative analysis (`0px CLS`).
+ *
+ * @param {Object|null} companyFacts - Normalized company facts object
+ * @param {Object|null} companyMeta - Optional metadata ({ name, sector, sic, sicDescription, industry, ticker })
+ * @returns {{ archetype: string, financialSubType: string, confidence: string, source: string }}
+ */
+export function inferArchetypeFromXbrlAndMeta(companyFacts = null, companyMeta = null) {
+  const metrics = companyFacts?.metrics || null;
+  const revTag = metrics?.revenue?.tag || '';
+
+  // 1. Bank/fintech net interest revenue XBRL tag is an unambiguous Deposit Bank signal
+  if (revTag && BANK_REVENUE_TAGS.includes(revTag)) {
+    return {
+      archetype: 'FINANCIAL_SPREAD',
+      financialSubType: 'DEPOSIT_BANK',
+      confidence: 'high',
+      source: 'xbrl',
+    };
+  }
+
+  // 2. Explicit SEC SIC code
+  const rawSic = companyMeta?.sic ?? companyFacts?.metadata?.sic ?? companyFacts?.sic;
+  const sicNum = Number.parseInt(rawSic, 10);
+  const sicMatch = classifyFromSic(sicNum);
+  if (sicMatch) return sicMatch;
+
+  // 3. Explicit sector / industry / SIC description / name keywords
+  const metaText = [
+    companyMeta?.sector,
+    companyMeta?.industry,
+    companyMeta?.sicDescription,
+    companyMeta?.name,
+    companyMeta?.companyName,
+    companyFacts?.companyName,
+    companyFacts?.entityName,
+    companyFacts?.metadata?.sicDescription,
+  ]
+    .filter((s) => typeof s === 'string' && s.trim())
+    .join(' ');
+  const metaMatch = classifyFromMetaKeywords(metaText);
+  if (metaMatch) return metaMatch;
+
+  if (!metrics || typeof metrics !== 'object') {
+    return {
+      archetype: 'STAPLES_GENERAL',
+      financialSubType: 'NONE',
+      confidence: 'none',
+      source: 'default',
+    };
+  }
+
+  // 4. Pure XBRL financial ratio & GAAP tag signature classification
+  const rev = getLatestMetricValue(metrics, 'revenue');
+  const grossProfit = getLatestMetricValue(metrics, 'grossProfit');
+  const costOfRev = getLatestMetricValue(metrics, 'costOfRevenue');
+  const rd = getLatestMetricValue(metrics, 'researchAndDevelopment');
+  const deferredRev = getLatestMetricValue(metrics, 'deferredRevenueCurrent');
+  const inventory = getLatestMetricValue(metrics, 'inventory');
+  const intExpRaw = getLatestMetricValue(metrics, 'interestExpense');
+  const intExp = intExpRaw !== null ? Math.abs(intExpRaw) : 0;
+  const capexRaw = getLatestMetricValue(metrics, 'capitalExpenditures');
+  const capex = capexRaw !== null ? Math.abs(capexRaw) : 0;
+  const ppe = getLatestMetricValue(metrics, 'propertyPlantEquipment');
+  const totalAssets = getLatestMetricValue(metrics, 'totalAssets');
+  const totalLiabilities = getLatestMetricValue(metrics, 'totalLiabilities');
+  const equity = getLatestMetricValue(metrics, 'stockholdersEquity');
+  const currentAssets = getLatestMetricValue(metrics, 'currentAssets');
+  const currentLiabilities = getLatestMetricValue(metrics, 'currentLiabilities');
+
+  const hasCurrentRatioData =
+    currentAssets !== null && currentLiabilities !== null && currentLiabilities > 0;
+  const hasInventory = inventory !== null && inventory > 0;
+  const hasDeferredRev = deferredRev !== null && deferredRev > 0;
+
+  let grossMarginPct = null;
+  if (rev > 0) {
+    if (grossProfit !== null) grossMarginPct = (grossProfit / rev) * 100;
+    else if (costOfRev !== null) grossMarginPct = ((rev - costOfRev) / rev) * 100;
+  }
+
+  const defRevToRevPct = rev > 0 && hasDeferredRev ? (deferredRev / rev) * 100 : 0;
+  const defRevToCLPct =
+    currentLiabilities > 0 && hasDeferredRev ? (deferredRev / currentLiabilities) * 100 : 0;
+  const rdToRevPct = rev > 0 && rd > 0 ? (rd / rev) * 100 : 0;
+  const invToRevPct = rev > 0 && hasInventory ? (inventory / rev) * 100 : 0;
+  const intExpToRevPct = rev > 0 && intExp > 0 ? (intExp / rev) * 100 : 0;
+  const ppeToAssetsPct = totalAssets > 0 && ppe > 0 ? (ppe / totalAssets) * 100 : 0;
+  const capexToRevPct = rev > 0 && capex > 0 ? (capex / rev) * 100 : 0;
+  const liabToEquity = equity > 0 && totalLiabilities > 0 ? totalLiabilities / equity : null;
+  const { spread: marginsSpread, hasLossYear } = extractOperatingMarginProfile(metrics);
+
+  // Non-bank financing / aircraft & equipment leasing / REITs (e.g. AER)
+  if (
+    intExpToRevPct >= 10 &&
+    (!hasInventory || invToRevPct < 5) &&
+    ((liabToEquity !== null && liabToEquity >= 2.0) ||
+      (equity !== null && totalAssets > 0 && equity / totalAssets < 0.35) ||
+      ppeToAssetsPct >= 40 ||
+      !hasCurrentRatioData)
+  ) {
+    return {
+      archetype: 'FINANCIAL_SPREAD',
+      financialSubType: 'NON_BANK_FINANCE',
+      confidence: 'medium',
+      source: 'xbrl',
+    };
+  }
+
+  // Deposit bank signature without Bank Revenue tag (unclassified balance sheet + <20% equity/assets + zero inventory)
+  if (
+    !hasCurrentRatioData &&
+    totalAssets > 0 &&
+    equity !== null &&
+    equity / totalAssets < 0.2 &&
+    (!hasInventory || invToRevPct === 0)
+  ) {
+    return {
+      archetype: 'FINANCIAL_SPREAD',
+      financialSubType: 'DEPOSIT_BANK',
+      confidence: 'medium',
+      source: 'xbrl',
+    };
+  }
+
+  // Healthcare / Pharma / Biotech
+  if (
+    ((rev === null || rev === 0) && rd > 0) ||
+    (grossMarginPct !== null &&
+      grossMarginPct >= 55 &&
+      rdToRevPct >= 12 &&
+      !hasDeferredRev &&
+      (invToRevPct >= 5 || rdToRevPct >= 20))
+  ) {
+    return {
+      archetype: 'HEALTHCARE_PHARMA',
+      financialSubType: 'NONE',
+      confidence: 'medium',
+      source: 'xbrl',
+    };
+  }
+
+  // Tech / SaaS (deferred revenue subscription signature or asset-light high-margin R&D)
+  if (
+    ((defRevToRevPct >= 5 || defRevToCLPct >= 10) && (grossMarginPct === null || grossMarginPct >= 45)) ||
+    (grossMarginPct !== null && grossMarginPct >= 60 && rdToRevPct >= 10 && invToRevPct < 5) ||
+    (grossMarginPct !== null && grossMarginPct >= 65 && invToRevPct < 5 && !hasLossYear)
+  ) {
+    return {
+      archetype: 'TECH_SAAS',
+      financialSubType: 'NONE',
+      confidence: 'medium',
+      source: 'xbrl',
+    };
+  }
+
+  // Cyclical / Industrial (capital/inventory heavy with R&D/CapEx or cyclical margin swings)
+  if (
+    ((grossMarginPct === null || grossMarginPct < 50) &&
+      (marginsSpread >= 10 || hasLossYear) &&
+      (ppeToAssetsPct >= 15 || capexToRevPct >= 4 || invToRevPct >= 10 || rdToRevPct >= 1.5)) ||
+    (invToRevPct >= 10 && (rdToRevPct >= 2 || capexToRevPct >= 4))
+  ) {
+    return {
+      archetype: 'CYCLICAL_INDUSTRIAL',
+      financialSubType: 'NONE',
+      confidence: 'medium',
+      source: 'xbrl',
+    };
+  }
+
+  // Retail / E-Commerce (inventory-carrying, < 45% gross margin, low/no R&D, steady margins)
+  if (invToRevPct >= 4 && grossMarginPct !== null && grossMarginPct > 0 && grossMarginPct < 45) {
+    return {
+      archetype: 'RETAIL_ECOMMERCE',
+      financialSubType: 'NONE',
+      confidence: 'medium',
+      source: 'xbrl',
+    };
+  }
+
+  return {
+    archetype: 'STAPLES_GENERAL',
+    financialSubType: 'NONE',
+    confidence: 'low',
+    source: 'default',
+  };
+}
 
 const DB_NAME = 'edgar-ai-cache';
 const DB_VERSION = 1;
@@ -567,6 +980,10 @@ const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 // Curated high-fidelity structured Tear Sheet summaries for marquee tickers
 const PRESET_MOCKS = {
   MSFT: {
+    schemaVersion: AI_SUMMARY_SCHEMA_VERSION,
+    businessArchetype: 'TECH_SAAS',
+    financialSubType: 'NONE',
+    qualitativeFlags: [],
     summary:
       'מייקרוסופט היא ענקית טכנולוגיה שמרוויחה כסף ממכירת רישיונות תוכנה (Windows, Office), שירותי ענן לארגונים (Azure), ומוצרי חומרה וגיימינג. המודל נשען על הכנסות חוזרות ממנויים (SaaS).',
     keyEngines: [
@@ -762,6 +1179,10 @@ const PRESET_MOCKS = {
     },
   },
   AAPL: {
+    schemaVersion: AI_SUMMARY_SCHEMA_VERSION,
+    businessArchetype: 'TECH_SAAS',
+    financialSubType: 'NONE',
+    qualitativeFlags: [],
     summary:
       'אפל היא חברת טכנולוגיה מובילה שמפתחת ומוכרת מכשירי פרימיום כמו iPhone, מחשבי Mac ושעוני Apple Watch. עיקר רווחיה מגיע ממכירת חומרה יוקרתית ומאקוסיסטם עשיר של שירותים דיגיטליים (App Store, iCloud, Apple Pay).',
     keyEngines: [
@@ -955,6 +1376,10 @@ const PRESET_MOCKS = {
     },
   },
   GOOGL: {
+    schemaVersion: AI_SUMMARY_SCHEMA_VERSION,
+    businessArchetype: 'TECH_SAAS',
+    financialSubType: 'NONE',
+    qualitativeFlags: [],
     summary:
       'אלפבית (גוגל) היא ענקית אינטרנט המרוויחה את עיקר הונה מהצגת מודעות פרסום מותאמות אישית במנוע החיפוש שלה, ב-YouTube ובאתרי שותפים. בנוסף, החברה מרחיבה בעקביות את פעילות שירותי הענן (Google Cloud) ומערכת ההפעלה Android.',
     keyEngines: [
@@ -965,6 +1390,10 @@ const PRESET_MOCKS = {
     ],
   },
   GOOG: {
+    schemaVersion: AI_SUMMARY_SCHEMA_VERSION,
+    businessArchetype: 'TECH_SAAS',
+    financialSubType: 'NONE',
+    qualitativeFlags: [],
     summary:
       'אלפבית (גוגל) היא ענקית אינטרנט המרוויחה את עיקר הונה מהצגת מודעות פרסום מותאמות אישית במנוע החיפוש שלה, ב-YouTube ובאתרי שותפים. בנוסף, החברה מרחיבה בעקביות את פעילות שירותי הענן (Google Cloud) ומערכת ההפעלה Android.',
     keyEngines: [
@@ -975,6 +1404,10 @@ const PRESET_MOCKS = {
     ],
   },
   NVDA: {
+    schemaVersion: AI_SUMMARY_SCHEMA_VERSION,
+    businessArchetype: 'TECH_SAAS',
+    financialSubType: 'NONE',
+    qualitativeFlags: [],
     summary:
       'אנבידיה היא מובילה עולמית בפיתוח מעבדים גרפיים (GPU) ושבבי בינה מלאכותית למרכזי נתונים ענקיים. החברה מרוויחה סכומי עתק ממכירת חומרת מחשוב-על ופלטפורמת התוכנה CUDA לחברות המאמנות ומריצות מודלי AI.',
     keyEngines: [
@@ -985,6 +1418,10 @@ const PRESET_MOCKS = {
     ],
   },
   AMZN: {
+    schemaVersion: AI_SUMMARY_SCHEMA_VERSION,
+    businessArchetype: 'RETAIL_ECOMMERCE',
+    financialSubType: 'NONE',
+    qualitativeFlags: [],
     summary:
       'אמזון היא קונגלומרט טכנולוגיה ומסחר אלקטרוני שמרוויח כסף מעמלות על מכירות באתרי הסחר שלו, מנויי Prime, שירותי פרסום דיגיטלי, ושירותי הענן המובילים בעולם (AWS) המהווים את מנוע הרווח העיקרי.',
     keyEngines: [
@@ -995,6 +1432,10 @@ const PRESET_MOCKS = {
     ],
   },
   TSLA: {
+    schemaVersion: AI_SUMMARY_SCHEMA_VERSION,
+    businessArchetype: 'CYCLICAL_INDUSTRIAL',
+    financialSubType: 'NONE',
+    qualitativeFlags: [],
     summary:
       'טסלה היא יצרנית רכב חשמלי וטכנולוגיית אנרגיה נקייה. הכנסותיה נובעות ממכירת מכוניות חשמליות מתקדמות, מערכות אגירת אנרגיה וסוללות (Megapack), שירותי תוכנה לנהיגה אוטונומית (FSD) ורשת טעינה מהירה עולמית.',
     keyEngines: [
@@ -1336,6 +1777,21 @@ function enrichWithTearSheetDefaults(baseObj, normTicker, companyName) {
   const heGlossary = normalizeGlossary(baseObj.glossary, 'he');
   const enGlossary = normalizeGlossary(rawEn?.glossary || baseObj.glossary, 'en');
 
+  const normalizedArchetype = normalizeArchetypeCode(baseObj.businessArchetype);
+  const normalizedSubType = normalizeFinancialSubType(baseObj.financialSubType, normalizedArchetype);
+  const normalizedSchemaVersion = Number.isFinite(Number(baseObj.schemaVersion))
+    ? Number(baseObj.schemaVersion)
+    : normalizedArchetype
+    ? AI_SUMMARY_SCHEMA_VERSION
+    : 1;
+  const heQualitativeFlags = normalizeQualitativeFlags(baseObj.qualitativeFlags, 'he');
+  const enQualitativeFlags = normalizeQualitativeFlags(
+    rawEn?.qualitativeFlags || baseObj.qualitativeFlags,
+    'en'
+  );
+  const normalizedConcentration = normalizeCustomerConcentration(baseObj.customerConcentration);
+  const normalizedGovernance = normalizeGovernanceRisks(baseObj.governanceAndMoatRisks);
+
   const enrichedTranslations = {
     ...(baseObj.translations || {}),
     en: {
@@ -1352,6 +1808,21 @@ function enrichWithTearSheetDefaults(baseObj, normTicker, companyName) {
       competitors: enCompetitors,
       glossary: enGlossary,
       moat: normalizedEnMoat,
+      qualitativeFlags: enQualitativeFlags,
+      customerConcentration: {
+        ...normalizedConcentration,
+        ...(typeof rawEn?.customerConcentration?.detailEn === 'string' &&
+        rawEn.customerConcentration.detailEn.trim()
+          ? { detailEn: rawEn.customerConcentration.detailEn.trim() }
+          : {}),
+      },
+      governanceAndMoatRisks: {
+        ...normalizedGovernance,
+        ...(typeof rawEn?.governanceAndMoatRisks?.summaryEn === 'string' &&
+        rawEn.governanceAndMoatRisks.summaryEn.trim()
+          ? { summaryEn: rawEn.governanceAndMoatRisks.summaryEn.trim() }
+          : {}),
+      },
     },
   };
 
@@ -1376,6 +1847,12 @@ function enrichWithTearSheetDefaults(baseObj, normTicker, companyName) {
       `חדירה לשווקים בינלאומיים והשקת שירותים משלימים`,
     ],
     ...baseObj,
+    schemaVersion: normalizedSchemaVersion,
+    businessArchetype: normalizedArchetype,
+    financialSubType: normalizedSubType,
+    qualitativeFlags: heQualitativeFlags,
+    customerConcentration: normalizedConcentration,
+    governanceAndMoatRisks: normalizedGovernance,
     keyEngines: engines,
     businessInfographic: heInfographic,
     competitors: heCompetitors,
@@ -1441,13 +1918,15 @@ async function callLlmApi(ticker, companyProfile, apiKey, options = {}) {
   const sector = companyProfile?.sector || '';
   const cik = normalizeCikNumber(options?.cik ?? companyProfile?.cik);
 
-  const promptText = `אתה אנליסט השקעות ערך בכיר. קרא בעיון את נתוני דוח ה-10-K (Item 1, Item 1A, Item 7) ושיחת הוועידה המצורפים עבור ${companyName} (${normTicker}${sector ? `, סקטור: ${sector}` : ''}).
-בנה JSON מובנה עבור כרטיס סיכום ויזואלי ("Tear Sheet" / Blade) שמאפשר למשקיע להבין את העסק ב-30 שניות ללא "קיר של טקסט".
-שמור על עברית טבעית ורהוטה, והשאר מונחים מקצועיים ושמות חטיבות/מוצרים/מתחרים באנגלית.
+  const promptText = `אתה אנליסט השקעות ערך בכיר. קרא בעיון את נתוני הדוח השנתי (10-K / 20-F / 40-F), הדיווחים השוטפים (8-K / 6-K) ושיחת הוועידה המצורפים עבור ${companyName} (${normTicker}${sector ? `, סקטור: ${sector}` : ''}).
+בנה JSON מובנה עבור כרטיס סיכום ויזואלי ("Tear Sheet" / Blade) וסינון דגלים אדומים ("60-Second Inversion") שמאפשר למשקיע להבין את העסק ולזהות מלכודות ללא "קיר של טקסט".
+שמור על עברית טבעית ורהוטה, והשאר מונחים מקצועיים, שמות חטיבות/מוצרים/מתחרים, וציטוטי מקור מה-SEC (quoteEn) באנגלית מקורית מדויקת.
 
 החזר אך ורק JSON תקין במבנה הבא:
 {
   "summary": "Elevator Pitch חד (1-2 משפטים בעברית פשוטה) שמסביר מה החברה עושה ואיך היא מרוויחה כסף",
+  "businessArchetype": "TECH_SAAS | FINANCIAL_SPREAD | RETAIL_ECOMMERCE | CYCLICAL_INDUSTRIAL | HEALTHCARE_PHARMA | STAPLES_GENERAL",
+  "financialSubType": "DEPOSIT_BANK | NON_BANK_FINANCE | NONE (רלוונטי רק עבור FINANCIAL_SPREAD, אחרת NONE)",
   "keyEngines": ["Engine 1 in English", "Engine 2 in English", "Engine 3 in English", "Engine 4 in English"],
   "businessModelTraits": [
     {
@@ -1497,7 +1976,7 @@ async function callLlmApi(ticker, companyProfile, apiKey, options = {}) {
     }
   ],
   "growthEngines": [
-    "מנוע צמיחה 1 קצר וממוקד בעברית מתוך ה-10-K/שיחת הוועידה",
+    "מנוע צמיחה 1 קצר וממוקד בעברית מתוך הדוח/שיחת הוועידה",
     "מנוע צמיחה 2 קצר וממוקד בעברית",
     "מנוע צמיחה 3 קצר וממוקד בעברית"
   ],
@@ -1527,7 +2006,36 @@ async function callLlmApi(ticker, companyProfile, apiKey, options = {}) {
       { "name": "Intangible Assets", "active": true, "rationale": "נימוק קצר בעברית" },
       { "name": "Efficient Scale", "active": false, "rationale": "נימוק קצר בעברית מדוע קיים או לא קיים" }
     ]
-  }
+  },
+  "customerConcentration": {
+    "detected": false,
+    "maxCustomerPct": null,
+    "detailHe": "תיאור קצר אם קיים לקוח המהווה 10%+ או 20%+ מההכנסות (או ריק אם מפוזר)",
+    "detailEn": "Concise note if any single customer >= 10% or >= 20% of revenue",
+    "quoteEn": null
+  },
+  "governanceAndMoatRisks": {
+    "hasRestatement": false,
+    "hasExecutiveTurnover": false,
+    "hasOptionRepricing": false,
+    "supplyChainOrSovereignRisk": false,
+    "erodingMoatRisk": false,
+    "summaryHe": "סיכום קצר אם זוהו סימני אזהרה ממשלתיים/דיווחיים (Restatement, עזיבת CEO/CFO ב-8-K 5.02, או תלות גאופוליטית/קניין רוחני)",
+    "summaryEn": "Short summary of governance/supply-chain/ersatz-moat risks if present"
+  },
+  "qualitativeFlags": [
+    {
+      "id": "customer-concentration | restatement | executive-turnover | eroding-moat | sovereign-supply-risk",
+      "severity": "fail | warn | info",
+      "category": "concentration | governance | moat | geopolitical",
+      "titleHe": "כותרת קצרה בעברית פשוטה",
+      "titleEn": "Concise English flag title",
+      "rationaleHe": "הסבר ברור של 1-2 משפטים בעברית פשוטה למה זה מסוכן למשקיע",
+      "rationaleEn": "Clear 1-2 sentence English explanation of investor impact",
+      "quoteEn": "Exact short verbatim quote from the SEC filing if available (else null)",
+      "sourceRef": "e.g. 10-K Item 1A / 20-F Item 3D / 8-K Item 5.02"
+    }
+  ]
 }`;
 
   const provider = llmFactory.getProvider();
@@ -1541,8 +2049,21 @@ async function callLlmApi(ticker, companyProfile, apiKey, options = {}) {
     throw new Error('Malformed JSON structure from LLM');
   }
 
+  const resolvedArchetype =
+    normalizeArchetypeCode(parsed.businessArchetype) ||
+    inferArchetypeFromXbrlAndMeta(null, {
+      name: companyName,
+      sector,
+      sic: companyProfile?.sic,
+      sicDescription: companyProfile?.sicDescription,
+      ticker: normTicker,
+    }).archetype;
+
   return enrichWithTearSheetDefaults(
     {
+      schemaVersion: AI_SUMMARY_SCHEMA_VERSION,
+      businessArchetype: resolvedArchetype,
+      financialSubType: normalizeFinancialSubType(parsed.financialSubType, resolvedArchetype),
       ticker: normTicker,
       summary: parsed.summary,
       keyEngines: parsed.keyEngines.slice(0, 4),
@@ -1571,6 +2092,15 @@ async function callLlmApi(ticker, companyProfile, apiKey, options = {}) {
         ? { glossary: parsed.glossary.slice(0, 5) }
         : {}),
       ...(parsed.moat && typeof parsed.moat === 'object' ? { moat: parsed.moat } : {}),
+      ...(Array.isArray(parsed.qualitativeFlags)
+        ? { qualitativeFlags: parsed.qualitativeFlags.slice(0, 6) }
+        : {}),
+      ...(parsed.customerConcentration && typeof parsed.customerConcentration === 'object'
+        ? { customerConcentration: parsed.customerConcentration }
+        : {}),
+      ...(parsed.governanceAndMoatRisks && typeof parsed.governanceAndMoatRisks === 'object'
+        ? { governanceAndMoatRisks: parsed.governanceAndMoatRisks }
+        : {}),
       ...(parsed._ingestionStatus ? { ingestionStatus: parsed._ingestionStatus } : {}),
       source: 'ai-live',
     },
@@ -1610,6 +2140,9 @@ export async function translateSummaryOnDemand(ticker, summaryObj, targetLang = 
       summaryObj.mermaidDiagram
     );
     const normalizedTerms = normalizeGlossary(summaryObj.glossary || [], 'he');
+    const normalizedHeFlags = normalizeQualitativeFlags(summaryObj.qualitativeFlags, 'he');
+    const normalizedConc = normalizeCustomerConcentration(summaryObj.customerConcentration);
+    const normalizedGov = normalizeGovernanceRisks(summaryObj.governanceAndMoatRisks);
 
     const compactPayload = {
       summary: summaryObj.summary,
@@ -1618,9 +2151,22 @@ export async function translateSummaryOnDemand(ticker, summaryObj, targetLang = 
       competitors: normalizedPeers.map((c) => ({ name: c.name, competeOn: c.competeOn })),
       glossary: normalizedTerms.map((g) => ({ term: g.term, definition: g.definition })),
       moat: summaryObj.moat || null,
+      ...(normalizedHeFlags.length > 0
+        ? {
+            qualitativeFlags: normalizedHeFlags.map((f) => ({
+              id: f.id,
+              title: f.titleHe,
+              rationale: f.rationaleHe,
+            })),
+          }
+        : {}),
+      ...(normalizedConc.detected && normalizedConc.detailHe
+        ? { customerConcentrationDetail: normalizedConc.detailHe }
+        : {}),
+      ...(normalizedGov.summaryHe ? { governanceSummary: normalizedGov.summaryHe } : {}),
     };
 
-    const translatePrompt = `Translate the following structured investment Tear Sheet JSON fields into clear, professional English for value investors. Return ONLY valid JSON with the keys ("summary", "growthEngines", "businessInfographic", "competitors", "glossary", "moat") preserving all 5 moat sources, competitor names, and glossary terms:
+    const translatePrompt = `Translate the following structured investment Tear Sheet JSON fields into clear, professional English for value investors. Return ONLY valid JSON with the keys ("summary", "growthEngines", "businessInfographic", "competitors", "glossary", "moat"${normalizedHeFlags.length > 0 ? ', "qualitativeFlags"' : ''}${normalizedConc.detected && normalizedConc.detailHe ? ', "customerConcentrationDetail"' : ''}${normalizedGov.summaryHe ? ', "governanceSummary"' : ''}) preserving all 5 moat sources, flag ids, competitor names, and glossary terms:
 ${JSON.stringify(compactPayload)}`;
 
     const translated = await provider.generateJSON(translatePrompt, apiKey);
@@ -1697,15 +2243,62 @@ ${JSON.stringify(compactPayload)}`;
           orig.definition,
       }));
 
+      const mergedQualitativeFlags =
+        normalizedHeFlags.length > 0
+          ? normalizedHeFlags.map((orig, idx) => {
+              const tr =
+                (Array.isArray(translated.qualitativeFlags) &&
+                  translated.qualitativeFlags.find((x) => x?.id === orig.id)) ||
+                (Array.isArray(translated.qualitativeFlags)
+                  ? translated.qualitativeFlags[idx]
+                  : null);
+              return {
+                id: orig.id,
+                severity: orig.severity,
+                category: orig.category,
+                titleHe: orig.titleHe,
+                rationaleHe: orig.rationaleHe,
+                titleEn: String(tr?.titleEn || tr?.title || orig.titleEn || orig.titleHe).trim(),
+                rationaleEn: String(
+                  tr?.rationaleEn || tr?.rationale || orig.rationaleEn || orig.rationaleHe
+                ).trim(),
+                quoteEn: orig.quoteEn,
+                sourceRef: orig.sourceRef,
+              };
+            })
+          : undefined;
+
+      const mergedConcentration =
+        normalizedConc.detected && typeof translated.customerConcentrationDetail === 'string'
+          ? {
+              ...normalizedConc,
+              detailEn: translated.customerConcentrationDetail.trim(),
+            }
+          : undefined;
+
+      const mergedGovernance =
+        typeof translated.governanceSummary === 'string' && translated.governanceSummary.trim()
+          ? {
+              ...normalizedGov,
+              summaryEn: translated.governanceSummary.trim(),
+            }
+          : undefined;
+
       const normalizedTranslated = {
         ...translated,
         ...(mergedInfographic ? { businessInfographic: mergedInfographic } : {}),
         ...(mergedCompetitors.length > 0 ? { competitors: mergedCompetitors } : {}),
         ...(mergedGlossary.length > 0 ? { glossary: mergedGlossary } : {}),
         ...(mergedMoat ? { moat: mergedMoat } : {}),
+        ...(mergedQualitativeFlags ? { qualitativeFlags: mergedQualitativeFlags } : {}),
+        ...(mergedConcentration ? { customerConcentration: mergedConcentration } : {}),
+        ...(mergedGovernance ? { governanceAndMoatRisks: mergedGovernance } : {}),
       };
       const updated = {
         ...summaryObj,
+        ...(mergedQualitativeFlags ? { qualitativeFlags: mergedQualitativeFlags } : {}),
+        ...(mergedConcentration ? { customerConcentration: mergedConcentration } : {}),
+        ...(mergedGovernance ? { governanceAndMoatRisks: mergedGovernance } : {}),
         translations: {
           ...(summaryObj.translations || {}),
           [targetLang]: normalizedTranslated,
@@ -1892,9 +2485,11 @@ export async function getOrFetchCompanySummary(ticker, companyProfile = {}, opti
     // Ignore cache lookup error
   }
 
-  if (forceRefresh) {
-    await invalidateCachedSummary(normTicker);
-  } else if (existingCached) {
+  const companyName = companyProfile?.name || companyProfile?.companyName || normTicker;
+
+  // Serve cached summary unless forceRefresh is explicitly requested;
+  // NEVER pre-delete valid cache entries before live LLM upgrade succeeds (#357).
+  if (!forceRefresh && existingCached) {
     return enrichWithTearSheetDefaults(
       {
         ...existingCached,
@@ -1902,7 +2497,7 @@ export async function getOrFetchCompanySummary(ticker, companyProfile = {}, opti
         source: 'cache',
       },
       normTicker,
-      companyProfile?.name || companyProfile?.companyName || normTicker
+      companyName
     );
   }
 
@@ -1931,20 +2526,24 @@ export async function getOrFetchCompanySummary(ticker, companyProfile = {}, opti
     }
   }
 
-  // If budget is exhausted and we had a previously cached summary, restore & serve what we already had
-  if (budgetExhausted && existingCached) {
-    try {
-      await setCachedSummary(normTicker, existingCached);
-    } catch {
-      // Ignore
-    }
-    return {
-      ...existingCached,
-      originalSource: existingCached.originalSource || existingCached.source || 'unknown',
-      source: 'cache',
-      budgetExhausted: true,
-      fallbackError,
-    };
+  // Preserve existing valid cached summary when refresh fails on budget exhaustion or transient upgrade failure
+  const existingOriginalSource = existingCached?.originalSource || existingCached?.source;
+  const hasRealCachedSummary =
+    Boolean(existingCached) &&
+    existingOriginalSource !== 'mock-preset' &&
+    existingOriginalSource !== 'mock-dynamic';
+  if (existingCached && (budgetExhausted || hasRealCachedSummary)) {
+    return enrichWithTearSheetDefaults(
+      {
+        ...existingCached,
+        originalSource: existingOriginalSource || 'unknown',
+        source: 'cache',
+        ...(budgetExhausted ? { budgetExhausted: true } : {}),
+        fallbackError,
+      },
+      normTicker,
+      companyName
+    );
   }
 
   // 3. Fallback: Simulate 1.5s delay to allow Skeleton Loader testing, then return mock
@@ -1962,6 +2561,9 @@ export async function getOrFetchCompanySummary(ticker, companyProfile = {}, opti
 }
 
 export default {
+  AI_SUMMARY_SCHEMA_VERSION,
+  BUSINESS_ARCHETYPES,
+  FINANCIAL_SUBTYPES,
   getOrFetchCompanySummary,
   getCachedSummary,
   setCachedSummary,
@@ -1972,11 +2574,15 @@ export default {
   refreshCompanyContext,
   saveManualTranscript,
   translateSummaryOnDemand,
+  inferArchetypeFromXbrlAndMeta,
   CANONICAL_MOAT_SOURCES,
   normalizeMoat,
   normalizeBusinessInfographic,
   normalizeCompetitors,
   normalizeGlossary,
+  normalizeQualitativeFlags,
+  normalizeCustomerConcentration,
+  normalizeGovernanceRisks,
   resolveTraitDisplay,
   translateMoatRating,
 };
